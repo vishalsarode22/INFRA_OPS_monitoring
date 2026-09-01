@@ -1,0 +1,11 @@
+2026-08-31 07:32:49,430 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: garbage | no rows
+2026-08-31 07:32:49,430 | ERROR    | collectors.sap_process_collector | Skipping parse -- collector reported error: boom
+2026-08-31 07:33:05,955 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
+2026-08-31 07:33:05,955 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
+2026-08-31 08:28:30,111 | ERROR    | collectors.sap_process_collector | sapcontrol produced no usable output. Tried: su -> bash: sapcontrol: command not found | /usr/sap/hostctrl/exe/sapcontrol -> bash: sapcontrol: command not found | /usr/sap/TST/D02/exe/sapcontrol -> bash: sapcontrol: command not found | /usr/sap/TST/DVEBMGS02/exe/sapcontrol -> bash: sapcontrol: command not found
+2026-08-31 08:28:39,454 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
+2026-08-31 08:28:39,454 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
+2026-08-31 10:19:49,576 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
+2026-08-31 10:19:49,577 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
+2026-08-31 10:26:13,771 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
+2026-08-31 10:26:13,771 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?

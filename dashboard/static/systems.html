@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Systems</title>
+<link rel="stylesheet" href="/static/shell.css?v=bf941ec8">
+<style>
+  .paths span{margin-right:4px}
+  .cfg{font-family:var(--mono);font-size:11.5px;color:var(--muted-dim)}
+  .sec{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:18px 0 9px;padding-bottom:5px;
+       border-bottom:1px solid var(--border)}
+  .sec .hint{font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted-dim);
+       font-size:10.5px;margin-left:6px}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px 16px}
+  .fgrid label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700;
+       letter-spacing:.03em;text-transform:uppercase;color:var(--muted-dim)}
+  .fgrid .input{text-transform:none;letter-spacing:0;font-weight:400}
+  .req{color:var(--red)}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Systems</h2>
+      <div class="sub">Registry, collection paths and current state</div></div>
+    <div class="top-actions">
+      <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
+      <input class="input" id="q" placeholder="Filter…">
+      <span id="run-ctl"></span>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="banner banner-warn" style="display:none" id="warn"></div>
+
+    <div class="card">
+      <div class="card-h"><h3>Registered systems</h3>
+        <span class="src src-none" id="count">–</span></div>
+      <div style="overflow-x:auto">
+        <table id="tbl">
+          <tr>
+            <th>System</th><th>SID</th><th>Client</th><th>Host</th>
+            <th>Collection paths</th><th>State</th><th>Metrics</th>
+            <th>Last sweep</th><th></th>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+
+    <div class="card" style="margin-top:16px" id="add-card">
+      <div class="card-h">
+        <h3 id="form-title">Add a system</h3>
+        <button class="btn" id="toggle-add" style="margin-left:auto">Show form</button>
+      </div>
+      <div class="card-b" id="add-body" style="display:none">
+
+        <p style="font-size:12.5px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+          RFC is the important part. It works headless — no SAP GUI host, no OS
+          access — so it is the only path that reports on RISE and hosted
+          systems. A system added without RFC details produces no T-code
+          counters and stays blank on the live wall.
+          Passwords are written to <span class="mono">.env</span>; the registry
+          file itself only stores <span class="mono">${VAR}</span> references.
+        </p>
+
+        <div class="sec">Identity</div>
+        <div class="fgrid">
+          <label>System name <span class="req">*</span>
+            <input class="input" id="f-name" placeholder="BWQ"></label>
+          <label>SAP SID
+            <input class="input" id="f-sid" placeholder="BWQ"></label>
+          <label>Client <span class="req">*</span>
+            <input class="input" id="f-client" placeholder="100"></label>
+          <label>Language
+            <input class="input" id="f-lang" value="EN"></label>
+        </div>
+
+        <div class="sec">RFC — headless collection <span class="hint">strongly recommended</span></div>
+        <div class="fgrid">
+          <label>Application server
+            <input class="input" id="f-rfc-host" placeholder="10.1.0.178"></label>
+          <label>System number
+            <input class="input" id="f-rfc-sysnr" placeholder="00"></label>
+          <label>RFC client
+            <input class="input" id="f-rfc-client" placeholder="defaults to client above"></label>
+          <label>RFC user
+            <input class="input" id="f-rfc-user" placeholder="MONITORING"></label>
+          <label>RFC password
+            <input class="input" id="f-rfc-pass" type="password"></label>
+          <label>SAProuter route
+            <input class="input" id="f-rfc-router"
+                   placeholder="/H/router/H/ — keep the trailing /H/"></label>
+        </div>
+
+        <div class="sec">SAP GUI — screenshots and OCR evidence <span class="hint">optional</span></div>
+        <div class="fgrid">
+          <label style="grid-column:1/-1;flex-direction:row;align-items:center;gap:8px">
+            <input type="checkbox" id="f-gui"> Enable SAP GUI collection
+            <span class="hint">needs a Windows host with SAP GUI and an unlocked desktop</span>
+          </label>
+          <label>Logon Pad connection name
+            <input class="input" id="f-conn" placeholder="exact name, case-sensitive"></label>
+          <label>SAP user
+            <input class="input" id="f-user"></label>
+          <label>SAP password
+            <input class="input" id="f-pass" type="password"></label>
+        </div>
+
+        <div class="sec">OS access over SSH <span class="hint">optional</span></div>
+        <div class="fgrid">
+          <label style="grid-column:1/-1;flex-direction:row;align-items:center;gap:8px">
+            <input type="checkbox" id="f-ssh"> Enable SSH collection
+            <span class="hint">CPU, memory, swap, disk, sapcontrol</span>
+          </label>
+          <label>SSH host <input class="input" id="f-ssh-host"></label>
+          <label>SSH port <input class="input" id="f-ssh-port" value="22"></label>
+          <label>SSH user <input class="input" id="f-ssh-user" value="root"></label>
+          <label>SSH password <input class="input" id="f-ssh-pass" type="password"></label>
+          <label>Instance number <input class="input" id="f-inst" placeholder="00"></label>
+        </div>
+
+        <div class="sec">Alerting <span class="hint">optional — falls back to the global .env settings</span></div>
+        <div class="fgrid">
+          <label>SMTP server
+            <input class="input" id="f-smtp-host" placeholder="inherits .env"></label>
+          <label>SMTP port
+            <input class="input" id="f-smtp-port" placeholder="587"></label>
+          <label>SMTP username
+            <input class="input" id="f-smtp-user" placeholder="inherits .env"></label>
+          <label>SMTP password
+            <input class="input" id="f-smtp-pass" type="password"
+                   placeholder="inherits .env"></label>
+          <label>Sender address
+            <input class="input" id="f-sender" placeholder="alerts@company.com"></label>
+          <label>Recipients <span style="text-transform:none;font-weight:400">(comma separated)</span>
+            <input class="input" id="f-to" placeholder="basis@company.com, oncall@company.com"></label>
+          <label style="grid-column:1/-1">CC recipients
+            <span style="text-transform:none;font-weight:400">— second list, e.g. a customer contact</span>
+            <input class="input" id="f-cc" placeholder="manager@customer.com"></label>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;margin-top:18px">
+          <button class="btn btn-primary" id="f-save">Save and monitor now</button>
+          <button class="btn" id="f-clear" style="display:none">Cancel edit</button>
+          <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="f-run" checked> run monitoring immediately
+          </label>
+        </div>
+        <div id="f-msg" style="margin-top:12px;font-size:12.5px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-h"><h3>How collection works</h3></div>
+      <div class="card-b" style="font-size:12.5px;line-height:1.7;color:var(--muted)">
+        Systems are defined in <span class="mono">config/systems.yaml</span>. Each may use
+        any combination of three independent collection paths:
+        <ul style="margin:9px 0 9px 18px">
+          <li><span class="src src-rfc">RFC</span> headless; the only path that works on
+              RISE and hosted systems where there is no GUI host and no OS access</li>
+          <li><span class="src src-ssh">SSH</span> CPU, memory, swap, disk and sapcontrol
+              process state, read on the host itself</li>
+          <li><span class="src src-gui">SAP GUI</span> screenshots and OCR evidence; needs a
+              Windows machine with SAP GUI and a live desktop session</li>
+        </ul>
+        Passwords belong in <span class="mono">.env</span> and are referenced from the YAML
+        as <span class="mono">${VAR}</span>, so the registry itself holds no secrets.
+        See <span class="mono">config/systems.yaml.example</span>.
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=69f382d5"></script>
+<script>
+/* Every page here depends on shell.js for the sidebar, theme and helpers.
+   If it fails to load the page renders bare with only a console error, which
+   looks like the app is broken rather than one asset being missing. Say so
+   on screen instead. */
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
+    '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
+    '<p style="color:#666;line-height:1.6">This page needs ' +
+    '<code>/static/shell.js?v=69f382d5</code> and <code>/static/shell.css?v=bf941ec8</code>. ' +
+    'They are missing or the static mount is not serving them.</p>' +
+    '<p style="color:#666;line-height:1.6">Check that ' +
+    '<code>dashboard/static/shell.js?v=69f382d5</code> exists, then restart the server. ' +
+    'If you are seeing this inside a preview pane rather than at ' +
+    '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
+    'behind a preview.</p></div>';
+}
+</script>
+<script>
+IB.mountShell("systems");
+IB.mountSchedulerControl("sched-ctl");
+IB.mountRunControl("run-ctl");
+IB.themeToggle(document.getElementById("theme"));
+let DATA = [];
+
+function row(s) {
+  const paths = (s.paths || []).map(p =>
+    `<span class="src src-${p.toLowerCase()}">${p}</span>`).join("") ||
+    '<span class="src src-none">none</span>';
+  return `<tr>
+    <td><b>${IB.esc(s.name)}</b></td>
+    <td class="mono">${IB.esc(s.sid || "—")}</td>
+    <td class="mono">${IB.esc(s.client || "—")}</td>
+    <td class="cfg">${IB.esc(s.host || "—")}</td>
+    <td class="paths">${paths}</td>
+    <td><span class="chip ${IB.statusClass(s.status)}">${IB.esc(s.status)}</span></td>
+    <td class="mono">${s.metric_count || 0}</td>
+    <td class="cfg">${IB.esc(s.last_scan || "never")}</td>
+    <td style="white-space:nowrap">
+      <a class="btn" href="/system?name=${encodeURIComponent(s.name)}">Open</a>
+      <button class="btn" onclick="editSystem('${IB.esc(s.name)}')">Edit</button>
+    </td>
+  </tr>`;
+}
+
+function render() {
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  const rows = DATA.filter(s => !q ||
+    [s.name, s.sid, s.host, s.client].join(" ").toLowerCase().includes(q));
+  const tbl = document.getElementById("tbl");
+  tbl.innerHTML = tbl.rows[0].outerHTML + rows.map(row).join("");
+  document.getElementById("count").textContent = `${rows.length} of ${DATA.length}`;
+
+  // A system configured for a path that produced nothing is worth naming:
+  // it means a collector failed, not that the system is quiet.
+  const blind = DATA.filter(s => s.metric_count === 0);
+  const w = document.getElementById("warn");
+  if (blind.length) {
+    w.style.display = "block";
+    w.innerHTML = `<strong>${blind.length} system(s) returned no metrics:</strong>
+      ${blind.map(s => IB.esc(s.name)).join(", ")} — their state is unknown, not healthy.`;
+  } else { w.style.display = "none"; }
+}
+
+document.getElementById("q").oninput = render;
+
+/* The Run/Stop button is provided by the shell (IB.mountRunControl), so the
+   page-local handler was removed -- it referenced an element that no longer
+   exists and threw on load. poll() is kept: the Add System form uses it. */
+async function poll() {
+  try {
+    const s = await IB.get("/api/run-status");
+    if (s.running) return setTimeout(poll, 2000);
+  } catch (e) {}
+  load();
+}
+
+async function load() {
+  const d = await IB.get("/api/overview");
+  DATA = d.systems;
+  IB.updatePathCounts(DATA);
+  render();
+}
+load();
+
+/* ---- Add system ------------------------------------------------------- */
+document.getElementById("toggle-add").onclick = () => {
+  const b = document.getElementById("add-body");
+  const open = b.style.display !== "none";
+  b.style.display = open ? "none" : "block";
+  document.getElementById("toggle-add").textContent = open ? "Show form" : "Hide form";
+};
+
+const v = id => document.getElementById(id).value.trim();
+const chk = id => document.getElementById(id).checked;
+
+/* Editing an existing system reuses the same form. Passwords are never sent
+   back to the browser, so their fields stay blank and blank means "keep the
+   stored one" -- otherwise changing a router string would require re-typing
+   every password. */
+let EDITING = null;
+
+function setForm(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value ?? "";
+}
+
+async function editSystem(name) {
+  try {
+    const c = await IB.get("/api/systems/" + encodeURIComponent(name) + "/config");
+    EDITING = name;
+
+    document.getElementById("add-body").style.display = "block";
+    document.getElementById("toggle-add").textContent = "Hide form";
+    document.getElementById("form-title").textContent = "Edit " + name;
+    document.getElementById("f-clear").style.display = "inline-block";
+
+    setForm("f-name", c.name);      setForm("f-sid", c.sap_system_id);
+    setForm("f-client", c.client);  setForm("f-lang", c.language);
+
+    setForm("f-rfc-host", c.rfc_ashost);   setForm("f-rfc-sysnr", c.rfc_sysnr);
+    setForm("f-rfc-client", c.rfc_client); setForm("f-rfc-user", c.rfc_username);
+    setForm("f-rfc-router", c.rfc_saprouter);
+    setForm("f-rfc-pass", "");
+
+    document.getElementById("f-gui").checked = c.has_gui_access;
+    setForm("f-conn", c.connection_name);  setForm("f-user", c.username);
+    setForm("f-pass", "");
+
+    document.getElementById("f-ssh").checked = c.has_os_access;
+    setForm("f-ssh-host", c.ssh_host);  setForm("f-ssh-port", c.ssh_port);
+    setForm("f-ssh-user", c.ssh_username); setForm("f-ssh-pass", "");
+    setForm("f-inst", c.sap_instance_nr);
+
+    setForm("f-smtp-host", c.smtp_host); setForm("f-smtp-port", c.smtp_port);
+    setForm("f-smtp-user", c.smtp_username); setForm("f-smtp-pass", "");
+    setForm("f-sender", c.sender_email);
+    setForm("f-to", c.alert_receivers); setForm("f-cc", c.alert_receivers_cc);
+
+    const kept = [
+      c.has_rfc_password && "RFC", c.has_password && "SAP GUI",
+      c.has_ssh_password && "SSH", c.has_smtp_password && "SMTP",
+    ].filter(Boolean);
+    document.getElementById("f-msg").innerHTML = kept.length
+      ? `<span style="color:var(--muted)">Leave a password blank to keep the stored one
+         (${IB.esc(kept.join(", "))}).</span>` : "";
+
+    document.getElementById("add-card").scrollIntoView({ behavior: "smooth" });
+  } catch (e) {
+    alert("Could not load " + name + ": " + e.message);
+  }
+}
+
+document.getElementById("f-clear").onclick = () => {
+  EDITING = null;
+  document.getElementById("form-title").textContent = "Add a system";
+  document.getElementById("f-clear").style.display = "none";
+  document.getElementById("f-msg").innerHTML = "";
+  ["f-name","f-sid","f-client","f-rfc-host","f-rfc-sysnr","f-rfc-client","f-rfc-user",
+   "f-rfc-pass","f-rfc-router","f-conn","f-user","f-pass","f-ssh-host","f-ssh-user",
+   "f-ssh-pass","f-inst","f-smtp-host","f-smtp-port","f-smtp-user","f-smtp-pass",
+   "f-sender","f-to","f-cc"].forEach(id => setForm(id, ""));
+  setForm("f-lang", "EN"); setForm("f-ssh-port", "22");
+};
+
+document.getElementById("f-save").onclick = async () => {
+  const msg = document.getElementById("f-msg");
+  if (!v("f-name") || !v("f-client")) {
+    msg.innerHTML = `<span style="color:var(--red)">System name and client are required.</span>`;
+    return;
+  }
+
+  const body = {
+    name: v("f-name"), client: v("f-client"), language: v("f-lang") || "EN",
+    sap_system_id: v("f-sid"),
+    has_gui_access: chk("f-gui"),
+    connection_name: v("f-conn"), username: v("f-user"), password: v("f-pass"),
+    has_os_access: chk("f-ssh"),
+    ssh_host: v("f-ssh-host"), ssh_port: Number(v("f-ssh-port") || 22),
+    ssh_username: v("f-ssh-user"), ssh_password: v("f-ssh-pass"),
+    sap_instance_nr: v("f-inst"),
+    rfc_ashost: v("f-rfc-host"), rfc_sysnr: v("f-rfc-sysnr"),
+    rfc_client: v("f-rfc-client"), rfc_username: v("f-rfc-user"),
+    rfc_password: v("f-rfc-pass"), rfc_saprouter: v("f-rfc-router"),
+    smtp_host: v("f-smtp-host"), smtp_port: v("f-smtp-port"),
+    smtp_username: v("f-smtp-user"), smtp_password: v("f-smtp-pass"),
+    sender_email: v("f-sender"),
+    alert_receivers: v("f-to"), alert_receivers_cc: v("f-cc"),
+    monitor_now: chk("f-run"),
+  };
+
+  const btn = document.getElementById("f-save");
+  btn.disabled = true; btn.textContent = "Saving…";
+  try {
+    const r = await fetch("/api/systems", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "save failed");
+
+    const warn = (d.warnings || []).map(w =>
+      `<div style="color:var(--amber);margin-top:6px">${IB.esc(w)}</div>`).join("");
+    msg.innerHTML =
+      `<span style="color:var(--green);font-weight:700">` +
+      (EDITING ? "Updated." : "Saved.") + `</span> ` +
+      (d.monitoring_started
+        ? "Monitoring started — the row below will fill when it finishes."
+        : "Monitoring not started (a run is already in progress).") + warn;
+
+    if (d.monitoring_started) poll(); else load();
+  } catch (e) {
+    msg.innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`;
+  }
+  btn.disabled = false; btn.textContent = "Save and monitor now";
+};
+</script>
+</body>
+</html>

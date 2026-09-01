@@ -1,0 +1,72 @@
+# System registry.
+#
+# Every system may declare up to THREE independent collection paths. They are
+# additive: a system can use any combination, and each is optional.
+#
+#   has_gui_access : SAP GUI scripting + OCR. Needs a Windows host with SAP
+#                    GUI installed and a foreground session.
+#   has_os_access  : SSH to the application server. Gives CPU, memory, swap,
+#                    disk, load average and sapcontrol process status.
+#   rfc            : pyrfc to the application server. Headless, works on any
+#                    OS, and is the ONLY path that works on RISE and hosted
+#                    systems where neither GUI host nor OS access exists.
+#
+# Never put a password here directly. Use ${VAR} and keep the value in .env,
+# which is gitignored. Placeholders resolve inside the rfc block too.
+
+systems:
+  # Full access: all three collectors.
+  - name: TST
+    sap_system_id: TST
+    client: "000"
+    language: EN
+
+    connection_name: ${TST_SAP_CONNECTION_NAME}
+    username: ${TST_SAP_USERNAME}
+    password: ${TST_SAP_PASSWORD}
+    has_gui_access: true
+
+    has_os_access: true
+    ssh_host: ${TST_SSH_HOST}
+    ssh_port: 22
+    ssh_username: ${TST_SSH_USERNAME}
+    ssh_password: ${TST_SSH_PASSWORD}
+    sap_instance_nr: "02"
+
+    rfc:
+      ashost: ${TST_RFC_HOST}
+      sysnr: "02"
+      client: "000"
+      username: ${TST_RFC_USER}        # a dedicated service account, not DDIC
+      password: ${TST_RFC_PASSWORD}
+      language: EN
+
+  # Behind a SAProuter, no OS access. RFC only.
+  - name: FUJI_QAS
+    sap_system_id: CEQ
+    client: "000"
+    language: EN
+    has_gui_access: false
+    has_os_access: false
+
+    rfc:
+      ashost: ${CEQ_RFC_HOST}
+      sysnr: "00"
+      client: "000"
+      username: ${CEQ_RFC_USER}
+      password: ${CEQ_RFC_PASSWORD}
+      # Pass the route EXACTLY as SAP gives it, including the trailing "/H/".
+      # That trailing segment is what the RFC library appends the target host
+      # to; removing it produces "NiPGetHostByName: H/<target> not found".
+      # A route may also carry a router password as /W/<secret>/.
+      saprouter: ${CEQ_SAPROUTER}
+
+  # GUI-only system (no service account, no OS access).
+  - name: CENTOR_QAS
+    client: "100"
+    language: EN
+    connection_name: ${QAS_SAP_CONNECTION_NAME}
+    username: ${QAS_SAP_USERNAME}
+    password: ${QAS_SAP_PASSWORD}
+    has_gui_access: true
+    has_os_access: false

@@ -1,0 +1,25 @@
+{
+  "system": "TST",
+  "events": [
+    {
+      "event_id": "EVT-F78BFA9BB2",
+      "system": "TST",
+      "client": "000",
+      "metric_name": "disk_/",
+      "severity": "WARNING",
+      "status": "ACTIVE",
+      "first_seen": "2026-08-28T10:56:59.621458",
+      "last_seen": "2026-09-01T14:42:38.388856",
+      "occurrences": 2,
+      "current_value": 86.0,
+      "display_value": "86.0%",
+      "threshold_warning": 80,
+      "threshold_critical": 90,
+      "source": "linux_collector",
+      "tcode": null,
+      "detail": "mount=/",
+      "resolved_at": null,
+      "duration_seconds": 359138.767398
+    }
+  ]
+}

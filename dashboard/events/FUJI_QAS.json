@@ -1,0 +1,45 @@
+{
+  "system": "FUJI_QAS",
+  "events": [
+    {
+      "event_id": "EVT-0A232AA7AC",
+      "system": "FUJI_QAS",
+      "client": "000",
+      "metric_name": "sap.st22.dump_count",
+      "severity": "WARNING",
+      "status": "RESOLVED",
+      "first_seen": "2026-08-19T18:19:01.330420",
+      "last_seen": "2026-08-21T14:27:09.932247",
+      "occurrences": 3,
+      "current_value": 0.0,
+      "display_value": "0 count",
+      "threshold_warning": 1,
+      "threshold_critical": 10,
+      "source": "sap_gui_collector",
+      "tcode": "ST22",
+      "detail": "Extracted from ST22; evidence metric 'dump_count'.",
+      "resolved_at": "2026-08-21T14:27:09.932247",
+      "duration_seconds": 158888.601827
+    },
+    {
+      "event_id": "EVT-6F1D3EA994",
+      "system": "FUJI_QAS",
+      "client": "000",
+      "metric_name": "sap.st03n.dialog_response_time",
+      "severity": "CRITICAL",
+      "status": "ACTIVE",
+      "first_seen": "2026-08-20T16:13:38.165928",
+      "last_seen": "2026-08-21T14:27:09.932247",
+      "occurrences": 2,
+      "current_value": 8726.0,
+      "display_value": "8726 ms",
+      "threshold_warning": 500,
+      "threshold_critical": 1000,
+      "source": "sap_gui_collector",
+      "tcode": "ST03N",
+      "detail": "Extracted from ST03N; evidence metric 'dialog_avg_response_time_ms'.",
+      "resolved_at": null,
+      "duration_seconds": 80011.766319
+    }
+  ]
+}

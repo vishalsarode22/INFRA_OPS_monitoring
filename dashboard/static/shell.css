@@ -1,0 +1,174 @@
+/* =========================================================================
+   InfraBeatOps — shared application shell.
+
+   One stylesheet for every page so the sidebar, header, cards and status
+   colours cannot drift apart. Pages add only their own layout.
+
+   Palette is InfraBeat brand. Dark is the default because this runs on a
+   wall display; light is available via html[data-theme="light"].
+
+   Status colours are deliberately NOT brand colours: if the alert red
+   matches the logo red, operators stop reading it as an alarm.
+   ========================================================================= */
+
+:root {
+  --brand:#0066B3; --brand-hover:#0078D4; --brand-live:#00A8E8;
+  --automation:#A855F7;
+
+  --bg:#08111C; --sidebar:#06101A; --card:#0D1B2A; --card-hover:#12283D;
+  --border:#1B3449;
+  --text:#F5F9FC; --muted:#A8B8C7; --muted-dim:#6F8293;
+
+  --green:#22C55E; --green-bg:rgba(34,197,94,.12);  --green-br:rgba(34,197,94,.30);
+  --amber:#F59E0B; --amber-bg:rgba(245,158,11,.12); --amber-br:rgba(245,158,11,.30);
+  --red:#EF4444;   --red-bg:rgba(239,68,68,.12);    --red-br:rgba(239,68,68,.30);
+  --info:#38BDF8;  --info-bg:rgba(56,189,248,.12);  --info-br:rgba(56,189,248,.30);
+  --gray:#6F8293;  --gray-bg:rgba(111,130,147,.12); --gray-br:#1B3449;
+
+  --radius:10px;
+  --shadow:0 2px 10px rgba(0,0,0,.30);
+  --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  --sans:'Inter',-apple-system,'Segoe UI',sans-serif;
+}
+
+html[data-theme="light"] {
+  --bg:#F4F7FA; --sidebar:#FFFFFF; --card:#FFFFFF; --card-hover:#F7FAFC;
+  --border:#D9E2EA;
+  --text:#102A43; --muted:#526579; --muted-dim:#7A8CA0;
+  --brand-live:#008CC9; --automation:#7E22CE;
+  /* Darkened for contrast on white: the dark-theme greens and ambers fail
+     WCAG AA against a light surface. */
+  --green:#15803D; --green-bg:#ECFDF3; --green-br:#ABEFC6;
+  --amber:#B45309; --amber-bg:#FFFAEB; --amber-br:#FEDF89;
+  --red:#B91C1C;   --red-bg:#FEF3F2;   --red-br:#FECDCA;
+  --info:#0369A1;  --info-bg:#EFF8FF;  --info-br:#B2DDFF;
+  --gray:#526579;  --gray-bg:#F2F4F7;  --gray-br:#E4E7EC;
+  --shadow:0 1px 2px rgba(16,42,67,.06);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;
+     display:flex;min-height:100vh}
+a{color:inherit;text-decoration:none}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px}
+
+/* ---------- sidebar ---------- */
+.sidebar{width:228px;background:var(--sidebar);border-right:1px solid var(--border);
+         display:flex;flex-direction:column;position:sticky;top:0;height:100vh;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:10px;padding:18px 18px 20px}
+.brand .logo{width:32px;height:32px;border-radius:8px;flex-shrink:0;
+     background:linear-gradient(135deg,var(--brand),var(--brand-hover));
+     display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px}
+.brand h1{font-size:15px;font-weight:800;letter-spacing:-.01em}
+.brand small{display:block;font-size:9.5px;color:var(--muted-dim);font-weight:600;
+     letter-spacing:.05em;text-transform:uppercase}
+nav{padding:0 10px;flex:1;overflow-y:auto}
+.nav-sec{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+     color:var(--muted-dim);padding:12px 11px 5px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;
+     color:var(--muted);font-weight:600;font-size:13px;margin-bottom:2px;cursor:pointer}
+.nav-item:hover{background:var(--card-hover);color:var(--text)}
+.nav-item.active{background:rgba(0,102,179,.14);color:var(--brand-live)}
+.nav-item .ico{width:15px;text-align:center;font-size:12.5px;opacity:.85}
+.nav-item .badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;
+     font-weight:700;padding:1px 6px;border-radius:9px}
+.nav-item.soon{opacity:.4;cursor:default}
+.nav-item.soon:hover{background:none;color:var(--muted)}
+
+.side-foot{margin:10px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);
+     background:var(--card)}
+.side-foot .t{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+     color:var(--muted-dim);margin-bottom:8px}
+.side-foot .row{display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0}
+.side-foot .row span:last-child{font-family:var(--mono);font-weight:700}
+
+/* ---------- main ---------- */
+main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:14px;padding:13px 22px;background:var(--card);
+     border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+.topbar h2{font-size:16px;font-weight:800}
+.topbar .sub{font-size:11.5px;color:var(--muted-dim)}
+.crumb{font-size:11.5px;color:var(--muted-dim)}
+.crumb a:hover{color:var(--brand-live)}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.content{padding:20px 22px 40px}
+
+.btn{padding:7px 13px;border:1px solid var(--border);background:var(--card);color:var(--text);
+     border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;font-family:inherit}
+.btn:hover{background:var(--card-hover)}
+.btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn-primary:hover{background:var(--brand-hover)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.input{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);
+     color:var(--text);font-size:12.5px;font-family:inherit}
+.input:focus{outline:2px solid var(--brand-live);outline-offset:1px;border-color:transparent}
+
+/* ---------- status ---------- */
+.chip{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+     padding:3px 8px;border-radius:20px;white-space:nowrap;display:inline-block}
+.c-normal,.c-healthy{background:var(--green-bg);color:var(--green);border:1px solid var(--green-br)}
+.c-warning{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-br)}
+.c-critical{background:var(--red-bg);color:var(--red);border:1px solid var(--red-br)}
+.c-unknown{background:var(--gray-bg);color:var(--gray);border:1px solid var(--gray-br)}
+.c-live{background:var(--info-bg);color:var(--info);border:1px solid var(--info-br)}
+
+/* Provenance. An operator must be able to see WHERE a number came from:
+   "SAP is unhealthy" and "our collector failed" are different statements. */
+.src{font-size:9px;font-weight:700;letter-spacing:.04em;padding:1px 5px;border-radius:4px;
+     text-transform:uppercase;white-space:nowrap}
+.src-rfc{color:var(--brand-live);background:rgba(0,168,232,.12);border:1px solid rgba(0,168,232,.28)}
+.src-ssh{color:var(--green);background:var(--green-bg);border:1px solid var(--green-br)}
+.src-gui{color:var(--automation);background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.28)}
+.src-stale{color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber-br)}
+.src-none{color:var(--muted-dim);background:var(--gray-bg);border:1px solid var(--gray-br)}
+
+/* UNKNOWN is hatched so "could not read" never looks like a pass. */
+.unknown-fill{background-image:repeating-linear-gradient(135deg,transparent 0 8px,
+     rgba(111,130,147,.06) 8px 16px)}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+     box-shadow:var(--shadow)}
+.card-h{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;
+     align-items:center;gap:10px}
+.card-h h3{font-size:13.5px;font-weight:800;flex:1}
+.card-b{padding:15px 16px}
+
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.kpi .lbl{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+     color:var(--muted-dim);margin-bottom:6px}
+.kpi .num{font-size:26px;font-weight:800;line-height:1;font-family:var(--mono)}
+.kpi .sub{font-size:10.5px;color:var(--muted-dim);margin-top:4px}
+.n-green{color:var(--green)} .n-amber{color:var(--amber)}
+.n-red{color:var(--red)} .n-gray{color:var(--gray)} .n-info{color:var(--info)}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+   color:var(--muted-dim);padding:9px 12px;border-bottom:1px solid var(--border);
+   background:var(--bg);position:sticky;top:0}
+td{padding:9px 12px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--card-hover)}
+td.mono,.mono{font-family:var(--mono)}
+
+.bar{height:6px;border-radius:3px;background:var(--gray-bg);overflow:hidden;margin-top:5px}
+.bar i{display:block;height:100%;border-radius:3px;background:var(--brand-live)}
+.bar i.w{background:var(--amber)} .bar i.c{background:var(--red)}
+
+.empty{padding:36px;text-align:center;color:var(--muted-dim)}
+.banner{padding:11px 14px;border-radius:var(--radius);margin-bottom:15px;font-size:12.5px}
+.banner-warn{background:var(--amber-bg);border:1px solid var(--amber-br);color:var(--amber)}
+.banner-err{background:var(--red-bg);border:1px solid var(--red-br);color:var(--red)}
+
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;
+       animation:p 2s ease-in-out infinite}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.35}}
+
+@media (max-width:900px){.sidebar{display:none}.content{padding:14px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media print{.sidebar,.topbar,.btn{display:none!important}body{background:#fff}}

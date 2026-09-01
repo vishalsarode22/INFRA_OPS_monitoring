@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Scheduler</title>
+<link rel="stylesheet" href="/static/shell.css?v=bf941ec8">
+<style>
+  .srow{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+        margin-bottom:13px;overflow:hidden}
+  .srow.off{opacity:.62}
+  .sh{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid var(--border)}
+  .sh h3{font-size:15px;font-weight:800}
+  .sh .sid{font-family:var(--mono);font-size:11px;color:var(--muted-dim)}
+  .sh .right{margin-left:auto;display:flex;align-items:center;gap:9px}
+  .sb{padding:14px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+      gap:13px 16px;align-items:end}
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld label{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+      color:var(--muted-dim)}
+  select.input,input.input{width:100%}
+  .days{display:flex;gap:4px;flex-wrap:wrap}
+  .day{padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:10.5px;
+       font-weight:700;cursor:pointer;background:var(--bg);color:var(--muted-dim);user-select:none}
+  .day.on{background:rgba(0,102,179,.16);border-color:var(--brand-live);color:var(--brand-live)}
+  .meta{padding:9px 16px;border-top:1px solid var(--border);display:flex;gap:18px;
+        font-size:11px;font-family:var(--mono);color:var(--muted-dim);flex-wrap:wrap}
+  .meta b{color:var(--text);font-weight:700}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Scheduler</h2>
+      <div class="sub">Per-system monitoring cadence</div></div>
+    <div class="top-actions">
+      <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
+      <span id="run-ctl"></span>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="banner" style="background:var(--info-bg);border:1px solid var(--info-br);
+         color:var(--text);margin-bottom:16px">
+      A sweep drives SAP GUI and takes over the desktop for several minutes, so only one
+      system runs at a time. Systems are checked every 20 seconds and run when due.
+      The <b>Pause auto</b> button above stops the next cycle without aborting one already
+      in progress — and resets on restart, unlike these schedules which persist.
+    </div>
+
+    <div id="list"><div class="empty">Loading…</div></div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=69f382d5"></script>
+<script>
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
+    '<h2>Shared assets did not load</h2><p style="color:#666">This page needs ' +
+    '<code>/static/shell.js?v=69f382d5</code>. If you are seeing this in a preview pane rather ' +
+    'than at <code>127.0.0.1:8000</code>, that is expected.</p></div>';
+}
+</script>
+<script>
+IB.mountShell("scheduler");
+IB.mountSchedulerControl("sched-ctl");
+IB.mountRunControl("run-ctl");
+IB.themeToggle(document.getElementById("theme"));
+
+const DAYS = ["mon","tue","wed","thu","fri","sat","sun"];
+let DATA = [];
+
+function row(s) {
+  const c = s.schedule;
+  const id = s.system.replace(/[^A-Za-z0-9]/g, "_");
+  return `<div class="srow ${c.enabled ? "" : "off"}" id="row-${id}">
+    <div class="sh">
+      <div>
+        <h3>${IB.esc(s.system)}</h3>
+        <div class="sid">${IB.esc(s.sid)}</div>
+      </div>
+      <div class="right">
+        <span class="chip ${c.enabled ? "c-normal" : "c-unknown"}"
+              id="desc-${id}">${IB.esc(s.description)}</span>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;
+               color:var(--muted);cursor:pointer">
+          <input type="checkbox" id="en-${id}" ${c.enabled ? "checked" : ""}> enabled
+        </label>
+      </div>
+    </div>
+
+    <div class="sb">
+      <div class="fld">
+        <label>Mode</label>
+        <select class="input" id="mode-${id}">
+          <option value="minutes" ${c.mode === "minutes" ? "selected" : ""}>Every N minutes</option>
+          <option value="hours"   ${c.mode === "hours"   ? "selected" : ""}>Every N hours</option>
+          <option value="daily"   ${c.mode === "daily"   ? "selected" : ""}>Daily at a time</option>
+        </select>
+      </div>
+
+      <div class="fld" id="every-wrap-${id}">
+        <label>Interval</label>
+        <input class="input" type="number" min="1" id="every-${id}" value="${c.every}">
+      </div>
+
+      <div class="fld hide" id="at-wrap-${id}">
+        <label>Run at</label>
+        <input class="input" type="time" id="at-${id}" value="${IB.esc(c.at)}">
+      </div>
+
+      <div class="fld hide" style="grid-column:span 2" id="days-wrap-${id}">
+        <label>Days</label>
+        <div class="days" id="days-${id}">
+          ${DAYS.map(d => `<span class="day ${c.days.includes(d) ? "on" : ""}"
+              data-day="${d}">${d.toUpperCase()}</span>`).join("")}
+        </div>
+      </div>
+
+      <div class="fld">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary" id="save-${id}">Save</button>
+      </div>
+    </div>
+
+    <div class="meta">
+      <span>last run <b>${IB.esc(s.last_run || "never")}</b></span>
+      <span>next run <b id="next-${id}">${IB.esc(s.next_run || "—")}</b></span>
+      <span id="msg-${id}"></span>
+    </div>
+  </div>`;
+}
+
+function wire(s) {
+  const id = s.system.replace(/[^A-Za-z0-9]/g, "_");
+  const $ = x => document.getElementById(x + "-" + id);
+
+  function applyMode() {
+    const daily = $("mode").value === "daily";
+    $("every-wrap").classList.toggle("hide", daily);
+    $("at-wrap").classList.toggle("hide", !daily);
+    $("days-wrap").classList.toggle("hide", !daily);
+  }
+  $("mode").onchange = applyMode;
+  applyMode();
+
+  $("days").querySelectorAll(".day").forEach(el => {
+    el.onclick = () => el.classList.toggle("on");
+  });
+
+  $("save").onclick = async () => {
+    const days = [...$("days").querySelectorAll(".day.on")].map(e => e.dataset.day);
+    const body = {
+      enabled: $("en").checked,
+      mode: $("mode").value,
+      every: Number($("every").value || 1),
+      at: $("at").value || "08:00",
+      days: days.length ? days : DAYS,
+    };
+    const btn = $("save");
+    btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      const r = await fetch("/api/schedules/" + encodeURIComponent(s.system), {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || "save failed");
+      document.getElementById("desc-" + id).textContent = d.description;
+      $("next").textContent = d.next_run || "—";
+      $("msg").innerHTML = `<span style="color:var(--green)">saved</span>`;
+      document.getElementById("row-" + id).classList.toggle("off", !d.schedule.enabled);
+      setTimeout(() => { $("msg").innerHTML = ""; }, 2500);
+    } catch (e) {
+      $("msg").innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`;
+    }
+    btn.disabled = false; btn.textContent = "Save";
+  };
+}
+
+async function load() {
+  try {
+    const d = await IB.get("/api/schedules");
+    DATA = d.systems;
+    document.getElementById("list").innerHTML =
+      DATA.length ? DATA.map(row).join("")
+                  : '<div class="empty">No systems configured.</div>';
+    DATA.forEach(wire);
+  } catch (e) {
+    document.getElementById("list").innerHTML =
+      `<div class="banner banner-err">Could not load schedules — ${IB.esc(e.message)}</div>`;
+  }
+}
+load();
+</script>
+</body>
+</html>

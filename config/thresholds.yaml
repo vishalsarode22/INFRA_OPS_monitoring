@@ -1,0 +1,76 @@
+cpu:
+  warning: 80
+  critical: 90
+
+memory:
+  warning: 80
+  critical: 90
+
+swap:
+  warning: 20
+  critical: 40
+
+disk:
+  warning: 80
+  critical: 90
+
+load_1m:
+  warning: 4
+  critical: 8
+
+# ============================================================
+# SAP GUI / T-code monitoring thresholds
+# ============================================================
+
+# SMLG instance response time
+# Healthy  : < 1000 ms
+# Warning  : 1000 - 2500 ms
+# Critical : > 2500 ms
+sap.smlg.response_time:
+  warning: 1000
+  critical: 2500
+
+# ST22 ABAP runtime errors / short dumps per day
+# Healthy  : 0
+# Warning  : 1 - 5
+# Critical : > 5
+sap.st22.dump_count:
+  warning: 1
+  critical: 5
+
+# SM12 active enqueue locks
+# Healthy  : < 50
+# Warning  : 50 - 150
+# Critical : > 150
+sap.sm12.lock_count:
+  warning: 50
+  critical: 150
+
+# SM50 / SM51 active Dialog + Background work-process utilization
+# Healthy  : < 70%
+# Warning  : 70 - 90%
+# Critical : > 90%
+sap.sm50.wp_utilization:
+  warning: 70
+  critical: 90
+
+# Existing SAP GUI metrics
+sap.sm13.failed_updates:
+  warning: 1
+  critical: 10
+
+sap.sm37.cancelled_jobs:
+  warning: 5
+  critical: 20
+
+sap.smq1.entries:
+  warning: 10
+  critical: 50
+
+sap.smq2.entries:
+  warning: 10
+  critical: 50
+
+sap.sost.errors:
+  warning: 1
+  critical: 10

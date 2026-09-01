@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "system": "CENTOR_QAS",
+  "samples": {
+    "sap.sm13.failed_updates": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ],
+    "sap.sm37.active_jobs": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ],
+    "sap.sm66.running_processes": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 1.0
+      }
+    ],
+    "sap.smq1.entries": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ],
+    "sap.smq1.queues": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ],
+    "sap.smq2.entries": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ],
+    "sap.smq2.queues": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ],
+    "sap.sost.send_requests": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ],
+    "sap.sost.waiting": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ],
+    "sap.sost.sent": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ],
+    "sap.sost.errors": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ],
+    "sap.sp01.spool_count": [
+      {
+        "timestamp": "2026-08-28T10:57:59.865781",
+        "value": 0.0
+      }
+    ]
+  }
+}

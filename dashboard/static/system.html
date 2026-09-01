@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · System detail</title>
+<link rel="stylesheet" href="/static/shell.css?v=bf941ec8">
+<style>
+  .tabs{display:flex;gap:5px;border-bottom:1px solid var(--border);margin-bottom:16px}
+  .tab{padding:9px 15px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted);
+       border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab:hover{color:var(--text)}
+  .tab.on{color:var(--brand-live);border-bottom-color:var(--brand-live)}
+  .pane{display:none} .pane.on{display:block}
+  .mtable td:first-child{font-family:var(--mono);font-size:11.5px}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div>
+      <div class="crumb"><a href="/overview">Overview</a> › <span id="crumb">system</span></div>
+      <h2 id="title">…</h2>
+    </div>
+    <div class="top-actions">
+      <span id="livechip"></span>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="tabs">
+      <div class="tab on" data-p="live">Live (RFC)</div>
+      <div class="tab" data-p="metrics">All metrics</div>
+      <div class="tab" data-p="report">Health report</div>
+    </div>
+
+    <div class="pane on" id="p-live"><div class="empty">Reading…</div></div>
+    <div class="pane" id="p-metrics"><div class="empty">Loading…</div></div>
+    <div class="pane" id="p-report"><div class="empty">Loading…</div></div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=69f382d5"></script>
+<script>
+/* Every page here depends on shell.js for the sidebar, theme and helpers.
+   If it fails to load the page renders bare with only a console error, which
+   looks like the app is broken rather than one asset being missing. Say so
+   on screen instead. */
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
+    '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
+    '<p style="color:#666;line-height:1.6">This page needs ' +
+    '<code>/static/shell.js?v=69f382d5</code> and <code>/static/shell.css?v=bf941ec8</code>. ' +
+    'They are missing or the static mount is not serving them.</p>' +
+    '<p style="color:#666;line-height:1.6">Check that ' +
+    '<code>dashboard/static/shell.js?v=69f382d5</code> exists, then restart the server. ' +
+    'If you are seeing this inside a preview pane rather than at ' +
+    '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
+    'behind a preview.</p></div>';
+}
+</script>
+<script>
+IB.mountShell("systems");
+IB.themeToggle(document.getElementById("theme"));
+const NAME = new URLSearchParams(location.search).get("name") || "";
+document.getElementById("title").textContent = NAME;
+document.getElementById("crumb").textContent = NAME;
+
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
+  document.querySelectorAll(".pane").forEach(x => x.classList.remove("on"));
+  t.classList.add("on");
+  document.getElementById("p-" + t.dataset.p).classList.add("on");
+});
+
+function kpi(l, v, cls, sub) {
+  return `<div class="kpi"><div class="lbl">${l}</div><div class="num ${cls||''}">${v}</div>
+          ${sub?`<div class="sub">${sub}</div>`:""}</div>`;
+}
+
+async function loadLive() {
+  const el = document.getElementById("p-live");
+  try {
+    const s = await IB.get("/api/live/" + encodeURIComponent(NAME));
+    document.getElementById("livechip").innerHTML = s.connected
+      ? '<span class="chip c-live"><span class="pulse"></span> RFC live</span>'
+      : '<span class="chip c-unknown">not reachable</span>';
+
+    const wp = s.work_processes || {};
+    const types = Object.entries(wp.by_type || {}).map(([k,v]) =>
+      `<tr><td>${IB.esc(k)}</td><td class="mono">${v.in_use} / ${v.total}</td>
+       <td class="mono">${v.free}</td></tr>`).join("");
+
+    el.innerHTML = `
+      ${s.error ? `<div class="banner banner-warn">${IB.esc(String(s.error).split("\n")[0])}
+        ${s.cooldown ? ` · retrying in ${s.cooldown}s` : ""}</div>` : ""}
+      <div class="grid g4" style="margin-bottom:16px">
+        ${kpi("CPU", IB.val(s.cpu,"%",0), s.cpu>=80?"n-red":"n-green")}
+        ${kpi("Memory", IB.val(s.memory,"%",0), s.memory>=85?"n-red":"n-green")}
+        ${kpi("Load 1m", IB.val(s.load_1m,"",2), "n-info")}
+        ${kpi("Sessions", IB.val(s.users,"",0), "n-info")}
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-h"><h3>T-code checks</h3>
+          <span class="src src-rfc">${IB.esc(s.check_source || "RFC")} LIVE</span>
+          <span class="src src-none">${(s.checks||[]).length} checks</span></div>
+        ${(s.checks||[]).length ? `<table>
+          <tr><th>T-Code</th><th>Check</th><th>Value</th><th>Status</th><th>Detail</th></tr>
+          ${s.checks.map(c=>`<tr>
+            <td class="mono"><b>${IB.esc(c.tcode)}</b></td>
+            <td>${IB.esc(c.label)}</td>
+            <td class="mono">${IB.esc(c.value)}</td>
+            <td><span class="chip ${IB.statusClass(c.status)}">${IB.esc(c.status)}</span></td>
+            <td style="color:var(--muted-dim);font-size:11.5px">${IB.esc(c.detail||"")}</td>
+          </tr>`).join("")}
+        </table>` : `<div class="card-b"><div class="empty">
+            ${s.check_error ? IB.esc(s.check_error)
+              : "No counters returned — system unreachable, or the Z function module is not installed."}
+          </div></div>`}
+      </div>
+
+      <div class="grid g2">
+        <div class="card">
+          <div class="card-h"><h3>Work processes</h3>
+            <span class="src src-rfc">RFC LIVE</span></div>
+          <div class="card-b">
+            ${wp.available ? `
+              <div style="font-size:24px;font-weight:800;font-family:var(--mono)">
+                ${wp.in_use} <span style="color:var(--muted-dim);font-size:15px">/ ${wp.total} in use</span></div>
+              <div class="bar" style="margin:9px 0 14px"><i class="${IB.barClass(wp.utilization_pct)}"
+                style="width:${wp.utilization_pct||0}%"></i></div>
+              <table><tr><th>Type</th><th>In use</th><th>Free</th></tr>${types}</table>
+              ${wp.longest_running ? `<div style="margin-top:11px;font-size:11.5px;color:var(--amber);font-family:var(--mono)">
+                Longest: WP ${IB.esc(wp.longest_running.wp)} ·
+                ${Math.round(wp.longest_running.seconds/60)}m ·
+                ${IB.esc(wp.longest_running.user||"system")} ${IB.esc(wp.longest_running.report||"")}</div>`:""}
+            ` : '<div class="empty">No data</div>'}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>Instances &amp; services</h3></div>
+          <div class="card-b">
+            ${(s.instances||[]).length ? `<table>
+              <tr><th>Instance</th><th>Host</th><th>Services</th></tr>
+              ${s.instances.map(i=>`<tr><td class="mono">${IB.esc(i.name)}</td>
+                <td class="mono">${IB.esc(i.host)}</td>
+                <td class="mono" style="color:var(--muted-dim)">${IB.esc(i.services||"—")}</td></tr>`).join("")}
+            </table>` : '<div class="empty">No data</div>'}
+            <div style="margin-top:12px;display:flex;gap:18px;font-size:12px">
+              <div><div class="lbl" style="font-size:9.5px;color:var(--muted-dim)">DISPATCHER</div>
+                <b>${IB.esc(s.dispatcher.label)}</b></div>
+              <div><div class="lbl" style="font-size:9.5px;color:var(--muted-dim)">ICM</div>
+                <b>${IB.esc(s.icm.label)}</b></div>
+              <div><div class="lbl" style="font-size:9.5px;color:var(--muted-dim)">RFC ROUND-TRIP</div>
+                <b>${s.rfc_round_trip_ms !== null && s.rfc_round_trip_ms !== undefined
+                     ? s.rfc_round_trip_ms + " ms " +
+                       '<span class="src src-rfc">LIVE</span>'
+                     : IB.val(null)}</b></div>
+              <div><div class="lbl" style="font-size:9.5px;color:var(--muted-dim)">DIALOG RESPONSE (SMLG)</div>
+                <b>${s.response_time ? IB.esc(s.response_time.value) + " " +
+                    IB.srcBadge(s.response_time.source, s.response_time.age_minutes)
+                    : IB.val(null)}</b></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="banner banner-err">${IB.esc(e.message)}</div>`;
+  }
+}
+
+async function loadMetrics() {
+  const el = document.getElementById("p-metrics");
+  try {
+    const d = await IB.get("/api/status/" + encodeURIComponent(NAME));
+    if (!d.available) { el.innerHTML = '<div class="card"><div class="empty">No sweep has completed for this system.</div></div>'; return; }
+    el.innerHTML = `<div class="card"><div class="card-h"><h3>Metrics from last sweep</h3>
+      <span class="src src-none">${IB.esc(d.cycle_timestamp||"")}</span></div>
+      <table class="mtable"><tr><th>Metric</th><th>Value</th><th>Status</th><th>Detail</th></tr>
+      ${(d.metrics||[]).map(m=>`<tr><td>${IB.esc(m.name)}</td>
+        <td class="mono">${IB.esc(m.display_value)}</td>
+        <td><span class="chip ${IB.statusClass(m.status)}">${IB.esc(m.status)}</span></td>
+        <td style="color:var(--muted-dim);font-size:11.5px">${IB.esc(m.detail||"")}</td></tr>`).join("")}
+      </table></div>`;
+  } catch (e) { el.innerHTML = `<div class="banner banner-err">${IB.esc(e.message)}</div>`; }
+}
+
+async function loadReport() {
+  const el = document.getElementById("p-report");
+  try {
+    const r = await IB.get("/api/report/" + encodeURIComponent(NAME));
+    el.innerHTML = `<div class="banner" style="background:var(--info-bg);border:1px solid var(--info-br);color:var(--text)">
+        ${IB.esc(r.summary)}</div>
+      ${r.findings.map(f=>`<div class="card" style="margin-bottom:11px">
+        <div class="card-h"><span class="chip ${IB.statusClass(f.severity)}">${IB.esc(f.severity)}</span>
+          <h3>${IB.esc(f.tcode)} · ${IB.esc(f.observation)}</h3></div>
+        <div class="card-b"><div style="color:var(--muted);margin-bottom:9px">${IB.esc(f.why_it_matters)}</div>
+          <ol style="margin-left:17px;font-size:12.5px;line-height:1.7">
+            ${f.solutions.map(x=>`<li>${IB.esc(x)}</li>`).join("")}</ol></div></div>`).join("")
+        || '<div class="card"><div class="empty">No findings.</div></div>'}
+      <div style="margin-top:10px"><a class="btn" href="/reports-page">Full report →</a></div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="empty">No report yet — a sweep must complete first.</div></div>`;
+  }
+}
+
+loadLive(); loadMetrics(); loadReport();
+setInterval(loadLive, 10000);
+</script>
+</body>
+</html>

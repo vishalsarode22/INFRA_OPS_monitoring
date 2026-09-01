@@ -1,0 +1,116 @@
+[
+  {
+    "system": "TST",
+    "event": "Sweep failed: timed out",
+    "timestamp": "2026-08-18 10:33:44",
+    "status": "error"
+  },
+  {
+    "system": "172.16.1.22",
+    "event": "Sweep failed: Could not find/select connection 'Centor QAS system' in SAP Logon Pad. Run tests/inspect_logon_pad.py to find the correct control identifiers.",
+    "timestamp": "2026-08-18 10:34:02",
+    "status": "error"
+  },
+  {
+    "system": "TST",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 10:45:58",
+    "status": "ok"
+  },
+  {
+    "system": "172.16.1.22",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 10:47:48",
+    "status": "ok"
+  },
+  {
+    "system": "TST",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 10:50:00",
+    "status": "ok"
+  },
+  {
+    "system": "172.16.1.22",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 10:53:08",
+    "status": "ok"
+  },
+  {
+    "system": "TST",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 11:04:07",
+    "status": "ok"
+  },
+  {
+    "system": "172.16.1.22",
+    "event": "Sweep failed: {'title': 'SAP', 'top_level_only': True, 'backend': 'win32'}",
+    "timestamp": "2026-08-18 11:04:32",
+    "status": "error"
+  },
+  {
+    "system": "TST",
+    "event": "Sweep failed: {'title': 'SAP', 'top_level_only': True, 'backend': 'win32'}",
+    "timestamp": "2026-08-18 11:08:34",
+    "status": "error"
+  },
+  {
+    "system": "172.16.1.22",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 11:11:00",
+    "status": "ok"
+  },
+  {
+    "system": "TST",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 11:19:12",
+    "status": "ok"
+  },
+  {
+    "system": "172.16.1.22",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 11:22:11",
+    "status": "ok"
+  },
+  {
+    "system": "TST",
+    "event": "Sweep failed: timed out",
+    "timestamp": "2026-08-18 11:26:44",
+    "status": "error"
+  },
+  {
+    "system": "172.16.1.22",
+    "event": "Sweep failed: timed out",
+    "timestamp": "2026-08-18 11:27:31",
+    "status": "error"
+  },
+  {
+    "system": "TST",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 11:45:20",
+    "status": "ok"
+  },
+  {
+    "system": "172.16.1.22",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 11:47:55",
+    "status": "ok"
+  },
+  {
+    "system": "TST",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 16:20:55",
+    "status": "ok"
+  },
+  {
+    "system": "172.16.1.22",
+    "event": "Sweep completed",
+    "timestamp": "2026-08-18 16:22:12",
+    "status": "ok"
+  },
+  {
+    "system": "TST",
+    "event": "Sweep completed",
+    "timestamp": "2026-09-01 14:43:10",
+    "status": "ok"
+  }
+]

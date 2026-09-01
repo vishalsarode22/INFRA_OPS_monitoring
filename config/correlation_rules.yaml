@@ -1,0 +1,34 @@
+# Deterministic incident-correlation policy.
+# These values are intentionally conservative defaults and should be tuned
+# against real historical incidents after the baseline dataset is built.
+rules:
+  - id: SAP_LOCK_CONTENTION
+    enabled: true
+    title: SAP application / lock contention
+    severity: CRITICAL
+    description: Elevated SAP locks and dialog response time indicate likely application contention.
+    confidence: 0.87
+    thresholds:
+      lock_count: 10
+      response_time_ms: 500
+      dump_count: 0
+
+  - id: INFRA_RESOURCE_PRESSURE
+    enabled: true
+    title: Infrastructure resource pressure
+    severity: CRITICAL
+    description: Multiple host resource indicators are saturated or are driving severe response-time degradation.
+    confidence: 0.86
+    thresholds:
+      cpu_percent: 90
+      memory_percent: 90
+      load_1m: 8
+      response_time_ms: 1000
+      minimum_high_resources: 2
+
+  - id: SAP_PROCESS_FAILURE
+    enabled: true
+    title: SAP application server process failure
+    severity: CRITICAL
+    description: One or more SAP work processes are reporting a critical state.
+    confidence: 0.96

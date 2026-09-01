@@ -1,0 +1,43 @@
+tasks:
+  - tcode: AL08
+    action: al08
+  - tcode: DB01
+    action: db01
+  - tcode: DB02
+    action: db02
+  - tcode: DB12
+    action: db12
+  - tcode: SCOT
+    action: scot
+  - tcode: SM12
+    action: sm12
+  - tcode: SM13
+    action: sm13
+  - tcode: SM21
+    action: sm21
+  - tcode: SM37
+    action: sm37_active
+  - tcode: SM37_CANCELLED
+    action: sm37_cancelled
+  - tcode: SM51
+    action: sm51
+  - tcode: SM58
+    action: sm58
+  - tcode: SM50 
+    action: sm50
+  - tcode: SM66
+    action: sm66
+  - tcode: SMLG
+    action: smlg
+  - tcode: SMQ1
+    action: smq1
+  - tcode: SMQ2
+    action: smq2
+  - tcode: SOST
+    action: sost
+  - tcode: SP01
+    action: sp01
+  - tcode: ST03N
+    action: st03n
+  - tcode: ST22
+    action: st22_today

@@ -1,0 +1,27 @@
+
+
+SM12:
+  lock_count: "Selected Lock Entries:\\s*(\\d+)"
+
+
+
+
+
+SOST:
+  send_summary: "([\\d,\\.]+\\s*Send Rquests[^\\n]*Error)"
+
+DB12:
+  backup_status: "(Backup Successful|Backup Failed)"
+
+DB01:
+  blocked_transactions: "(\\d+)\\s*Blocked Transaction"
+
+DB02:
+  db_size: "([\\d\\.]+\\s*TB\\s*/\\s*[\\d\\.]+\\s*TB)"
+
+
+SM58:
+  status: "(Nothing was selected\\.)"
+
+ST03N:
+  avg_response_time: "Avg\\. dialog response time[^\\d]*([\\d,\\.]+)"

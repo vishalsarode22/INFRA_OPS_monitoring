@@ -1,0 +1,15 @@
+﻿.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.log
+logs/
+reports/
+.vscode/
+.idea/
+*.pdf
+*.xlsx
+*.xlsm
+~$*
+config/systems.yaml

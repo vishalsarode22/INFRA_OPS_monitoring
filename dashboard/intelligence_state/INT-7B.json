@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "system": "INT-7B",
+  "samples": {
+    "sap.sm12.lock_count": [
+      {
+        "timestamp": "2026-08-18T15:00:00",
+        "value": 23.0
+      }
+    ]
+  }
+}

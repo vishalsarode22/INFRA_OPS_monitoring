@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Health Reports</title>
+<link rel="stylesheet" href="/static/shell.css?v=bf941ec8">
+<style>
+  .split{display:grid;grid-template-columns:250px 1fr;gap:16px;align-items:start}
+  .syslist .item{padding:11px 13px;border-bottom:1px solid var(--border);cursor:pointer;
+       display:flex;align-items:center;gap:9px}
+  .syslist .item:last-child{border-bottom:none}
+  .syslist .item:hover{background:var(--card-hover)}
+  .syslist .item.on{background:rgba(0,102,179,.14);color:var(--brand-live)}
+  .syslist .item b{font-size:13px}
+  .summary{font-size:14.5px;line-height:1.65;padding:16px;border-radius:var(--radius);
+       background:var(--info-bg);border:1px solid var(--info-br)}
+  .finding{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:13px;
+       overflow:hidden;background:var(--card)}
+  .finding.critical{border-left:3px solid var(--red)}
+  .finding.warning{border-left:3px solid var(--amber)}
+  .fh{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid var(--border)}
+  .fh h4{font-size:13.5px;font-weight:800;flex:1}
+  .fb{padding:13px 15px}
+  .fb .why{color:var(--muted);margin-bottom:12px;line-height:1.55;font-size:12.5px}
+  .fb h5{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:12px 0 6px}
+  .fb ol,.fb ul{margin-left:17px;font-size:12.5px;line-height:1.7}
+  .fb li{margin-bottom:3px}
+  .missing li{color:var(--amber)}
+  .ev li{color:var(--muted);font-family:var(--mono);font-size:11.5px}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Health reports</h2>
+      <div class="sub">Findings, solutions and summary from the last monitoring sweep</div></div>
+    <div class="top-actions">
+      <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
+      <button class="btn" onclick="window.print()">Print</button>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="split">
+      <div class="card syslist" id="list"><div class="empty">Loading…</div></div>
+      <div id="report"><div class="card"><div class="empty">Select a system.</div></div></div>
+    </div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=69f382d5"></script>
+<script>
+/* Every page here depends on shell.js for the sidebar, theme and helpers.
+   If it fails to load the page renders bare with only a console error, which
+   looks like the app is broken rather than one asset being missing. Say so
+   on screen instead. */
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
+    '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
+    '<p style="color:#666;line-height:1.6">This page needs ' +
+    '<code>/static/shell.js?v=69f382d5</code> and <code>/static/shell.css?v=bf941ec8</code>. ' +
+    'They are missing or the static mount is not serving them.</p>' +
+    '<p style="color:#666;line-height:1.6">Check that ' +
+    '<code>dashboard/static/shell.js?v=69f382d5</code> exists, then restart the server. ' +
+    'If you are seeing this inside a preview pane rather than at ' +
+    '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
+    'behind a preview.</p></div>';
+}
+</script>
+<script>
+IB.mountShell("reports");
+IB.mountSchedulerControl("sched-ctl");
+IB.themeToggle(document.getElementById("theme"));
+let SYSTEMS = [];
+
+function renderList(active) {
+  document.getElementById("list").innerHTML = SYSTEMS.map(s => `
+    <div class="item ${s.name === active ? "on" : ""}" onclick="show('${IB.esc(s.name)}')">
+      <span class="chip ${IB.statusClass(s.status)}">${IB.esc((s.status||"?")[0])}</span>
+      <b>${IB.esc(s.name)}</b>
+    </div>`).join("");
+}
+
+function finding(f) {
+  return `<div class="finding ${f.severity.toLowerCase()}">
+    <div class="fh">
+      <span class="chip ${IB.statusClass(f.severity)}">${IB.esc(f.severity)}</span>
+      <h4>${IB.esc(f.tcode)} · ${IB.esc(f.observation)}</h4>
+      <span class="src src-none">confidence ${IB.esc(f.confidence)}</span>
+    </div>
+    <div class="fb">
+      <div class="why">${IB.esc(f.why_it_matters)}</div>
+      <h5>Recommended actions</h5>
+      <ol>${f.solutions.map(s => `<li>${IB.esc(s)}</li>`).join("")}</ol>
+      <h5>Evidence</h5>
+      <ul class="ev">${f.evidence.map(e => `<li>${IB.esc(e)}</li>`).join("")}</ul>
+      ${f.missing_evidence.length ? `<h5>Evidence not available</h5>
+        <ul class="missing">${f.missing_evidence.map(e => `<li>${IB.esc(e)}</li>`).join("")}</ul>` : ""}
+    </div>
+  </div>`;
+}
+
+async function show(name) {
+  renderList(name);
+  const el = document.getElementById("report");
+  el.innerHTML = `<div class="card"><div class="empty">Building report for ${IB.esc(name)}…</div></div>`;
+  try {
+    const r = await IB.get("/api/report/" + encodeURIComponent(name));
+    const c = r.counts;
+    el.innerHTML = `
+      <div class="grid g4" style="margin-bottom:15px">
+        <div class="kpi"><div class="lbl">Health score</div>
+          <div class="num ${r.health_score>=80?'n-green':r.health_score>=50?'n-amber':'n-red'}">${r.health_score}</div>
+          <div class="sub">deducted for breaches and blind spots</div></div>
+        <div class="kpi"><div class="lbl">Critical</div><div class="num n-red">${c.critical}</div></div>
+        <div class="kpi"><div class="lbl">Warning</div><div class="num n-amber">${c.warning}</div></div>
+        <div class="kpi"><div class="lbl">Not collected</div><div class="num n-gray">${c.uncollected}</div>
+          <div class="sub">state unknown</div></div>
+      </div>
+
+      <div class="summary" style="margin-bottom:16px">
+        ${IB.esc(r.summary)}
+        <div style="margin-top:9px;font-size:11px;color:var(--muted-dim)">
+          Summary written by ${r.summary_source === "llm" ? "the AI layer from the findings below"
+            : "deterministic rules (AI disabled or unavailable)"} ·
+          sweep ${IB.esc(r.cycle_timestamp)}
+        </div>
+      </div>
+
+      ${r.findings.length
+        ? `<h3 style="font-size:13px;margin-bottom:10px">Findings (${r.findings.length})</h3>
+           ${r.findings.map(finding).join("")}`
+        : `<div class="card"><div class="empty">No threshold breaches in the checks that returned data.</div></div>`}
+
+      ${r.uncollected.length ? `
+        <div class="card" style="margin-top:15px">
+          <div class="card-h"><h3>Not collected (${r.uncollected.length})</h3>
+            <span class="src src-none">state unknown, not healthy</span></div>
+          <table>
+            <tr><th>T-Code</th><th>Metric</th><th>Reason</th></tr>
+            ${r.uncollected.map(u => `<tr><td class="mono">${IB.esc(u.tcode)}</td>
+              <td class="mono">${IB.esc(u.metric)}</td>
+              <td style="color:var(--muted-dim)">${IB.esc(u.reason)}</td></tr>`).join("")}
+          </table>
+        </div>` : ""}`;
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="empty">
+      No report available for ${IB.esc(name)}.<br><small>${IB.esc(e.message)}</small><br><br>
+      <small>A monitoring sweep must complete before a report can be built.</small></div></div>`;
+  }
+}
+
+(async () => {
+  const d = await IB.get("/api/overview");
+  SYSTEMS = d.systems;
+  IB.updatePathCounts(SYSTEMS);
+  renderList(null);
+  if (SYSTEMS.length) show(SYSTEMS[0].name);
+})();
+</script>
+</body>
+</html>

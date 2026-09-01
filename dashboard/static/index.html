@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>InfraBeatOps · Basis Monitoring</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  /* The brand light theme is defined with the palette further down.
+     A second html[data-theme="light"] block used to live here; two
+     competing definitions meant the winner depended on source order. */
+  html[data-theme="light"] .evidence-item, html[data-theme="light"] input { background:#f8fafc; }
+  html[data-theme="light"] .ai-box { color:#334155; }
+  .theme-toggle { padding:7px 10px; border:1px solid var(--border); background:var(--card); color:var(--text); border-radius:8px; cursor:pointer; font-weight:700; font-size:12px; }
+  .intel-grid { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr); gap:16px; }
+  .intel-score { display:flex; align-items:center; gap:18px; }
+  .intel-ring { width:76px; height:76px; border-radius:50%; display:grid; place-items:center; font-size:19px; font-weight:900; background:conic-gradient(var(--red) var(--score,0%), var(--border) 0); position:relative; flex-shrink:0; }
+  .intel-ring::after { content:""; position:absolute; inset:8px; border-radius:50%; background:var(--card); }
+  .intel-ring span { position:relative; z-index:1; }
+  .signal-list { display:grid; gap:9px; }
+  .signal-row { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .signal-row:last-child { border-bottom:0; }
+  .signal-strength { font-weight:800; }
+  .finding { padding:9px 11px; background:var(--card-hover); border:1px solid var(--border); border-radius:8px; font-size:12px; margin-bottom:8px; }
+  @media (max-width: 1000px) { .sidebar{width:205px}.content{padding:24px}.stat-strip{grid-template-columns:repeat(2,1fr)} .intel-grid{grid-template-columns:1fr} }
+  @media (max-width: 720px) { body{display:block}.sidebar{position:sticky;top:0;z-index:50;width:100%;height:auto;padding:10px 12px;border-right:0;border-bottom:1px solid var(--border)} .brand{padding:0 4px 8px}.sidebar .nav-section-label,.sidebar-footer{display:none}.sidebar .nav-item{display:inline-flex;margin:0 2px;padding:8px}.main{width:100%}.topbar{padding:12px 16px}.content{padding:18px 14px 42px}.greeting{font-size:25px}.stat-strip{grid-template-columns:1fr 1fr;gap:10px}.stat-card{padding:14px}.two-col{grid-template-columns:1fr}.landscape-grid{grid-template-columns:1fr}.header-row{align-items:flex-start}.topbar-right .avatar{display:none}.detail-panel .two-col{grid-template-columns:1fr} }
+  /* ==================================================================
+     InfraBeat brand palette.
+
+     Dark is the default: this is an operations console that stays open on
+     a wall display, and the light theme is provided for daytime desk use
+     and printing. Both are hand-tuned rather than inverted -- an inverted
+     dark palette produces grey-on-grey status lamps that stop reading as
+     alarms.
+
+     Status colours are deliberately NOT brand colours. If the alert red
+     matches the logo red, operators stop seeing it.
+     ================================================================== */
+  :root {
+    /* --- Brand --- */
+    --brand:            #0066B3;   /* InfraBeat Blue: primary action    */
+    --brand-hover:      #0078D4;   /* Bright Blue: hover / focus        */
+    --brand-live:       #00A8E8;   /* Electric Cyan: live + interactive */
+    --automation:       #A855F7;   /* Purple: GUI automation / OCR      */
+
+    /* --- Surfaces (dark) --- */
+    --bg:               #08111C;   /* Deep Navy: application background */
+    --sidebar:          #06101A;   /* Dark Navy: navigation rail        */
+    --card:             #0D1B2A;   /* Navy: content surface             */
+    --card-hover:       #12283D;   /* Elevated Navy                     */
+    --border:           #1B3449;   /* Blue Gray                         */
+
+    /* --- Type (dark) --- */
+    --text:             #F5F9FC;
+    --muted:            #A8B8C7;
+    --muted-dim:        #6F8293;
+
+    /* --- Status --- */
+    --green:            #22C55E;  --green-dim: rgba(34,197,94,0.14);
+    --amber:            #F59E0B;  --amber-dim: rgba(245,158,11,0.14);
+    --red:              #EF4444;  --red-dim:   rgba(239,68,68,0.14);
+    --info:             #38BDF8;  --info-dim:  rgba(56,189,248,0.14);
+    --gray:             #6F8293;  --gray-dim:  rgba(111,130,147,0.14);
+
+    /* Collector provenance. An operator must be able to tell at a glance
+       WHERE a number came from, because "SAP is unhealthy" and "our
+       collector failed" are different statements. */
+    --src-rfc:          #00A8E8;
+    --src-ssh:          #22C55E;
+    --src-gui:          #A855F7;
+    --src-none:         #6F8293;
+  }
+
+  /* Light theme: <html data-theme="light"> */
+  html[data-theme="light"] {
+    --bg:               #F4F7FA;
+    --sidebar:          #FFFFFF;
+    --card:             #FFFFFF;
+    --card-hover:       #F7FAFC;
+    --border:           #D9E2EA;
+
+    --text:             #102A43;
+    --muted:            #526579;
+    --muted-dim:        #7A8CA0;
+
+    --brand:            #0066B3;
+    --brand-hover:      #0078D4;
+    --brand-live:       #008CC9;
+
+    /* Darkened for contrast against white: the dark-theme greens and ambers
+       fail WCAG AA on a light surface. */
+    --green:            #15803D;  --green-dim: rgba(21,128,61,0.10);
+    --amber:            #B45309;  --amber-dim: rgba(180,83,9,0.10);
+    --red:              #B91C1C;  --red-dim:   rgba(185,28,28,0.10);
+    --info:             #0369A1;  --info-dim:  rgba(3,105,161,0.10);
+    --gray:             #526579;  --gray-dim:  rgba(82,101,121,0.10);
+
+    --src-rfc:          #008CC9;
+    --src-ssh:          #15803D;
+    --src-gui:          #7E22CE;
+    --src-none:         #7A8CA0;
+  }
+
+  /* Source badges: RFC / SSH / SAP GUI / NO DATA */
+  .src { font-size:10px; font-weight:700; letter-spacing:.04em; padding:2px 7px;
+         border-radius:4px; text-transform:uppercase; }
+  .src-rfc  { color:var(--src-rfc);  background:rgba(0,168,232,.12);  border:1px solid rgba(0,168,232,.3); }
+  .src-ssh  { color:var(--src-ssh);  background:var(--green-dim);     border:1px solid rgba(34,197,94,.3); }
+  .src-gui  { color:var(--src-gui);  background:rgba(168,85,247,.12); border:1px solid rgba(168,85,247,.3); }
+  .src-none { color:var(--src-none); background:var(--gray-dim);      border:1px solid var(--border); }
+
+  /* UNKNOWN must never look like a pass. Hatching makes "we could not read
+     this" visually distinct from a healthy zero at a glance. */
+  .status-unknown, .card.unknown {
+    background-image: repeating-linear-gradient(135deg,
+      transparent 0 7px, rgba(111,130,147,.07) 7px 14px);
+    border-color: var(--border);
+  }
+  .status-unknown .value { color: var(--muted-dim); font-style: italic; }
+
+  :focus-visible { outline: 2px solid var(--brand-live); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration:.001ms !important; animation-iteration-count:1 !important;
+      transition-duration:.001ms !important;
+    }
+  }
+
+  @media print {
+    :root { --bg:#fff; --card:#fff; --text:#000; }
+    .sidebar, .topbar, button { display:none !important; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text); margin: 0;
+    font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
+    display: flex; min-height: 100vh;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 250px; background: var(--sidebar); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 22px 16px; flex-shrink: 0;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 6px 24px; }
+  .brand-icon {
+    width: 34px; height: 34px; border-radius: 8px; background: var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 16px; color: white; flex-shrink: 0;
+  }
+  .brand-name { font-weight: 800; font-size: 14px; letter-spacing: 0.4px; }
+  .brand-sub { font-size: 9.5px; color: var(--muted-dim); letter-spacing: 1.2px; font-weight: 700; }
+  .nav-section-label {
+    font-size: 10px; color: var(--muted-dim); font-weight: 800; letter-spacing: 1.2px;
+    padding: 10px 10px 8px;
+  }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 10px; border-radius: 8px; font-size: 13.5px; font-weight: 600;
+    color: var(--muted); cursor: pointer; margin-bottom: 2px; border-left: 2px solid transparent;
+  }
+  .nav-item:hover { background: var(--card); color: var(--text); }
+  .nav-item.active { background: var(--card); color: var(--text); border-left-color: var(--red); }
+  .nav-item-left { display: flex; align-items: center; gap: 10px; }
+  .nav-icon { width: 16px; text-align: center; opacity: 0.85; }
+  .nav-badge {
+    background: var(--red); color: white; font-size: 10.5px; font-weight: 800;
+    padding: 1px 7px; border-radius: 10px;
+  }
+  .sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+  .collector-status { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 8px 10px; }
+  .collector-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 1.8s infinite; }
+  .collector-sub { font-size: 10.5px; color: var(--muted-dim); margin-left: 16px; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+    70% { box-shadow: 0 0 0 6px transparent; opacity: 0.5; }
+    100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+  }
+
+  /* ---------- Main ---------- */
+  .main { flex: 1; min-width: 0; }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 32px; border-bottom: 1px solid var(--border);
+  }
+  .breadcrumb { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .breadcrumb b { color: var(--text); }
+  .topbar-right { display: flex; align-items: center; gap: 14px; }
+  .live-dot-wrap { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--green); font-weight: 700; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 1.8s infinite; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 8px; background: #1e293b;
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800;
+  }
+
+  .content { padding: 28px 32px 60px; max-width: 1360px; }
+
+  .date-line { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .date-line .bar { width: 22px; height: 2px; background: var(--red); }
+  .greeting { font-size: 32px; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.5px; }
+  .greeting-sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+
+  .header-row { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+  .btn {
+    padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--text); display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { background: var(--card-hover); }
+  .btn-primary { background: var(--red); border-color: var(--red); color: white; }
+  .btn-primary:hover { background: #dc2626; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+  .stat-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .stat-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+  .stat-delta { font-size: 11.5px; color: var(--green); font-weight: 700; }
+  .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-size: 26px; font-weight: 800; }
+
+  .section { margin-bottom: 36px; }
+  .section-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; }
+  .section-title { font-size: 17px; font-weight: 800; margin: 0 0 3px; }
+  .section-sub { font-size: 12.5px; color: var(--muted); }
+  .section-link { font-size: 12.5px; color: #93c5fd; font-weight: 700; cursor: pointer; }
+
+  .landscape-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .sys-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; cursor: pointer; transition: border-color .15s; }
+  .sys-card:hover { border-color: #3a3d44; }
+  .sys-card.selected { border-color: var(--red); }
+  .sys-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .sys-name { color: var(--red); font-weight: 800; font-size: 14px; letter-spacing: 0.3px; }
+  .status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.4px; padding: 3px 9px; border-radius: 12px; }
+  .status-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .sys-desc { font-size: 14.5px; font-weight: 700; margin-bottom: 12px; }
+  .sys-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  .sys-foot { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted-dim); border-top: 1px solid var(--border); padding-top: 10px; }
+  .sys-alert-banner {
+    margin-top: 12px; background: var(--red-dim); color: #fca5a5; font-size: 11.5px; font-weight: 600;
+    padding: 8px 10px; border-radius: 7px; display: flex; gap: 6px; align-items: flex-start;
+  }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .list-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+  .list-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .list-row:last-child { border-bottom: none; }
+  .list-row-left { display: flex; gap: 12px; align-items: flex-start; }
+  .list-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  .list-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+  .list-sub { font-size: 11.5px; color: var(--muted); }
+  .list-time { font-size: 11px; color: var(--muted-dim); white-space: nowrap; }
+  .ack-btn { font-size: 11px; font-weight: 700; color: #fca5a5; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  .ack-btn.acked { color: var(--green); border-color: transparent; cursor: default; }
+
+  .empty { color: var(--muted-dim); font-style: italic; font-size: 13px; padding: 12px 0; }
+  .incident-command { margin-bottom:16px; }
+  .incident-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .incident-filters { display:flex; gap:6px; flex-wrap:wrap; }
+  .incident-filter { padding:6px 10px; border:1px solid var(--border); background:var(--card); color:var(--muted); border-radius:7px; cursor:pointer; font-size:11px; font-weight:800; }
+  .incident-filter.active { color:var(--text); border-color:var(--red); background:var(--red-dim); }
+  .incident-row { display:grid; grid-template-columns:90px minmax(0,1fr) 110px 92px; gap:12px; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); }
+  .incident-row:last-child { border-bottom:none; }
+  .incident-severity { font-size:10px; font-weight:900; letter-spacing:.5px; }
+  .incident-title { font-size:13px; font-weight:800; }
+  .incident-meta { color:var(--muted); font-size:11px; margin-top:3px; }
+  .incident-action { font-size:11px; font-weight:800; padding:6px 9px; border:1px solid var(--border); background:var(--card); color:var(--text); border-radius:6px; cursor:pointer; }
+  .rca-drawer { display:none; margin-top:12px; border:1px solid var(--border); border-radius:10px; background:var(--card-hover); padding:16px; }
+  .rca-drawer.open { display:block; }
+  .rca-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .rca-block { border:1px solid var(--border); border-radius:8px; padding:12px; }
+  .rca-label { color:var(--muted); font-size:10px; font-weight:900; letter-spacing:.8px; margin-bottom:6px; }
+  .rca-value { font-size:12.5px; line-height:1.55; }
+  .rca-list { margin:0; padding-left:18px; font-size:12px; line-height:1.6; }
+  @media (max-width: 760px) { .incident-row { grid-template-columns:1fr; gap:6px; } .rca-grid { grid-template-columns:1fr; } }
+
+  /* System detail panel */
+  .detail-panel { display: none; }
+  .detail-panel.open { display: block; }
+  .metric-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 9px; }
+  .ai-box { font-size: 13px; line-height: 1.8; color: #d5d8dd; }
+  .intel-grid { display:grid; grid-template-columns: 170px 1fr; gap:16px; align-items:stretch; }
+  .intel-score { background:#0e0f12; border:1px solid var(--border); border-radius:10px; padding:16px; text-align:center; }
+  .intel-signal { font-size:22px; font-weight:900; letter-spacing:.5px; margin:8px 0 2px; }
+  .intel-score-label { color:var(--muted); font-size:10.5px; font-weight:800; letter-spacing:.8px; }
+  .intel-score-value { font-size:28px; font-weight:900; }
+  .intel-findings { display:grid; gap:8px; }
+  .intel-finding { background:#0e0f12; border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:12px; }
+  .intel-signal-row { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); font-size:11.5px; }
+  .intel-signal-row:last-child { border-bottom:none; }
+  .ai-box b { color: #fca5a5; }
+  .evidence-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+  .evidence-item { background: #0e0f12; border: 1px solid var(--border); border-left: 3px solid var(--red); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #c7cad0; }
+  .evidence-item.no-data { border-left-color: var(--gray); }
+  .evidence-tcode { font-weight: 800; color: #fca5a5; margin-bottom: 3px; font-size: 12.5px; }
+  canvas { max-height: 200px; }
+
+  input {
+    background: #0e0f12; border: 1px solid var(--border); color: var(--text);
+    padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 9px; width: 100%;
+  }
+  input:focus { outline: none; border-color: var(--red); }
+  .add-btn { background: var(--red-dim); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; padding: 10px; border-radius: 8px; font-size: 13px; cursor: pointer; width: 100%; font-weight: 700; }
+
+  .registry-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .registry-item { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; font-weight: 700; }
+  .registry-item span { display: block; font-size: 10.5px; color: var(--muted-dim); font-weight: 500; margin-top: 2px; }
+
+  .report-link { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .report-link:last-child { border-bottom: none; }
+  .report-link a { color: #93c5fd; font-weight: 700; }
+
+  .toast {
+    position: fixed; top: 20px; right: 20px; background: var(--card); border: 1px solid var(--border);
+    color: white; border-radius: 10px; padding: 12px 18px; font-size: 13px; display: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5); font-weight: 600; z-index: 999;
+  }
+
+  .incident-timeline{margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
+  .timeline-item{display:grid;grid-template-columns:86px 18px minmax(0,1fr);gap:10px;padding:9px 0}
+  .timeline-time{color:var(--muted);font-size:10px;white-space:nowrap}
+  .timeline-marker{position:relative;width:18px}
+  .timeline-marker:before{content:"";position:absolute;top:4px;left:5px;width:8px;height:8px;border-radius:50%;background:var(--muted)}
+  .timeline-marker:after{content:"";position:absolute;top:12px;bottom:-13px;left:8px;width:1px;background:var(--border)}
+  .timeline-item:last-child .timeline-marker:after{display:none}
+  .timeline-title{font-size:11px;font-weight:800;color:var(--text)}
+  .timeline-detail{color:var(--muted);font-size:11px;line-height:1.45;margin-top:2px}
+  @media(max-width:760px){.timeline-item{grid-template-columns:66px 18px minmax(0,1fr)}}
+
+  .correlation-view { margin-top:14px; border-top:1px solid var(--border); padding-top:14px; }
+  .correlation-map { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; align-items:stretch; }
+  .corr-node { border:1px solid var(--border); border-radius:9px; padding:11px; background:var(--card); }
+  .corr-node.root { border-width:2px; }
+  .corr-label { color:var(--muted); font-size:9px; font-weight:900; letter-spacing:.8px; }
+  .corr-title { margin-top:4px; font-size:12px; font-weight:850; }
+  .corr-detail { margin-top:4px; color:var(--muted); font-size:10.5px; line-height:1.45; }
+  .corr-note { margin-top:10px; color:var(--muted); font-size:10.5px; line-height:1.45; }
+  @media (max-width:760px) {
+    .correlation-map { grid-template-columns:1fr; }
+    .corr-arrow { min-height:12px; transform:rotate(90deg); }
+  }
+
+
+  .correlation-view { margin-top:14px; border-top:1px solid var(--border); padding-top:14px; }
+  .correlation-graph { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+  .correlation-node { border:1px solid var(--border); border-radius:9px; padding:11px; background:var(--card); }
+  .correlation-label { color:var(--muted); font-size:9px; font-weight:900; letter-spacing:.8px; }
+  .correlation-title { margin-top:4px; font-size:12px; font-weight:850; }
+  .correlation-detail { margin-top:4px; color:var(--muted); font-size:10.5px; line-height:1.45; }
+  .correlation-note { margin-top:10px; color:var(--muted); font-size:10.5px; line-height:1.45; }
+  @media (max-width:760px) { .correlation-graph { grid-template-columns:1fr; } }
+
+</style>
+</head>
+<body>
+
+<!-- Return path to the new multi-page UI.
+     This page predates that shell and has no link back, so the only way out
+     was typing a URL. A dead end in a navigation tree is a bug even when
+     every page behind it works. -->
+<div style="position:fixed;top:0;left:0;right:0;z-index:9999;display:flex;
+            align-items:center;gap:12px;padding:7px 16px;font-size:12px;
+            background:var(--card);border-bottom:1px solid var(--border);
+            font-family:'Inter',-apple-system,'Segoe UI',sans-serif;">
+  <strong style="color:var(--muted-dim);letter-spacing:.05em;
+                 text-transform:uppercase;font-size:10px;">Classic view</strong>
+  <a href="/wall" style="color:#00A8E8;font-weight:700;text-decoration:none;">Live wall</a>
+  <a href="/overview" style="color:#00A8E8;font-weight:700;text-decoration:none;">Overview</a>
+  <a href="/systems-page" style="color:#00A8E8;font-weight:700;text-decoration:none;">Systems</a>
+  <a href="/reports-page" style="color:#00A8E8;font-weight:700;text-decoration:none;">Health reports</a>
+</div>
+<div style="height:34px;"></div>
+
+<div class="sidebar">
+  <div class="brand">
+    <div class="brand-icon">S</div>
+    <div>
+      <div class="brand-name">InfraBeatOps</div>
+      <div class="brand-sub">BASIS MONITORING</div>
+    </div>
+  </div>
+
+  <div class="nav-section-label">COMMAND CENTER</div>
+  <div class="nav-item active" data-target="view-overview"><span class="nav-item-left"><span class="nav-icon">▦</span>Overview</span></div>
+  <div class="nav-item" data-target="view-systems"><span class="nav-item-left"><span class="nav-icon">☰</span>Systems</span></div>
+  <div class="nav-item" data-target="view-registry"><span class="nav-item-left"><span class="nav-icon">☑</span>Check registry</span></div>
+  <div class="nav-item" data-target="view-alerts"><span class="nav-item-left"><span class="nav-icon">🔔</span>Alert center</span><span class="nav-badge" id="sidebarAlertBadge">0</span></div>
+  <div class="nav-item" data-target="view-activity"><span class="nav-item-left"><span class="nav-icon">⟲</span>Run history</span></div>
+  <div class="nav-item" data-target="view-reports"><span class="nav-item-left"><span class="nav-icon">▤</span>Evidence reports</span></div>
+
+  <div class="sidebar-footer">
+    <div class="nav-item" data-target="view-settings" style="margin-bottom:10px;"><span class="nav-item-left"><span class="nav-icon">⚙</span>Settings</span></div>
+    <div class="collector-status">
+      <span class="collector-dot"></span>
+      <div>
+        <div style="font-weight:700;">Collector online</div>
+        <div class="collector-sub" id="schedulerLine">Auto-monitoring active</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div class="breadcrumb">Operations <span>›</span> <b id="breadcrumbLabel">Overview</b></div>
+    <div class="topbar-right">
+      <button class="theme-toggle" data-theme-toggle onclick="toggleTheme()" aria-label="Toggle theme">☀ Light</button>
+      <div class="live-dot-wrap"><span class="live-dot"></span>Live data</div>
+      <div class="avatar">OP</div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="header-row">
+      <div>
+        <div class="date-line"><span class="bar"></span><span id="dateLine">--</span></div>
+        <h1 class="greeting" id="greeting">Good day.</h1>
+        <div class="greeting-sub">Here's the current pulse across your SAP landscape.</div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="runBtn" onclick="runNow()">↻ Run sweep</button>
+        <button class="btn btn-primary" onclick="exportEvidence()">⭳ Export evidence</button>
+      </div>
+    </div>
+
+    <div class="stat-strip">
+      <div class="stat-card">
+        <div class="stat-top"><div class="stat-icon" style="background:var(--card-hover);">☰</div></div>
+        <div class="stat-label">Monitored systems</div>
+        <div class="stat-value" id="statSystems">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top"><div class="stat-icon" style="background:var(--green-dim);color:var(--green);">✓</div></div>
+        <div class="stat-label">Healthy systems</div>
+        <div class="stat-value" id="statHealthy">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top"><div class="stat-icon" style="background:var(--red-dim);color:var(--red);">⚠</div></div>
+        <div class="stat-label">Open alerts</div>
+        <div class="stat-value" id="statAlerts">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top"><div class="stat-icon" style="background:#1e293b;color:#93c5fd;">◷</div></div>
+        <div class="stat-label">Data freshness</div>
+        <div class="stat-value" id="statFreshness">--</div>
+      </div>
+    </div>
+
+    <div class="section" id="view-systems">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Landscape health</div>
+          <div class="section-sub">All registered systems · click a card for details</div>
+        </div>
+      </div>
+      <div class="landscape-grid" id="landscapeGrid"><div class="empty">Loading systems...</div></div>
+    </div>
+
+    <div class="two-col section" id="view-alerts">
+      <div class="list-card">
+        <div class="section-head">
+          <div>
+            <div class="section-title" style="font-size:14px;">Priority alerts</div>
+            <div class="section-sub">Live · from most recent sweep per system</div>
+          </div>
+        </div>
+        <div id="alertsList"><div class="empty">No alerts.</div></div>
+      </div>
+
+      <div class="list-card" id="view-activity">
+        <div class="section-head">
+          <div>
+            <div class="section-title" style="font-size:14px;">Recent activity</div>
+            <div class="section-sub">Collector sweep events</div>
+          </div>
+        </div>
+        <div id="activityList"><div class="empty">No activity yet.</div></div>
+      </div>
+    </div>
+
+    <div class="section" id="operationalIntelligence">
+      <div class="section-head"><div><div class="section-title">Operational intelligence</div><div class="section-sub">Baseline, recurrence and fused signals · advisory only</div></div></div>
+      <div class="intel-grid">
+        <div class="list-card"><div class="intel-score"><div class="intel-ring" id="intelRing"><span id="intelScore">--</span></div><div><div class="section-title" style="font-size:14px" id="intelSignal">No signal</div><div class="section-sub" id="intelSummary">Select a system to inspect operational intelligence.</div></div></div><div style="margin-top:18px" id="intelFindings"><div class="empty">No findings.</div></div></div>
+        <div class="list-card"><div class="section-title" style="font-size:13px;margin-bottom:10px">Signals</div><div class="signal-list" id="intelSignals"><div class="empty">No signals.</div></div></div>
+      </div>
+    </div>
+
+<div class="section detail-panel" id="detailPanel">
+      <div class="section-head">
+        <div>
+          <div class="section-title">System detail: <span id="detailName">--</span></div>
+          <div class="section-sub">Live metrics, AI analysis, and T-code evidence</div>
+        </div>
+      </div>
+
+      <div class="list-card incident-command" id="incidentCommandCenter">
+        <div class="incident-toolbar">
+          <div>
+            <div class="section-title" style="font-size:13px;">Incident command center</div>
+            <div class="section-sub">Authoritative incidents with evidence-focused AI RCA</div>
+          </div>
+          <div class="incident-filters">
+            <button class="incident-filter active" data-filter="ALL" onclick="setIncidentFilter('ALL')">All</button>
+            <button class="incident-filter" data-filter="CRITICAL" onclick="setIncidentFilter('CRITICAL')">Critical</button>
+            <button class="incident-filter" data-filter="WARNING" onclick="setIncidentFilter('WARNING')">Warning</button>
+            <button class="incident-filter" data-filter="RESOLVED" onclick="setIncidentFilter('RESOLVED')">Resolved</button>
+          </div>
+        </div>
+        <div id="incidentList"><div class="empty">No incidents.</div></div>
+        <div class="rca-drawer" id="rcaDrawer">
+          <div class="section-title" style="font-size:13px; margin-bottom:10px;" id="rcaTitle">Incident RCA</div>
+          <div id="rcaContent"><div class="empty">Select an incident.</div></div>
+
+          <div class="correlation-view" id="correlationView" aria-label="Read-only relationship view">
+            <div class="rca-label">SYSTEM CORRELATION · READ-ONLY RELATIONSHIP VIEW</div>
+            <div id="correlationGraph" class="correlation-map">
+              <div class="corr-node root">
+                <div class="corr-label">INCIDENT</div>
+                <div class="corr-title" id="corrIncidentTitle">No incident selected</div>
+                <div class="corr-detail" id="corrIncidentDetail">Authoritative monitoring state.</div>
+              </div>
+              <div class="corr-node">
+                <div class="corr-label">SAP EVIDENCE</div>
+                <div class="corr-title" id="corrEvidenceTitle">No evidence</div>
+                <div class="corr-detail" id="corrEvidenceDetail">No correlated metrics recorded.</div>
+              </div>
+              <div class="corr-node">
+                <div class="corr-label">INTELLIGENCE</div>
+                <div class="corr-title" id="corrIntelTitle">Unavailable</div>
+                <div class="corr-detail" id="corrIntelDetail">Intelligence is advisory and cannot change severity.</div>
+              </div>
+            </div>
+            <div class="corr-note">
+              Read-only relationship view. Deterministic incident severity remains authoritative;
+              AI and historical intelligence are supporting evidence only.
+            </div>
+          </div>
+
+          <div class="incident-timeline" id="incidentTimeline">
+            <div class="rca-label">INCIDENT TIMELINE</div>
+            <div id="timelineList"><div class="empty">Select an incident.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-bottom:16px;">
+        <div class="list-card">
+          <div class="section-title" style="font-size:13px; margin-bottom:12px;">Live metrics</div>
+          <div id="detailMetrics"><div class="empty">No data.</div></div>
+        </div>
+        <div class="list-card">
+          <div class="section-title" style="font-size:13px; margin-bottom:12px;">AI assistant</div>
+          <div class="ai-box" id="detailAi">No analysis available.</div>
+        </div>
+      </div>
+
+      <div class="list-card" style="margin-bottom:16px;">
+        <div class="section-title" style="font-size:13px; margin-bottom:12px;">Operational intelligence</div>
+        <div id="detailIntelligence"><div class="empty">No intelligence available.</div></div>
+      </div>
+
+      <div class="list-card" style="margin-bottom:16px;">
+        <div class="section-title" style="font-size:13px; margin-bottom:12px;">CPU & Memory trend</div>
+        <canvas id="trendChart"></canvas>
+      </div>
+
+      <div class="list-card">
+        <div class="section-title" style="font-size:13px; margin-bottom:12px;">T-code evidence</div>
+        <div class="evidence-grid" id="detailEvidence"><div class="empty">No data.</div></div>
+      </div>
+    </div>
+
+    <div class="section" id="view-registry">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Check registry</div>
+          <div class="section-sub">Configured T-code checks run every sweep</div>
+        </div>
+      </div>
+      <div class="registry-grid" id="registryGrid"><div class="empty">Loading...</div></div>
+    </div>
+
+    <div class="section" id="view-reports">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Evidence reports</div>
+          <div class="section-sub" id="reportsSub">Latest generated reports</div>
+        </div>
+      </div>
+      <div class="list-card" id="reportsList"><div class="empty">Select a system above to view its reports.</div></div>
+    </div>
+
+    <div class="section" id="view-settings">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Settings</div>
+          <div class="section-sub">Manage SAP systems and the scheduler</div>
+        </div>
+      </div>
+      <div class="list-card" style="max-width:420px; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <span style="font-weight:600; font-size:13px;">Run every</span>
+          <input id="schedInterval" type="number" min="5" style="width:70px;" value="120">
+          <span style="font-weight:600; font-size:13px;">minutes</span>
+          <button onclick="saveSchedulerInterval()">Save</button>
+        </div>
+      </div>
+      <div class="list-card" style="max-width:420px; margin-bottom:16px;" id="existingSystemsList"></div>
+      <div class="list-card" style="max-width:420px;">
+        <input id="newName" placeholder="System name (e.g. QAS)">
+        <input id="newClient" placeholder="Client (e.g. 100)">
+        <input id="newConn" placeholder="Connection name (e.g. NW_QAS_System)">
+        <input id="newUser" placeholder="SAP Username">
+        <input id="newPass" type="password" placeholder="SAP Password">
+        <div style="margin: 6px 0; font-size: 13px;">
+          <label style="margin-right: 16px;"><input type="checkbox" id="newGuiAccess" checked> Has SAP GUI access</label>
+          <label><input type="checkbox" id="newOsAccess" onchange="toggleNewSshFields()"> Has OS/SSH access</label>
+        </div>
+        <div id="newSshFields" style="display:none;">
+          <input id="newSshHost" placeholder="SSH Host/IP">
+          <input id="newSshPort" placeholder="SSH Port (default 22)">
+          <input id="newSshUser" placeholder="SSH Username">
+          <input id="newSshPass" type="password" placeholder="SSH Password">
+          <input id="newInstanceNr" placeholder="SAP instance number (e.g. 02)">
+        </div>
+        <button class="add-btn" onclick="addSystem()">+ Add System</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const statusColors = { NORMAL: "#22c55e", WARNING: "#f59e0b", CRITICAL: "#ef4444", UNKNOWN: "#6b7280" };
+const statusLabels = { NORMAL: "HEALTHY", WARNING: "WARNING", CRITICAL: "CRITICAL", UNKNOWN: "UNKNOWN" };
+
+let allSystems = [];
+let systemStatuses = {};
+let selectedSystem = null;
+let chart = null;
+let ackedAlerts = new Set();
+
+let incidentFilter = "ALL";
+
+function setIncidentFilter(filter) {
+  incidentFilter = filter;
+  document.querySelectorAll(".incident-filter").forEach(b => b.classList.toggle("active", b.dataset.filter === filter));
+  renderIncidentCenter();
+}
+
+function incidentStatus(incident) { return String(incident.status || "").toUpperCase(); }
+
+function renderIncidentCenter() {
+  const list = document.getElementById("incidentList");
+  const incidents = [];
+  Object.keys(systemStatuses).forEach(system => {
+    const data = systemStatuses[system];
+    if (!data || !data.available) return;
+    (data.incidents || []).forEach(incident => incidents.push({system, incident}));
+  });
+  const filtered = incidents.filter(({incident}) => {
+    const sev = String(incident.severity || "UNKNOWN").toUpperCase();
+    const status = incidentStatus(incident);
+    if (incidentFilter === "RESOLVED") return status === "RESOLVED" || incident.resolved === true;
+    if (incidentFilter === "CRITICAL") return sev === "CRITICAL" && status !== "RESOLVED";
+    if (incidentFilter === "WARNING") return sev === "WARNING" && status !== "RESOLVED";
+    return true;
+  });
+  if (!filtered.length) { list.innerHTML = '<div class="empty">No incidents match this filter.</div>'; return; }
+  list.innerHTML = "";
+  filtered.slice(0, 12).forEach(({system, incident}) => {
+    const sev = String(incident.severity || "UNKNOWN").toUpperCase();
+    const color = statusColors[sev] || statusColors.UNKNOWN;
+    const row = document.createElement("div"); row.className = "incident-row";
+    row.innerHTML = `<div class="incident-severity" style="color:${color};">${sev}</div><div><div class="incident-title">${incident.title || incident.rule_id || "Incident"}</div><div class="incident-meta">${system} · ${incident.incident_id || "unknown"} · ${incident.status || "ACTIVE"}</div></div><div class="incident-meta">${timeAgo(incident.last_seen || incident.updated_at)}</div><button class="incident-action">View RCA</button>`;
+    row.querySelector(".incident-action").onclick = () => loadIncidentRca(incident.incident_id);
+    list.appendChild(row);
+  });
+}
+
+
+function renderIncidentTimeline(incident, ai, intelligence){
+  const list=document.getElementById("timelineList"); if(!list) return;
+  const items=[]; const first=incident.first_seen||incident.created_at; const last=incident.last_seen||incident.updated_at;
+  if(first) items.push({time:first,title:"Incident first detected",detail:"Deterministic monitoring recorded this occurrence."});
+  if((incident.affected_metrics||[]).length) items.push({time:last||first,title:"Affected metrics",detail:incident.affected_metrics.slice(0,6).join(", ")});
+  if((incident.evidence||[]).length) items.push({time:last||first,title:"Evidence updated",detail:incident.evidence.slice(0,4).join(" · ")});
+  if(ai) items.push({time:last||first,title:"AI RCA generated",detail:ai.root_cause_category||ai.root_cause||ai.likely_root_cause||"Advisory hypothesis available."});
+  if(intelligence) items.push({time:last||first,title:"Operational intelligence evaluated",detail:(intelligence.overall_signal||"NO_SIGNIFICANT_INTELLIGENCE")+" · score "+Number(intelligence.score||0).toFixed(2)});
+  if(String(incident.status||"").toUpperCase()==="RESOLVED"||incident.resolved===true) items.push({time:last||first,title:"Incident resolved",detail:"Resolution state is authoritative; AI hypotheses are not treated as confirmed cause."});
+  if(!items.length){list.innerHTML='<div class="empty">No timeline events recorded.</div>';return;}
+  list.innerHTML=items.map(x=>`<div class="timeline-item"><div class="timeline-time">${x.time?timeAgo(x.time):"--"}</div><div class="timeline-marker"></div><div><div class="timeline-title">${x.title}</div><div class="timeline-detail">${x.detail}</div></div></div>`).join("");
+}
+
+
+function renderSystemCorrelation(incident, ai, intelligence) {
+  const title = document.getElementById("corrIncidentTitle");
+  const detail = document.getElementById("corrIncidentDetail");
+  const evidenceTitle = document.getElementById("corrEvidenceTitle");
+  const evidenceDetail = document.getElementById("corrEvidenceDetail");
+  const intelTitle = document.getElementById("corrIntelTitle");
+  const intelDetail = document.getElementById("corrIntelDetail");
+  if (!title) return;
+
+  const severity = String(incident && incident.severity || "UNKNOWN").toUpperCase();
+  const evidence = Array.isArray(incident && incident.evidence) ? incident.evidence : [];
+  const metrics = Array.isArray(incident && incident.affected_metrics) ? incident.affected_metrics : [];
+
+  title.textContent = incident && (incident.title || incident.rule_id) || "Incident";
+  detail.textContent = `${severity} · ${incident && incident.status || "UNKNOWN"} · authoritative`;
+  evidenceTitle.textContent = metrics.length ? `${metrics.length} affected metric(s)` : "SAP evidence";
+  evidenceDetail.textContent =
+    metrics.concat(evidence).slice(0, 5).join(" · ") ||
+    "No correlated metrics recorded.";
+
+  const signal = intelligence && (intelligence.overall_signal || intelligence.signal);
+  const score = intelligence && Number(intelligence.score);
+  intelTitle.textContent = signal || (ai ? "AI RCA available" : "No intelligence");
+  intelDetail.textContent =
+    Number.isFinite(score) ? `Score ${score.toFixed(2)} · advisory only` :
+    "AI and historical intelligence are supporting evidence only.";
+}
+
+async function loadIncidentRca(incidentId) {
+  const drawer = document.getElementById("rcaDrawer"); const content = document.getElementById("rcaContent");
+  drawer.classList.add("open"); document.getElementById("rcaTitle").textContent = "Incident RCA · " + incidentId;
+  content.innerHTML = '<div class="empty">Loading incident evidence...</div>';
+  if (!incidentId) { content.innerHTML = '<div class="empty">This incident has no persistent identity for RCA lookup.</div>'; return; }
+  try {
+    const res = await fetch("/api/incidents/" + encodeURIComponent(incidentId) + "/rca");
+    if (!res.ok) throw new Error("RCA request failed: " + res.status);
+    const payload = await res.json(); const incident = payload.incident || {}; const ai = payload.ai_analysis; const intel = payload.operational_intelligence;
+    const evidence = Array.isArray(incident.evidence) ? incident.evidence : [];
+    const actions = ai && Array.isArray(ai.recommended_actions) ? ai.recommended_actions : [];
+    const limitations = ai && Array.isArray(ai.limitations) ? ai.limitations : [];
+    renderCorrelationView(incident, ai, intel);
+    renderSystemCorrelation(incident, ai, intel);
+    renderIncidentTimeline(incident, ai, intel);
+    content.innerHTML = `<div class="rca-block" style="margin-bottom:12px;"><div class="rca-label">OPERATOR ACTIONS</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn" onclick="incidentAction('${incidentId}','ACKNOWLEDGE')">Acknowledge</button><button class="btn" onclick="incidentAction('${incidentId}','INVESTIGATE')">Start investigation</button><button class="btn btn-primary" onclick="incidentAction('${incidentId}','RESOLVE')">Resolve incident</button></div><div class="section-sub" style="margin-top:8px;">Lifecycle actions are operator-controlled. Severity remains authoritative and cannot be changed here.</div></div><div class="rca-grid"><div class="rca-block"><div class="rca-label">AUTHORITATIVE SEVERITY</div><div class="rca-value"><strong>${incident.severity || "UNKNOWN"}</strong> · ${incident.status || "UNKNOWN"}</div></div><div class="rca-block"><div class="rca-label">AI HYPOTHESIS</div><div class="rca-value">${ai ? (ai.likely_root_cause || ai.root_cause || "No hypothesis available.") : "No AI analysis available."}</div></div><div class="rca-block"><div class="rca-label">SUPPORTING EVIDENCE</div><ul class="rca-list">${(evidence.length ? evidence : ["No incident evidence recorded."]).map(x => `<li>${x}</li>`).join("")}</ul></div><div class="rca-block"><div class="rca-label">RECOMMENDED INVESTIGATION</div><ul class="rca-list">${(actions.length ? actions : ["Review the incident evidence and relevant SAP transaction logs."]).map(x => `<li>${x}</li>`).join("")}</ul></div></div>${intel ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">OPERATIONAL INTELLIGENCE</div><div class="rca-value">${intel.overall_signal || "NO_SIGNIFICANT_INTELLIGENCE"} · score ${Number(intel.score || 0).toFixed(2)}</div></div>` : ""}${limitations.length ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">LIMITATIONS</div><ul class="rca-list">${limitations.map(x => `<li>${x}</li>`).join("")}</ul></div>` : ""}${Array.isArray(incident.action_history) && incident.action_history.length ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">OPERATOR ACTION HISTORY</div><ul class="rca-list">${incident.action_history.slice(-10).reverse().map(x => `<li>${x.action} · ${x.actor} · ${x.timestamp}</li>`).join("")}</ul></div>` : ""}`;
+  } catch (err) { content.innerHTML = '<div class="empty">RCA is unavailable for this incident. The incident itself remains authoritative.</div>'; }
+}
+
+
+
+async function incidentAction(incidentId, action) {
+  let body = {action, actor: "operator"};
+  if (action === "RESOLVE") {
+    const summary = window.prompt("Resolution summary (required):", "");
+    if (summary === null) return;
+    if (!summary.trim()) { showToast("Resolution summary is required."); return; }
+    body.summary = summary.trim();
+    body.verified = false;
+  }
+  try {
+    const res = await fetch("/api/incidents/" + encodeURIComponent(incidentId) + "/action", {
+      method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body)
+    });
+    const payload = await res.json();
+    if (!res.ok) throw new Error(payload.detail || "Action failed");
+    showToast(action + " completed.");
+    loadAllData();
+    loadIncidentRca(incidentId);
+  } catch (err) {
+    showToast("Incident action failed: " + err.message);
+  }
+}
+
+function renderOperationalIntelligence() {
+  const data = selectedSystem ? systemStatuses[selectedSystem] : null;
+  const intel = data && data.operational_intelligence;
+
+  const signal = document.getElementById("intelSignal"),
+        summary = document.getElementById("intelSummary"),
+        scoreEl = document.getElementById("intelScore"),
+        ring = document.getElementById("intelRing"),
+        findings = document.getElementById("intelFindings"),
+        signals = document.getElementById("intelSignals");
+
+  if (!intel) {
+    const fallback = {overall_status:"UNKNOWN"};
+
+    signal.textContent = fallback.overall_status;
+    summary.textContent = "Insufficient or unavailable intelligence data.";
+    scoreEl.textContent = "--";
+    ring.style.setProperty("--score", "0%");
+    findings.innerHTML = '<div class="empty">No findings.</div>';
+    signals.innerHTML = '<div class="empty">No signals.</div>';
+    return;
+  }
+
+  const score = Number(intel.score || 0),
+        pct = Math.max(0, Math.min(100, Math.round(score * 100)));
+
+  signal.textContent = intel.overall_signal || "UNKNOWN";
+  summary.textContent =
+    intel.explanation ||
+    "Fused operational intelligence from available evidence.";
+
+  scoreEl.textContent = pct + "%";
+  ring.style.setProperty("--score", pct + "%");
+
+  const fs = intel.key_findings || [];
+
+  findings.innerHTML = fs.length
+    ? fs.slice(0, 5)
+        .map(x => '<div class="finding">' + escapeHtml(String(x)) + '</div>')
+        .join("")
+    : '<div class="empty">No findings.</div>';
+
+  const ss = intel.signals || [];
+
+  signals.innerHTML = ss.length
+    ? ss.slice(0, 8)
+        .map(s =>
+          '<div class="signal-row">' +
+            '<span><b>' +
+            escapeHtml(String(s.category || s.metric || "Signal")) +
+            '</b><br><span style="color:var(--muted)">' +
+            escapeHtml(String(s.summary || "")) +
+            '</span></span>' +
+            '<span class="signal-strength">' +
+            Math.round(Number(s.strength || 0) * 100) +
+            '%</span>' +
+          '</div>'
+        )
+        .join("")
+    : '<div class="empty">No signals.</div>';
+}
+function escapeHtml(value){const d=document.createElement("div");d.textContent=value;return d.innerHTML;}
+function toggleTheme(){const root=document.documentElement;const next=root.dataset.theme==="light"?"dark":"light";root.dataset.theme=next;localStorage.setItem("infrabeatops-theme",next);updateThemeButton();}
+function updateThemeButton(){const b=document.querySelector("[data-theme-toggle]");if(b)b.textContent=document.documentElement.dataset.theme==="light"?"◐ Dark":"☀ Light";}
+(function initTheme(){document.documentElement.dataset.theme=localStorage.getItem("infrabeatops-theme")||"dark";})();
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  setTimeout(() => t.style.display = "none", 4000);
+}
+
+function setGreeting() {
+  const now = new Date();
+  const h = now.getHours();
+  const greet = h < 12 ? "Good morning." : h < 18 ? "Good afternoon." : "Good evening.";
+  document.getElementById("greeting").textContent = greet;
+  const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  document.getElementById("dateLine").textContent =
+    now.toLocaleDateString('en-US', opts).toUpperCase() + " · " +
+    now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function timeAgo(tsStr) {
+  if (!tsStr) return "--";
+  const then = new Date(tsStr.replace(" ", "T"));
+  const diffMin = Math.round((Date.now() - then.getTime()) / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const hrs = Math.round(diffMin / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  return `${Math.round(hrs / 24)} d ago`;
+}
+
+// Sidebar nav: scroll to section, set active state
+document.querySelectorAll(".nav-item[data-target]").forEach(item => {
+  item.addEventListener("click", () => {
+    document.querySelectorAll(".nav-item[data-target]").forEach(i => i.classList.remove("active"));
+    item.classList.add("active");
+    const target = document.getElementById(item.dataset.target);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("breadcrumbLabel").textContent = item.textContent.trim();
+    if (item.dataset.target === "view-reports" && selectedSystem) loadReports(selectedSystem);
+  });
+});
+
+function renderExistingSystemsList() {
+  const box = document.getElementById("existingSystemsList");
+  if (!box) return;
+  box.innerHTML = "";
+  if (!allSystems.length) { box.innerHTML = '<div class="empty">No systems configured.</div>'; return; }
+  allSystems.forEach(s => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border, #333);";
+    const access = [s.has_gui_access ? "GUI" : null, s.has_os_access ? "OS" : null].filter(Boolean).join(" + ") || "none";
+    row.innerHTML = `<span><b>${s.name}</b> / ${s.client} <span style="opacity:0.6; font-size:12px;">(${access})</span></span>
+      <button style="font-size:12px; padding:4px 10px;" onclick="deleteConfiguredSystem('${s.name}')">Remove</button>`;
+    box.appendChild(row);
+  });
+}
+
+async function deleteConfiguredSystem(name) {
+  if (!confirm(`Remove system "${name}"? This cannot be undone.`)) return;
+  const res = await fetch("/api/systems/" + encodeURIComponent(name), { method: "DELETE" });
+  if (!res.ok) { showToast("Failed to remove system."); return; }
+  showToast("System removed.");
+  loadAllData();
+}
+
+async function loadSchedulerSettings() {
+  try {
+    const res = await fetch("/api/scheduler-settings");
+    const data = await res.json();
+    document.getElementById("schedInterval").value = data.interval_minutes;
+  } catch (e) { /* non-fatal */ }
+}
+
+async function saveSchedulerInterval() {
+  const minutes = parseInt(document.getElementById("schedInterval").value, 10);
+  if (!minutes || minutes < 5) { showToast("Interval must be at least 5 minutes."); return; }
+  const res = await fetch("/api/scheduler-settings", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ interval_minutes: minutes })
+  });
+  if (!res.ok) { showToast("Failed to update interval."); return; }
+  showToast(`Interval set to ${minutes} minutes.`);
+}
+
+async function loadAllData() {
+  const res = await fetch("/api/systems");
+  allSystems = await res.json();
+
+  systemStatuses = {};
+  await Promise.all(allSystems.map(async s => {
+    try {
+      const r = await fetch("/api/systems/" + encodeURIComponent(s.name) + "/overview");
+      systemStatuses[s.name] = r.ok ? await r.json() : { available: false };
+      systemStatuses[s.name].available = r.ok;
+    } catch (e) {
+      systemStatuses[s.name] = { available: false };
+    }
+  }));
+
+  renderStats();
+  renderLandscape();
+  renderAlerts();
+  renderIncidentCenter();
+  renderExistingSystemsList();
+  await loadActivity();
+
+  if (!selectedSystem && allSystems.length) {
+    selectSystem(allSystems[0].name);
+  } else if (selectedSystem) {
+    renderDetail();
+    renderOperationalIntelligence();
+  }
+}
+
+function renderStats() {
+  const names = Object.keys(systemStatuses);
+  document.getElementById("statSystems").textContent = allSystems.length;
+
+  let healthy = 0, alertCount = 0, fresh = 0;
+  names.forEach(n => {
+    const s = systemStatuses[n];
+    if (!s.available) return;
+    fresh++;
+    if (s.overall_status === "NORMAL") healthy++;
+    (s.metrics || []).forEach(m => {
+      if (m.status === "WARNING" || m.status === "CRITICAL") alertCount++;
+    });
+  });
+
+  document.getElementById("statHealthy").textContent = healthy;
+  document.getElementById("statAlerts").textContent = alertCount;
+  document.getElementById("statFreshness").textContent =
+    allSystems.length ? Math.round((fresh / allSystems.length) * 100) + "%" : "--";
+  document.getElementById("sidebarAlertBadge").textContent = alertCount;
+}
+
+function renderLandscape() {
+  const grid = document.getElementById("landscapeGrid");
+  if (!allSystems.length) { grid.innerHTML = '<div class="empty">No systems configured yet.</div>'; return; }
+  grid.innerHTML = "";
+
+  allSystems.forEach(s => {
+    const data = systemStatuses[s.name] || { available: false };
+    const status = data.available ? data.overall_status : "UNKNOWN";
+    const color = statusColors[status] || statusColors.UNKNOWN;
+
+    const metrics = data.metrics || [];
+    const healthyCount = metrics.filter(m => m.status === "NORMAL").length;
+    const total = metrics.length;
+
+    const criticalMetric = metrics.find(m => m.status === "CRITICAL");
+    const warningMetric = metrics.find(m => m.status === "WARNING");
+    const bannerMetric = criticalMetric || warningMetric;
+
+    const card = document.createElement("div");
+    card.className = "sys-card" + (selectedSystem === s.name ? " selected" : "");
+    card.onclick = () => selectSystem(s.name);
+
+    card.innerHTML = `
+      <div class="sys-top">
+        <span class="sys-name">${s.name}</span>
+        <span class="status-chip" style="background:${color}22; color:${color};">
+          <span class="dot" style="background:${color};"></span>${statusLabels[status]}
+        </span>
+      </div>
+      <div class="sys-desc">${s.connection_name}</div>
+      <div class="sys-meta">
+        <span>Client ${s.client}</span>
+        <span>${s.has_os_access ? "GUI + OS" : "GUI only"}</span>
+      </div>
+      <div class="sys-foot">
+        <span>${data.available ? timeAgo(data.generated_at) : "no data yet"}</span>
+        <span>${total ? `${healthyCount}/${total} checks healthy` : (data.gui_evidence ? `${data.gui_evidence.length} T-codes checked` : "--")}</span>
+      </div>
+      ${bannerMetric ? `<div class="sys-alert-banner">⚠ ${bannerMetric.name}: ${bannerMetric.detail || bannerMetric.display_value}</div>` : ""}
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function renderAlerts() {
+  const list = document.getElementById("alertsList");
+  const rows = [];
+
+  Object.keys(systemStatuses).forEach(name => {
+    const data = systemStatuses[name];
+    if (!data.available) return;
+    (data.metrics || []).forEach(m => {
+      if (m.status === "WARNING" || m.status === "CRITICAL") {
+        rows.push({ system: name, metric: m, ts: data.generated_at });
+      }
+    });
+  });
+
+  if (!rows.length) { list.innerHTML = '<div class="empty">No active alerts.</div>'; return; }
+
+  list.innerHTML = "";
+  rows.slice(0, 8).forEach((r, i) => {
+    const key = `${r.system}-${r.metric.name}`;
+    const acked = ackedAlerts.has(key);
+    const color = r.metric.status === "CRITICAL" ? "var(--red)" : "var(--amber)";
+    const bg = r.metric.status === "CRITICAL" ? "var(--red-dim)" : "var(--amber-dim)";
+
+    const row = document.createElement("div");
+    row.className = "list-row";
+    row.innerHTML = `
+      <div class="list-row-left">
+        <div class="list-icon" style="background:${bg}; color:${color};">⚠</div>
+        <div>
+          <div class="list-title">${r.metric.name} ${r.metric.status === "CRITICAL" ? "critical" : "warning"}</div>
+          <div class="list-sub">${r.system} · ${r.metric.display_value}${r.metric.detail ? " · " + r.metric.detail : ""}</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="list-time">${timeAgo(r.ts)}</span>
+        <button class="ack-btn ${acked ? "acked" : ""}" data-key="${key}">${acked ? "Acknowledged" : "Acknowledge"}</button>
+      </div>
+    `;
+    row.querySelector(".ack-btn").addEventListener("click", (e) => {
+      ackedAlerts.add(key);
+      renderAlerts();
+    });
+    list.appendChild(row);
+  });
+}
+
+async function loadActivity() {
+  const res = await fetch("/api/run-history");
+  const events = await res.json();
+  const list = document.getElementById("activityList");
+
+  if (!events.length) { list.innerHTML = '<div class="empty">No sweeps run yet.</div>'; return; }
+
+  list.innerHTML = "";
+  events.slice(0, 8).forEach(ev => {
+    const ok = ev.status !== "error";
+    const color = ok ? "var(--green)" : "var(--red)";
+    const bg = ok ? "var(--green-dim)" : "var(--red-dim)";
+    const row = document.createElement("div");
+    row.className = "list-row";
+    row.innerHTML = `
+      <div class="list-row-left">
+        <div class="list-icon" style="background:${bg}; color:${color};">${ok ? "✓" : "✕"}</div>
+        <div>
+          <div class="list-title">${ev.system} — ${ev.event}</div>
+        </div>
+      </div>
+      <span class="list-time">${timeAgo(ev.timestamp)}</span>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function selectSystem(name) {
+  selectedSystem = name;
+  document.getElementById("detailPanel").classList.add("open");
+  document.getElementById("detailName").textContent = name;
+  renderLandscape();
+  renderDetail();
+  renderOperationalIntelligence();
+  loadTrend(name);
+}
+
+function renderDetail() {
+  const data = systemStatuses[selectedSystem];
+  if (!data || !data.available) {
+    document.getElementById("detailMetrics").innerHTML = '<div class="empty">No data yet for this system.</div>';
+    document.getElementById("detailAi").innerHTML = "No analysis available.";
+    document.getElementById("detailIntelligence").innerHTML = '<div class="empty">No intelligence available.</div>';
+    document.getElementById("detailEvidence").innerHTML = '<div class="empty">No data yet.</div>';
+    return;
+  }
+
+  const metricsEl = document.getElementById("detailMetrics");
+  if (data.metrics && data.metrics.length) {
+    metricsEl.innerHTML = "";
+    data.metrics.forEach(m => {
+      const color = statusColors[m.status] || statusColors.UNKNOWN;
+      const row = document.createElement("div");
+      row.className = "metric-row";
+      row.innerHTML = `
+        <span><span class="metric-dot" style="background:${color};"></span>${m.name}</span>
+        <span style="font-weight:700;">${m.display_value}</span>`;
+      metricsEl.appendChild(row);
+    });
+  } else {
+    metricsEl.innerHTML = '<div class="empty">No OS-level metrics (GUI-only monitoring).</div>';
+  }
+
+  const aiEl = document.getElementById("detailAi");
+  if (data.ai_analysis) {
+    aiEl.innerHTML = `
+      <b>Severity:</b> ${data.ai_analysis.severity}<br>
+      <b>Root Cause:</b> ${data.ai_analysis.root_cause}<br>
+      <b>Confidence:</b> ${data.ai_analysis.confidence}`;
+  } else {
+    aiEl.innerHTML = "No analysis available.";
+  }
+
+  renderIntelligence(data.operational_intelligence);
+
+  const evEl = document.getElementById("detailEvidence");
+  if (data.gui_evidence && data.gui_evidence.length) {
+    evEl.innerHTML = "";
+    data.gui_evidence.forEach(e => {
+      const hasData = e.extra_data && Object.keys(e.extra_data).length;
+      const dataStr = hasData
+        ? Object.entries(e.extra_data).map(([k, v]) => `${k}: ${v}`).join(", ")
+        : "screenshot only";
+      const item = document.createElement("div");
+      item.className = "evidence-item" + (hasData ? "" : " no-data");
+      item.innerHTML = `<div class="evidence-tcode">${e.tcode}</div>${dataStr}`;
+      evEl.appendChild(item);
+    });
+  } else {
+    evEl.innerHTML = '<div class="empty">No data yet.</div>';
+  }
+}
+
+function renderIntelligence(intel) {
+  const el = document.getElementById("detailIntelligence");
+  if (!intel) {
+    el.innerHTML = '<div class="empty">Operational intelligence is not available for this snapshot.</div>';
+    return;
+  }
+
+  const signal = String(intel.overall_signal || "UNKNOWN").toUpperCase();
+  const score = Math.max(0, Math.min(1, Number(intel.score || 0)));
+  const signalColor = signal === "HIGH" ? "var(--red)" : signal === "MEDIUM" ? "var(--amber)" : "var(--green)";
+  const findings = Array.isArray(intel.key_findings) ? intel.key_findings.slice(0, 5) : [];
+  const signals = Array.isArray(intel.signals) ? intel.signals.slice(0, 6) : [];
+
+  el.innerHTML = `
+    <div class="intel-grid">
+      <div class="intel-score">
+        <div class="intel-score-label">OVERALL SIGNAL</div>
+        <div class="intel-signal" style="color:${signalColor}">${signal}</div>
+        <div class="intel-score-value">${Math.round(score * 100)}%</div>
+        <div class="intel-score-label">confidence signal</div>
+      </div>
+      <div>
+        <div class="section-sub" style="margin-bottom:8px;">Evidence fusion · baseline · recurrence · change signals</div>
+        <div class="intel-findings">
+          ${findings.length ? findings.map(f => `<div class="intel-finding">${escapeHtml(String(f))}</div>`).join("") : '<div class="empty">No key findings.</div>'}
+        </div>
+      </div>
+    </div>
+    ${signals.length ? `<div style="margin-top:12px;">${signals.map(s => `
+      <div class="intel-signal-row">
+        <span><b>${escapeHtml(String(s.category || "SIGNAL"))}</b> · ${escapeHtml(String(s.metric || ""))}</span>
+        <span>${Math.round(Math.max(0, Math.min(1, Number(s.strength || 0))) * 100)}%</span>
+      </div>`).join("")}</div>` : ""}
+  `;
+}
+
+function escapeHtml(value) {
+  return value.replace(/[&<>\"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+}
+
+async function loadTrend(name) {
+  const [cpu, mem] = await Promise.all([
+    fetch(`/api/history/${encodeURIComponent(name)}/cpu`).then(r => r.json()),
+    fetch(`/api/history/${encodeURIComponent(name)}/memory`).then(r => r.json()),
+  ]);
+
+  const labels = cpu.map(p => p.timestamp.slice(5, 16));
+  if (chart) chart.destroy();
+  const ctx = document.getElementById("trendChart").getContext("2d");
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "CPU %", data: cpu.map(p => p.value), borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,0.08)", fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2.5 },
+        { label: "Memory %", data: mem.map(p => p.value), borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.08)", fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2.5 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: "#8b909a", font: { size: 11.5 } } } },
+      scales: {
+        x: { ticks: { color: "#5a5f68", maxTicksLimit: 6, font: { size: 10 } }, grid: { color: "#1c1e22" } },
+        y: { ticks: { color: "#5a5f68", font: { size: 10 } }, grid: { color: "#1c1e22" } },
+      }
+    }
+  });
+}
+
+async function loadRegistry() {
+  const res = await fetch("/api/tcodes");
+  const tasks = await res.json();
+  const grid = document.getElementById("registryGrid");
+  if (!tasks.length) { grid.innerHTML = '<div class="empty">No checks configured.</div>'; return; }
+  grid.innerHTML = "";
+  tasks.forEach(t => {
+    const item = document.createElement("div");
+    item.className = "registry-item";
+    item.innerHTML = `${t.tcode}<span>${t.action}</span>`;
+    grid.appendChild(item);
+  });
+}
+
+async function loadReports(name) {
+  document.getElementById("reportsSub").textContent = `Latest generated reports for ${name}`;
+  const res = await fetch(`/api/reports/${encodeURIComponent(name)}`);
+  const files = await res.json();
+  const list = document.getElementById("reportsList");
+  if (!files.length) { list.innerHTML = '<div class="empty">No reports generated yet for this system.</div>'; return; }
+  list.innerHTML = "";
+  files.forEach(f => {
+    const row = document.createElement("div");
+    row.className = "report-link";
+    row.innerHTML = `<span>${f.filename}</span><span><a href="${f.url}" target="_blank">${f.date} ↗</a></span>`;
+    list.appendChild(row);
+  });
+}
+
+function exportEvidence() {
+  if (!selectedSystem) { showToast("Select a system first."); return; }
+  loadReports(selectedSystem);
+  document.getElementById("view-reports").scrollIntoView({ behavior: "smooth" });
+}
+
+function renderCorrelationView(incident, ai, intelligence) {
+  const incidentEl = document.getElementById("corrIncidentTitle");
+  const incidentDetailEl = document.getElementById("corrIncidentDetail");
+  const evidenceEl = document.getElementById("corrEvidenceTitle");
+  const evidenceDetailEl = document.getElementById("corrEvidenceDetail");
+  const intelligenceEl = document.getElementById("corrIntelTitle");
+  const intelligenceDetailEl = document.getElementById("corrIntelDetail");
+  if (!incidentEl) return;
+  const severity = String((incident && incident.severity) || "UNKNOWN").toUpperCase();
+  const evidence = Array.isArray(incident && incident.evidence) ? incident.evidence : [];
+  const metrics = Array.isArray(incident && incident.affected_metrics) ? incident.affected_metrics : [];
+  incidentEl.textContent = (incident && (incident.title || incident.rule_id)) || "Incident";
+  incidentDetailEl.textContent = severity + " \u00b7 " + ((incident && incident.status) || "UNKNOWN") + " \u00b7 authoritative";
+  evidenceEl.textContent = metrics.length ? metrics.length + " affected metric(s)" : "SAP evidence";
+  evidenceDetailEl.textContent = metrics.concat(evidence).slice(0, 5).join(" \u00b7 ") || "No correlated metrics recorded.";
+  const signal = intelligence && (intelligence.overall_signal || intelligence.signal || intelligence.overall_status);
+  const score = intelligence && Number(intelligence.score);
+  intelligenceEl.textContent = signal || (ai ? "AI RCA available" : "No intelligence");
+  intelligenceDetailEl.textContent = Number.isFinite(score) ? "Score " + score.toFixed(2) + " \u00b7 advisory only \u00b7 reference only" : "AI is advisory only; historical matches are reference only.";
+}
+
+function toggleNewSshFields() {
+  document.getElementById("newSshFields").style.display =
+    document.getElementById("newOsAccess").checked ? "block" : "none";
+}
+
+async function addSystem() {
+  const name = document.getElementById("newName").value.trim();
+  const client = document.getElementById("newClient").value.trim();
+  const connection_name = document.getElementById("newConn").value.trim();
+  const username = document.getElementById("newUser").value.trim();
+  const password = document.getElementById("newPass").value.trim();
+  const has_gui_access = document.getElementById("newGuiAccess").checked;
+  const has_os_access = document.getElementById("newOsAccess").checked;
+
+  if (!name || !client || !connection_name || !username || !password) {
+    showToast("Fill in the required fields."); return;
+  }
+  if (!has_gui_access && !has_os_access) {
+    showToast("System needs at least GUI or OS access."); return;
+  }
+
+  const body = { name, client, connection_name, username, password, has_gui_access, has_os_access };
+  if (has_os_access) {
+    body.ssh_host = document.getElementById("newSshHost").value.trim();
+    body.ssh_port = parseInt(document.getElementById("newSshPort").value.trim() || "22", 10);
+    body.ssh_username = document.getElementById("newSshUser").value.trim();
+    body.ssh_password = document.getElementById("newSshPass").value.trim();
+    body.sap_instance_nr = document.getElementById("newInstanceNr").value.trim();
+  }
+
+  const res = await fetch("/api/systems", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) { showToast("Failed to add system."); return; }
+
+  ["newName", "newClient", "newConn", "newUser", "newPass", "newSshHost", "newSshPort", "newSshUser", "newSshPass", "newInstanceNr"]
+    .forEach(id => document.getElementById(id).value = "");
+  document.getElementById("newGuiAccess").checked = true;
+  document.getElementById("newOsAccess").checked = false;
+  toggleNewSshFields();
+  showToast("System added.");
+  loadAllData();
+}
+
+async function runNow() {
+  const btn = document.getElementById("runBtn");
+  const res = await fetch("/api/run-now", { method: "POST" });
+  if (res.status === 409) { showToast("A sweep is already in progress."); return; }
+
+  btn.disabled = true;
+  btn.textContent = "⏳ Sweeping...";
+  pollRunStatus();
+}
+
+async function pollRunStatus() {
+  const res = await fetch("/api/run-status");
+  const data = await res.json();
+  const btn = document.getElementById("runBtn");
+
+  if (data.next_run_at) {
+    document.getElementById("schedulerLine").textContent = "Next sweep " + data.next_run_at.slice(11);
+  }
+
+  if (data.running) {
+    if (data.current_system) btn.textContent = `⏳ Sweeping ${data.current_system}...`;
+    setTimeout(pollRunStatus, 4000);
+  } else {
+    btn.disabled = false;
+    btn.textContent = "↻ Run sweep";
+    if (data.error) { showToast("Sweep failed: " + data.error); }
+    else { showToast("Sweep complete."); }
+    loadAllData();
+  }
+}
+
+setGreeting();
+updateThemeButton();
+setInterval(setGreeting, 30000);
+loadAllData();
+loadRegistry();
+loadSchedulerSettings();
+setInterval(loadAllData, 20000);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Live Wall</title>
+<link rel="stylesheet" href="/static/shell.css?v=bf941ec8">
+<style>
+  /* Sized for a wall monitor: fewer, larger cards; readable across a room. */
+  .wall{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(430px,1fr))}
+  .sys{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+       overflow:hidden;box-shadow:var(--shadow)}
+  .sys.s-normal{border-top:3px solid var(--green)}
+  .sys.s-warning{border-top:3px solid var(--amber)}
+  .sys.s-critical{border-top:3px solid var(--red)}
+  .sys.s-unknown{border-top:3px solid var(--gray)}
+
+  .sh{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
+  .sh h3{font-size:17px;font-weight:800}
+  .sh .sid{font-family:var(--mono);font-size:11px;color:var(--muted-dim)}
+  .sh .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)}
+  .t{background:var(--card);padding:11px 13px}
+  .t .k{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+        color:var(--muted-dim);margin-bottom:5px;white-space:nowrap}
+  .t .v{font-size:19px;font-weight:800;font-family:var(--mono);line-height:1.15}
+  .t .m{font-size:9.5px;color:var(--muted-dim);margin-top:3px}
+  .v-normal{color:var(--green)} .v-warning{color:var(--amber)}
+  .v-critical{color:var(--red)} .v-unknown{color:var(--muted-dim)}
+
+  .wp{padding:12px 16px;border-top:1px solid var(--border)}
+  .wp-head{display:flex;justify-content:space-between;font-size:10px;font-weight:700;
+        letter-spacing:.05em;text-transform:uppercase;color:var(--muted-dim);margin-bottom:7px}
+  .wp-types{display:flex;gap:14px;flex-wrap:wrap;margin-top:9px;font-size:11px;
+        font-family:var(--mono);color:var(--muted)}
+  .wp-types b{color:var(--text)}
+  .longest{margin-top:9px;font-size:11px;color:var(--amber);font-family:var(--mono)}
+
+  /* T-code checklist. Compact grid so 14 counters fit without scrolling,
+     sorted worst-first so the eye lands on a problem immediately. */
+  .checks{padding:11px 16px;border-top:1px solid var(--border)}
+  .checks-head{display:flex;justify-content:space-between;font-size:10px;font-weight:700;
+        letter-spacing:.05em;text-transform:uppercase;color:var(--muted-dim);margin-bottom:8px}
+  .kc-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;
+        background:var(--border);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  .kc{background:var(--card);padding:10px 12px;min-width:0}
+  .kc-k{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+        color:var(--muted-dim);margin-bottom:4px;white-space:nowrap;overflow:hidden;
+        text-overflow:ellipsis}
+  .kc-v{font-family:var(--mono);font-size:20px;font-weight:800;line-height:1.1}
+  .kc-d{font-size:9.5px;color:var(--muted-dim);margin-top:4px;overflow:hidden;
+        text-overflow:ellipsis;white-space:nowrap}
+  .kc.s-normal .kc-v{color:var(--green)}
+  .kc.s-warning{background:var(--amber-bg)} .kc.s-warning .kc-v{color:var(--amber)}
+  .kc.s-critical{background:var(--red-bg)}  .kc.s-critical .kc-v{color:var(--red)}
+  .kc.s-unknown .kc-v{color:var(--muted-dim);font-size:13px;font-style:italic}
+  .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:1px;
+        background:var(--border);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  .chk{background:var(--card);padding:7px 9px;display:flex;align-items:center;gap:7px;min-width:0}
+  .chk .tc{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--muted-dim);
+        min-width:38px}
+  .chk .lb{font-size:10.5px;color:var(--muted);flex:1;overflow:hidden;
+        text-overflow:ellipsis;white-space:nowrap}
+  .chk .vl{font-family:var(--mono);font-size:12px;font-weight:800;white-space:nowrap}
+  .chk.s-critical{background:var(--red-bg)}
+  .chk.s-warning{background:var(--amber-bg)}
+  .chk.s-unknown .vl{color:var(--muted-dim);font-style:italic;font-weight:600;font-size:10.5px}
+  .chk.s-critical .vl{color:var(--red)}
+  .chk.s-warning .vl{color:var(--amber)}
+  .chk.s-normal .vl{color:var(--green)}
+
+  .inst{padding:11px 16px;border-top:1px solid var(--border)}
+  .inst table{font-size:11.5px}
+  .inst th,.inst td{padding:6px 8px}
+
+  .err{padding:13px 16px;font-size:11.5px;font-family:var(--mono);color:var(--red);
+       border-top:1px solid var(--border);white-space:pre-wrap;max-height:110px;overflow:auto}
+  .foot{display:flex;gap:10px;padding:10px 16px;border-top:1px solid var(--border);
+        font-size:10.5px;color:var(--muted-dim);font-family:var(--mono)}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div>
+      <h2>Live operations wall</h2>
+      <div class="sub">Direct RFC reads · refreshed every <span id="every">10</span>s</div>
+    </div>
+    <div class="top-actions">
+      <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
+      <span class="chip c-live"><span class="pulse"></span> <span id="livecount">–</span> live</span>
+      <select class="input" id="rate">
+        <option value="5000">5s</option>
+        <option value="10000" selected>10s</option>
+        <option value="30000">30s</option>
+        <option value="0">paused</option>
+      </select>
+      <span id="run-ctl"></span>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="banner"></div>
+    <div class="wall" id="wall"><div class="empty">Reading live RFC…</div></div>
+    <div style="margin-top:14px;font-size:11px;color:var(--muted-dim)">
+      Last read <span id="gen" class="mono">–</span>. Values marked
+      <span class="src src-rfc">RFC LIVE</span> come straight from the application
+      server. Values marked <span class="src src-gui">SAP GUI</span> or
+      <span class="src src-stale">stale</span> come from the last monitoring sweep
+      on the dedicated collector machine.
+    </div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=69f382d5"></script>
+<script>
+/* Every page here depends on shell.js for the sidebar, theme and helpers.
+   If it fails to load the page renders bare with only a console error, which
+   looks like the app is broken rather than one asset being missing. Say so
+   on screen instead. */
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
+    '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
+    '<p style="color:#666;line-height:1.6">This page needs ' +
+    '<code>/static/shell.js?v=69f382d5</code> and <code>/static/shell.css?v=bf941ec8</code>. ' +
+    'They are missing or the static mount is not serving them.</p>' +
+    '<p style="color:#666;line-height:1.6">Check that ' +
+    '<code>dashboard/static/shell.js?v=69f382d5</code> exists, then restart the server. ' +
+    'If you are seeing this inside a preview pane rather than at ' +
+    '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
+    'behind a preview.</p></div>';
+}
+</script>
+<script>
+IB.mountShell("wall");
+IB.mountSchedulerControl("sched-ctl");
+IB.mountRunControl("run-ctl");
+IB.themeToggle(document.getElementById("theme"));
+
+let timer = null;
+
+function tile(label, value, status, meta) {
+  const st = String(status || "unknown").toLowerCase();
+  return `<div class="t">
+      <div class="k">${IB.esc(label)}</div>
+      <div class="v v-${st}">${value}</div>
+      ${meta ? `<div class="m">${meta}</div>` : ""}
+    </div>`;
+}
+
+/* A tile filled from the last sweep rather than the live RFC read must say
+   so. Showing a 45-minute-old value under an "RFC LIVE" badge would be a
+   quiet lie. */
+function srcNote(s, field) {
+  const f = (s.fallback_sources || {})[field];
+  if (!f) return "";
+  const age = (f.age_minutes !== null && f.age_minutes !== undefined)
+    ? ` · ${f.age_minutes}m old` : "";
+  return `${IB.esc(f.source)}${age}`;
+}
+
+function gradeCpu(v)  { if (v === null) return "unknown"; return v >= 90 ? "critical" : v >= 80 ? "warning" : "normal"; }
+function gradeWp(v)   { if (v === null) return "unknown"; return v >= 90 ? "critical" : v >= 75 ? "warning" : "normal"; }
+
+function overall(s) {
+  if (!s.connected) return "unknown";
+  const g = [gradeCpu(s.cpu), gradeCpu(s.memory),
+             gradeWp(s.work_processes && s.work_processes.utilization_pct)];
+  // The T-code counters carry the same weight as the OS tiles: 7 ABAP dumps
+  // matters more than CPU at 40%, and a card that ignored them would be
+  // green while the system was failing transactions.
+  for (const c of (s.checks || [])) {
+    if (c.status === "CRITICAL") g.push("critical");
+    else if (c.status === "WARNING") g.push("warning");
+  }
+  if (g.includes("critical")) return "critical";
+  if (g.includes("warning")) return "warning";
+  return "normal";
+}
+
+/* Key counts, not the full T-code grid.
+
+   The wall is read from across a room, so 14 truncated labels ("User …",
+   "Failed…") carry less than five readable numbers. Anything CRITICAL or
+   WARNING is always shown regardless of this list -- a problem must never be
+   hidden by a display preference. The full table is on the detail page. */
+const KEY_CHECKS = [
+  ["sap.al08.user_logons",    "Sessions"],
+  ["sap.sm12.lock_count",     "Locks"],
+  ["sap.st22.dumps",          "Dumps"],
+  ["sap.sm37.cancelled_jobs", "Cancelled jobs"],
+  ["sap.sm13.failed_updates", "Failed updates"],
+];
+
+function checks(list, source, err) {
+  if (err) {
+    return `<div class="checks"><div class="checks-head"><span>Checks</span>
+            <span>error</span></div><div class="no-data">${IB.esc(err)}</div></div>`;
+  }
+  if (!list || !list.length) {
+    return `<div class="checks"><div class="checks-head"><span>Checks</span>
+            <span>no data</span></div>
+            <div class="no-data">No counters returned — system unreachable, or
+            Z_GET_OBSERVABILITY_DATA is not installed.</div></div>`;
+  }
+
+  const by = Object.fromEntries(list.map(c => [c.metric, c]));
+  const bad = list.filter(c => c.status === "CRITICAL" || c.status === "WARNING");
+
+  const key = KEY_CHECKS
+    .filter(([m]) => by[m])
+    .map(([m, label]) => {
+      const c = by[m];
+      return `<div class="kc s-${c.status.toLowerCase()}"
+                   title="${IB.esc(c.metric)}${c.detail ? " — " + IB.esc(c.detail) : ""}">
+          <div class="kc-k">${IB.esc(label)}</div>
+          <div class="kc-v">${IB.esc(c.value.replace(/ count$/, ""))}</div>
+          ${c.detail ? `<div class="kc-d">${IB.esc(c.detail)}</div>` : ""}
+        </div>`;
+    }).join("");
+
+  // Anything breaching a threshold that is not already in the key list.
+  const extra = bad
+    .filter(c => !KEY_CHECKS.some(([m]) => m === c.metric))
+    .map(c => `<div class="kc s-${c.status.toLowerCase()}">
+        <div class="kc-k">${IB.esc(c.tcode)}</div>
+        <div class="kc-v">${IB.esc(c.value.replace(/ count$/, ""))}</div>
+        ${c.detail ? `<div class="kc-d">${IB.esc(c.detail)}</div>` : ""}
+      </div>`).join("");
+
+  return `<div class="checks">
+      <div class="checks-head">
+        <span>Key counts · ${IB.esc(source || "RFC")}</span>
+        <span class="mono">${bad.length ? bad.length + " need attention"
+                                        : "all within threshold"} · ${list.length} checks</span>
+      </div>
+      <div class="kc-row">${key}${extra}</div>
+    </div>`;
+}
+
+function workProcesses(wp) {
+  if (!wp || !wp.available) {
+    return `<div class="wp"><div class="wp-head"><span>Work processes</span>
+            <span>no data</span></div>
+            <div class="no-data">TH_WPINFO returned nothing for this system.</div></div>`;
+  }
+  const pct = wp.utilization_pct;
+  const types = Object.entries(wp.by_type || {}).map(([k, v]) =>
+    `<span>${IB.esc(k)} <b>${v.in_use}/${v.total}</b></span>`).join("");
+  const lr = wp.longest_running
+    ? `<div class="longest">Longest running: WP ${IB.esc(wp.longest_running.wp)} ·
+       ${Math.round(wp.longest_running.seconds / 60)}m ·
+       ${IB.esc(wp.longest_running.user || "system")}
+       ${IB.esc(wp.longest_running.report || "")}</div>` : "";
+
+  return `<div class="wp">
+      <div class="wp-head">
+        <span>Work processes</span>
+        <span class="mono">${wp.in_use} in use / ${wp.total} total · ${wp.free} free</span>
+      </div>
+      <div class="bar"><i class="${IB.barClass(pct)}" style="width:${pct || 0}%"></i></div>
+      <div class="wp-types">${types}</div>
+      ${lr}
+    </div>`;
+}
+
+function instances(list, responseTime, groups) {
+  if ((!list || !list.length) && (!groups || !groups.length)) return "";
+
+  // Two different measurements, never conflated:
+  //   RFC round-trip -- measured here, dispatcher latency only
+  //   SMLG RESP_TIME -- message server's per-group figure, from RZLLITAB
+  const rtt = responseTime && responseTime.rtt;
+  const rttGrade = rtt === null || rtt === undefined ? "unknown"
+                 : rtt >= 1000 ? "critical" : rtt >= 300 ? "warning" : "normal";
+  const rttLine = (rtt === null || rtt === undefined)
+    ? '<span class="no-data">not measured</span>'
+    : `<b class="v-${rttGrade}">${rtt} ms</b> <span class="src src-rfc">RFC LIVE</span>`;
+
+  const instRows = (list || []).map(i => `<tr>
+      <td class="mono">${IB.esc(i.name)}</td>
+      <td class="mono">${IB.esc(i.host)}</td>
+      <td class="mono" style="color:var(--muted-dim)">${IB.esc(i.services || "—")}</td>
+      <td><span class="chip c-live">${IB.esc(i.state)}</span></td>
+    </tr>`).join("");
+
+  // RESP_TIME is 0 until the message server distributes logons through the
+  // group. Saying "not measured" is honest; showing 0 ms would read as an
+  // impossibly fast system.
+  const groupRows = (groups || []).map(g => {
+    const ms = g.response_ms;
+    const grade = ms === null ? "unknown"
+                : ms >= 2000 ? "critical" : ms >= 1000 ? "warning" : "normal";
+    return `<tr>
+      <td class="mono">${IB.esc(g.group)}</td>
+      <td class="mono" style="color:var(--muted-dim)">${IB.esc(g.kind)}</td>
+      <td class="mono">${IB.esc(g.instance)}</td>
+      <td class="mono"><b class="v-${grade}">${ms === null
+          ? '<span class="no-data">not measured</span>' : ms + " ms"}</b></td>
+      <td class="mono">${g.users === null ? "—" : g.users}</td>
+    </tr>`;
+  }).join("");
+
+  return `<div class="inst">
+      ${instRows ? `<table>
+        <tr><th>Instance</th><th>Host</th><th>Services</th><th>State</th></tr>
+        ${instRows}</table>` : ""}
+
+      ${groupRows ? `<div style="margin-top:12px">
+        <div class="checks-head" style="margin-bottom:6px">
+          <span>Logon groups · SMLG</span>
+          <span class="src src-rfc">RZLLITAB</span>
+        </div>
+        <table>
+          <tr><th>Group</th><th>Type</th><th>Instance</th>
+              <th>Response</th><th>Users</th></tr>
+          ${groupRows}
+        </table></div>` : ""}
+
+      <div style="margin-top:9px;font-size:11px;color:var(--muted-dim)">
+        RFC round-trip: ${rttLine}
+      </div>
+    </div>`;
+}
+
+function card(s) {
+  const st = overall(s);
+  const wp = s.work_processes || {};
+  const wpPct = wp.available ? wp.utilization_pct : null;
+
+  const err = s.error
+    ? `<div class="err">${IB.esc(String(s.error).split("\n").slice(0, 4).join("\n"))}${
+        s.cooldown ? `\n\nRetrying in ${s.cooldown}s.` : ""}</div>`
+    : "";
+
+  return `<div class="sys s-${st} ${st === "unknown" ? "unknown-fill" : ""}">
+    <div class="sh">
+      <div>
+        <h3>${IB.esc(s.system)}</h3>
+        <div class="sid">${IB.esc(s.sid || "")} · client ${IB.esc(s.client || "—")}
+          ${s.db_type ? "· " + IB.esc(s.db_type) : ""}</div>
+      </div>
+      <div class="right">
+        ${s.connected ? '<span class="src src-rfc">RFC LIVE</span>'
+                      : '<span class="src src-none">no connection</span>'}
+        <span class="chip ${IB.statusClass(st)}">${st.toUpperCase()}</span>
+      </div>
+    </div>
+
+    <div class="tiles">
+      ${tile("CPU", IB.val(s.cpu, "%", 0), gradeCpu(s.cpu), srcNote(s, "cpu"))}
+      ${tile("Memory", IB.val(s.memory, "%", 0), gradeCpu(s.memory), srcNote(s, "memory"))}
+      ${tile("WP in use", wp.available ? `${wp.in_use}/${wp.total}` : IB.val(null),
+             gradeWp(wpPct), wpPct !== null ? wpPct + "% used" : "")}
+      ${tile("Load 1m", IB.val(s.load_1m, "", 2),
+             s.load_1m === null ? "unknown" : (s.load_1m >= 8 ? "critical" : s.load_1m >= 4 ? "warning" : "normal"),
+             srcNote(s, "load_1m"))}
+      ${tile("Dispatcher", IB.esc(s.dispatcher.label), s.dispatcher.status.toLowerCase(),
+             s.dispatcher.source ? IB.esc(s.dispatcher.source) : "")}
+      ${tile("ICM", IB.esc(s.icm.label), s.icm.status.toLowerCase(),
+             s.icm.source ? IB.esc(s.icm.source) : "")}
+      ${tile("Sessions", IB.val(s.users, "", 0), s.users === null ? "unknown" : "normal")}
+      ${tile("Server time", IB.val(s.server_time), s.server_time ? "normal" : "unknown")}
+    </div>
+
+    ${checks(s.checks, s.check_source, s.check_error)}
+    ${workProcesses(wp)}
+    ${instances(s.instances, {...(s.response_time || {}), rtt: s.rfc_round_trip_ms}, s.logon_groups)}
+    ${err}
+
+    <div class="foot">
+      <span>read ${IB.esc(s.read_at || "–")}</span>
+      ${s.cache_age_seconds ? `<span>cache ${s.cache_age_seconds}s</span>` : ""}
+      ${s.snapshot_age_minutes !== undefined && s.snapshot_age_minutes !== null
+        ? `<span>last sweep ${s.snapshot_age_minutes}m ago</span>` : ""}
+      <button class="btn btn-primary" style="margin-left:auto;padding:4px 11px;font-size:11px"
+              onclick="monitorOne('${IB.esc(s.system)}')"
+              id="run-${IB.esc(s.system)}">Monitor this system</button>
+      <a href="/system?name=${encodeURIComponent(s.system)}"
+         style="color:var(--brand-live);font-weight:700">Detail →</a>
+    </div>
+  </div>`;
+}
+
+/* Monitor ONE system. A full sweep drives SAP GUI for every system and
+   takes minutes; re-checking the one you are looking at should not. */
+async function monitorOne(name) {
+  const btn = document.getElementById("run-" + name);
+  if (btn) { btn.disabled = true; btn.textContent = "Monitoring…"; }
+  try {
+    const r = await fetch("/api/run-now/" + encodeURIComponent(name), { method: "POST" });
+    if (r.status === 409) {
+      const d = await r.json();
+      if (btn) { btn.disabled = false; btn.textContent = "Busy — try again"; }
+      alert(d.detail || "A run is already in progress.");
+      return;
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Monitor this system"; }
+    return;
+  }
+  pollRun(name);
+}
+
+async function pollRun(name) {
+  const btn = document.getElementById("run-" + name);
+  try {
+    const s = await IB.get("/api/run-status");
+    if (s.running) {
+      if (btn) btn.textContent = `Monitoring ${s.current_system || ""}…`;
+      return setTimeout(() => pollRun(name), 2000);
+    }
+  } catch (e) {}
+  if (btn) { btn.disabled = false; btn.textContent = "Monitor this system"; }
+  load();
+}
+
+async function load() {
+  try {
+    const d = await IB.get("/api/live");
+    document.getElementById("wall").innerHTML =
+      d.systems.length ? d.systems.map(card).join("")
+                       : '<div class="empty">No systems configured.</div>';
+    document.getElementById("livecount").textContent = `${d.live_count}/${d.total}`;
+    document.getElementById("gen").textContent = d.generated_at;
+
+    const down = d.systems.filter(s => !s.connected);
+    document.getElementById("banner").innerHTML = down.length
+      ? `<div class="banner banner-warn"><strong>${down.length} system(s) not reachable over RFC:</strong>
+         ${down.map(s => IB.esc(s.system)).join(", ")} — shown as UNKNOWN, not healthy.</div>`
+      : "";
+  } catch (e) {
+    document.getElementById("banner").innerHTML =
+      `<div class="banner banner-err">Could not reach /api/live — ${IB.esc(e.message)}</div>`;
+  }
+}
+
+function schedule() {
+  if (timer) clearInterval(timer);
+  const ms = Number(document.getElementById("rate").value);
+  document.getElementById("every").textContent = ms ? ms / 1000 : "—";
+  if (ms) timer = setInterval(load, ms);
+}
+document.getElementById("rate").onchange = schedule;
+
+load();
+schedule();
+</script>
+</body>
+</html>

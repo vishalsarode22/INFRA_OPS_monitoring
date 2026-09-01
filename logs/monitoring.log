@@ -1,0 +1,42 @@
+2026-08-31 07:32:49,428 | INFO     | collectors.sap_process_collector | Parsed 4 SAP process statuses.
+2026-08-31 07:32:49,429 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
+2026-08-31 07:32:49,429 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses (script format).
+2026-08-31 07:32:49,430 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: garbage | no rows
+2026-08-31 07:32:49,430 | ERROR    | collectors.sap_process_collector | Skipping parse -- collector reported error: boom
+2026-08-31 07:33:05,954 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
+2026-08-31 07:33:05,955 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
+2026-08-31 07:33:05,955 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
+2026-08-31 07:33:05,955 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses (script format).
+2026-08-31 07:33:05,955 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
+2026-08-31 08:28:30,108 | INFO     | collectors.sap_process_collector | SAP process list collected via: su
+2026-08-31 08:28:30,110 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
+2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from "su - tstadm -c 'sapcontrol -nr 02 -function GetProcessList'": bash: sapcontrol: command not found
+2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from '/usr/sap/hostctrl/exe/sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
+2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from '/usr/sap/TST/D02/exe/sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
+2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from '/usr/sap/TST/DVEBMGS02/exe/sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
+2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from '/usr/sap/TST/ASCS02/exe/sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
+2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from '/usr/sap/TST/J02/exe/sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
+2026-08-31 08:28:30,111 | DEBUG    | collectors.sap_process_collector | stderr from 'sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
+2026-08-31 08:28:30,111 | ERROR    | collectors.sap_process_collector | sapcontrol produced no usable output. Tried: su -> bash: sapcontrol: command not found | /usr/sap/hostctrl/exe/sapcontrol -> bash: sapcontrol: command not found | /usr/sap/TST/D02/exe/sapcontrol -> bash: sapcontrol: command not found | /usr/sap/TST/DVEBMGS02/exe/sapcontrol -> bash: sapcontrol: command not found
+2026-08-31 08:28:39,454 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
+2026-08-31 08:28:39,454 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
+2026-08-31 08:28:39,454 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
+2026-08-31 08:28:39,454 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses (script format).
+2026-08-31 08:28:39,454 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
+2026-08-31 10:19:49,576 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
+2026-08-31 10:19:49,576 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
+2026-08-31 10:19:49,576 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
+2026-08-31 10:19:49,577 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses (script format).
+2026-08-31 10:19:49,577 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
+2026-08-31 10:26:13,770 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
+2026-08-31 10:26:13,770 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
+2026-08-31 10:26:13,771 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
+2026-08-31 10:26:13,771 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses (script format).
+2026-08-31 10:26:13,771 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
+2026-09-01 14:42:36,304 | INFO     | collectors.linux_collector | Linux metrics collected successfully.
+2026-09-01 14:42:36,307 | INFO     | collectors.linux_collector | Parsed 7 Linux metrics.
+2026-09-01 14:42:36,968 | INFO     | collectors.sap_process_collector | SAP process list collected via: su
+2026-09-01 14:42:36,970 | INFO     | collectors.sap_process_collector | Parsed 4 SAP process statuses.
+2026-09-01 14:42:38,364 | INFO     | core.orchestrator | [TST] RFC collector: 14 metrics added, 3 already covered by another collector.
+2026-09-01 14:42:38,365 | INFO     | core.orchestrator | Monitoring cycle complete for TST/000: overall=WARNING, metrics=25, errors=0
+2026-09-01 14:42:38,371 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.

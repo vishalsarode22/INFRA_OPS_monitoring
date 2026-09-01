@@ -1,0 +1,43 @@
+2026-08-31 10:19:29,678 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmp4ou7znbr/TST.json
+2026-08-31 10:19:29,678 | INFO     | core.status_snapshot | TST: no GUI evidence this cycle; carrying forward 3 record(s) from 2026-08-31 14:33:00, marked stale.
+2026-08-31 10:19:29,679 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmp4ou7znbr/TST.json
+2026-08-31 10:19:29,679 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmp4ou7znbr/TST.json
+2026-08-31 10:19:49,588 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmpz7a_cy03/TST.json
+2026-08-31 10:19:49,589 | INFO     | core.status_snapshot | TST: no GUI evidence this cycle; carrying forward 2 record(s) from 2026-08-31 14:33:00, marked stale.
+2026-08-31 10:19:49,589 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmpz7a_cy03/TST.json
+2026-08-31 10:19:49,589 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmp5efo0otu/TST.json
+2026-08-31 10:19:49,590 | INFO     | core.status_snapshot | TST: no GUI evidence this cycle; carrying forward 2 record(s) from 2026-08-31 14:33:00, marked stale.
+2026-08-31 10:19:49,590 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmp5efo0otu/TST.json
+2026-08-31 10:19:49,590 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmp5efo0otu/TST.json
+2026-08-31 10:19:49,591 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmpzw51fipr/TST.json
+2026-08-31 10:19:49,591 | INFO     | core.status_snapshot | TST: no GUI evidence this cycle; carrying forward 1 record(s) from 2026-08-31 14:33:00, marked stale.
+2026-08-31 10:19:49,591 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmpzw51fipr/TST.json
+2026-08-31 10:26:13,784 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmpoiwadx9y/TST.json
+2026-08-31 10:26:13,784 | INFO     | core.status_snapshot | TST: no GUI evidence this cycle; carrying forward 2 record(s) from 2026-08-31 14:33:00, marked stale.
+2026-08-31 10:26:13,784 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmpoiwadx9y/TST.json
+2026-08-31 10:26:13,785 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmp8r_q4snd/TST.json
+2026-08-31 10:26:13,786 | INFO     | core.status_snapshot | TST: no GUI evidence this cycle; carrying forward 2 record(s) from 2026-08-31 14:33:00, marked stale.
+2026-08-31 10:26:13,786 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmp8r_q4snd/TST.json
+2026-08-31 10:26:13,786 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmp8r_q4snd/TST.json
+2026-08-31 10:26:13,787 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmpos72za5u/TST.json
+2026-08-31 10:26:13,787 | INFO     | core.status_snapshot | TST: no GUI evidence this cycle; carrying forward 1 record(s) from 2026-08-31 14:33:00, marked stale.
+2026-08-31 10:26:13,788 | INFO     | core.status_snapshot | Status snapshot saved for TST: /tmp/tmpos72za5u/TST.json
+2026-08-31 12:03:15,052 | WARNING  | core.schedules | Invalid schedule time '99:99'; using 08:00.
+2026-08-31 12:03:15,054 | WARNING  | core.schedules | Invalid schedule time '25:00'; using 08:00.
+2026-08-31 12:03:15,055 | WARNING  | core.schedules | Invalid schedule time 'abc'; using 08:00.
+2026-08-31 12:03:15,055 | WARNING  | core.schedules | Invalid schedule time ''; using 08:00.
+2026-09-01 14:42:08,114 | INFO     | main | ===== Pipeline START for system TST =====
+2026-09-01 14:42:09,633 | INFO     | sap_gui.launcher | Launching SAP Logon: C:\Program Files (x86)\SAP\FrontEnd\SAPgui\saplogon.exe
+2026-09-01 14:42:14,355 | INFO     | sap_gui.launcher | SAP Logon 800 pad is visible.
+2026-09-01 14:42:15,367 | INFO     | sap_gui.launcher | Selecting connection: test system
+2026-09-01 14:42:22,096 | INFO     | sap_gui.launcher | Opened connection 'test system' via keyboard activation.
+2026-09-01 14:42:24,097 | INFO     | sap_gui.connection | Finding SAP login window...
+2026-09-01 14:42:24,376 | INFO     | sap_gui.connection | SAP login window found: 'SAP' (pattern '^SAP$').
+2026-09-01 14:42:30,408 | WARNING  | sap_gui.connection | Could not focus the SAP window: {'title_re': '^SAP$', 'visible_only': True, 'top_level_only': True, 'backend': 'win32'}
+2026-09-01 14:42:30,408 | INFO     | sap_gui.connection | Moving to Client field...
+2026-09-01 14:42:35,421 | WARNING  | main | TST: SAP GUI unavailable (ElementNotFoundError: {'title_re': '^SAP$', 'visible_only': True, 'top_level_only': True, 'backend': 'win32'}). Continuing with RFC/SSH collectors.
+2026-09-01 14:42:38,365 | INFO     | main | Skipping T-code GUI evidence for TST -- GUI access disabled or no active SAP session.
+2026-09-01 14:42:38,447 | INFO     | core.status_snapshot | TST: no GUI evidence this cycle; carrying forward 21 record(s) from 2026-08-28 10:55:03, marked stale.
+2026-09-01 14:42:38,455 | INFO     | core.status_snapshot | Status snapshot saved for TST: C:\infrabeatops\dashboard\snapshots\TST.json
+2026-09-01 14:42:39,139 | INFO     | reporting.excel_template_writer | MetroBrands Excel template filled: C:/infrabeatops/reports/2026-09-01/TST/TST_Monitoring_Sheet.xlsx
+2026-09-01 14:43:10,022 | INFO     | main | ===== Pipeline COMPLETE for system TST (gui_available=False) =====

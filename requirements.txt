@@ -1,0 +1,17 @@
+fastapi
+starlette
+uvicorn
+pydantic
+requests
+PyYAML
+python-dotenv
+pandas
+openpyxl
+reportlab
+Pillow
+pytest
+httpx
+paramiko
+# RFC collector. Requires the SAP NetWeaver RFC SDK on the host;
+# the collector degrades quietly if this is absent.
+pyrfc

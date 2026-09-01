@@ -1,0 +1,746 @@
+{
+  "system": "CENTOR_QAS",
+  "client": "100",
+  "cycle_timestamp": "2026-08-28 10:57:59",
+  "overall_status": "NORMAL",
+  "metrics": [
+    {
+      "name": "sap.sm13.failed_updates",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": "Extracted from SM13; evidence metric 'update_count'."
+    },
+    {
+      "name": "sap.sm37.active_jobs",
+      "display_value": "0 count",
+      "status": "UNKNOWN",
+      "detail": "Extracted from SM37; evidence metric 'active_jobs'."
+    },
+    {
+      "name": "sap.sm66.running_processes",
+      "display_value": "1 count",
+      "status": "UNKNOWN",
+      "detail": "Extracted from SM66; evidence metric 'running_processes'."
+    },
+    {
+      "name": "sap.smq1.entries",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": "Extracted from SMQ1; evidence metric 'entries_displayed'."
+    },
+    {
+      "name": "sap.smq1.queues",
+      "display_value": "0 count",
+      "status": "UNKNOWN",
+      "detail": "Extracted from SMQ1; evidence metric 'queues_displayed'."
+    },
+    {
+      "name": "sap.smq2.entries",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": "Extracted from SMQ2; evidence metric 'entries_displayed'."
+    },
+    {
+      "name": "sap.smq2.queues",
+      "display_value": "0 count",
+      "status": "UNKNOWN",
+      "detail": "Extracted from SMQ2; evidence metric 'queues_displayed'."
+    },
+    {
+      "name": "sap.sost.send_requests",
+      "display_value": "0 count",
+      "status": "UNKNOWN",
+      "detail": "Extracted from SOST; evidence metric 'send_requests'."
+    },
+    {
+      "name": "sap.sost.waiting",
+      "display_value": "0 count",
+      "status": "UNKNOWN",
+      "detail": "Extracted from SOST; evidence metric 'waiting'."
+    },
+    {
+      "name": "sap.sost.sent",
+      "display_value": "0 count",
+      "status": "UNKNOWN",
+      "detail": "Extracted from SOST; evidence metric 'sent'."
+    },
+    {
+      "name": "sap.sost.errors",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": "Extracted from SOST; evidence metric 'errors'."
+    },
+    {
+      "name": "sap.sp01.spool_count",
+      "display_value": "0 count",
+      "status": "UNKNOWN",
+      "detail": "Extracted from SP01; evidence metric 'spool_count_visible'."
+    }
+  ],
+  "ai_analysis": null,
+  "operational_intelligence": {
+    "overall_signal": "NO_SIGNIFICANT_INTELLIGENCE",
+    "score": 0.0,
+    "signals": [],
+    "key_findings": [],
+    "limitations": [
+      "sap.sm13.failed_updates: insufficient baseline history",
+      "sap.sm37.active_jobs: insufficient baseline history",
+      "sap.sm66.running_processes: insufficient baseline history",
+      "sap.smq1.entries: insufficient baseline history",
+      "sap.smq1.queues: insufficient baseline history",
+      "sap.smq2.entries: insufficient baseline history",
+      "sap.smq2.queues: insufficient baseline history",
+      "sap.sost.send_requests: insufficient baseline history",
+      "sap.sost.waiting: insufficient baseline history",
+      "sap.sost.sent: insufficient baseline history",
+      "sap.sost.errors: insufficient baseline history",
+      "sap.sp01.spool_count: insufficient baseline history"
+    ]
+  },
+  "events": [],
+  "incidents": [],
+  "gui_evidence": [
+    {
+      "tcode": "AL08",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "evidence_id": "EV-CENTOR_QAS-AL08-20260828-052759-B7977B",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:57:59",
+        "finished_at": "2026-08-28T10:58:03"
+      }
+    },
+    {
+      "tcode": "DB01",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "evidence_id": "EV-CENTOR_QAS-DB01-20260828-052803-7B3669",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:03",
+        "finished_at": "2026-08-28T10:58:10"
+      }
+    },
+    {
+      "tcode": "DB02",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "evidence_id": "EV-CENTOR_QAS-DB02-20260828-052810-6687F5",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:10",
+        "finished_at": "2026-08-28T10:58:16"
+      }
+    },
+    {
+      "tcode": "DB12",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "evidence_id": "EV-CENTOR_QAS-DB12-20260828-052816-883589",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:16",
+        "finished_at": "2026-08-28T10:58:19"
+      }
+    },
+    {
+      "tcode": "SCOT",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "evidence_id": "EV-CENTOR_QAS-SCOT-20260828-052819-49F86D",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:19",
+        "finished_at": "2026-08-28T10:58:22"
+      }
+    },
+    {
+      "tcode": "SM12",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "sm12_variant": "select_lock_entries",
+        "evidence_id": "EV-CENTOR_QAS-SM12-20260828-052822-B3227A",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:22",
+        "finished_at": "2026-08-28T10:58:27"
+      }
+    },
+    {
+      "tcode": "SM13",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "update_count": 0,
+        "update_summary": "0 Update records found",
+        "evidence_id": "EV-CENTOR_QAS-SM13-20260828-052827-4D95E3",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:27",
+        "finished_at": "2026-08-28T10:58:31"
+      }
+    },
+    {
+      "tcode": "SM21",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "evidence_id": "EV-CENTOR_QAS-SM21-20260828-052831-DA543A",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:31",
+        "finished_at": "2026-08-28T10:58:35"
+      }
+    },
+    {
+      "tcode": "SM37",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "active_jobs": 0,
+        "active_jobs_date_from": "28.08.2026",
+        "active_jobs_date_to": "28.08.2026",
+        "active_jobs_status": "RUNNING",
+        "evidence_id": "EV-CENTOR_QAS-SM37-20260828-052835-4FC429",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:35",
+        "finished_at": "2026-08-28T10:58:38"
+      }
+    },
+    {
+      "tcode": "SM37_CANCELLED",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "cancelled_jobs": 0,
+        "cancelled_job_rows": [],
+        "cancelled_from_date": "27.08.2026",
+        "cancelled_to_date": "28.08.2026",
+        "sap_status": "No job matches the selection criteria",
+        "evidence_id": "EV-CENTOR_QAS-SM37_CANCELLED-20260828-052838-DC9D07",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:38",
+        "finished_at": "2026-08-28T10:58:42"
+      }
+    },
+    {
+      "tcode": "SM51",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "evidence_id": "EV-CENTOR_QAS-SM51-20260828-052842-5431DE",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:42",
+        "finished_at": "2026-08-28T10:58:46"
+      }
+    },
+    {
+      "tcode": "SM58",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "trfc_status": "Nothing was selected",
+        "evidence_id": "EV-CENTOR_QAS-SM58-20260828-052846-638F90",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:46",
+        "finished_at": "2026-08-28T10:58:50"
+      }
+    },
+    {
+      "tcode": "SM50",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "total_work_processes": 16,
+        "running_processes": 1,
+        "waiting_processes": 15,
+        "stopped_processes": 0,
+        "held_processes": 0,
+        "state_counts": {
+          "Waiting": 15,
+          "Running": 1
+        },
+        "processes": [
+          {
+            "wp_index": "0",
+            "wp_type": "DIA",
+            "pid": "1,865",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "1:07:02",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "1",
+            "wp_type": "BTC",
+            "pid": "24,777",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "0:14:43",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "2",
+            "wp_type": "DIA",
+            "pid": "34,058",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "0:54:39",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "3",
+            "wp_type": "BTC",
+            "pid": "27,235",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "1:10:18",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "4",
+            "wp_type": "DIA",
+            "pid": "37,073",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "3:12:40",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "5",
+            "wp_type": "BTC",
+            "pid": "23,559",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "1:18:40",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "6",
+            "wp_type": "DIA",
+            "pid": "56,026",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "3:52:43",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "7",
+            "wp_type": "DIA",
+            "pid": "60,683",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "0:33:23",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "8",
+            "wp_type": "DIA",
+            "pid": "5,288",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "0:30:13",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "9",
+            "wp_type": "DIA",
+            "pid": "56,486",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "0:28:45",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "10",
+            "wp_type": "UPD",
+            "pid": "56,030",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "0:01:35",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "11",
+            "wp_type": "DIA",
+            "pid": "57,513",
+            "state": "Running",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "1:08:45",
+            "elapsed_time": "",
+            "priority": "High",
+            "wait_priority": "",
+            "program": "CL_SERVER_INFO================CP",
+            "client": "100",
+            "user": "BASIS",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "12",
+            "wp_type": "DIA",
+            "pid": "3,679",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "1:53:58",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "13",
+            "wp_type": "DIA",
+            "pid": "60,527",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "1:43:00",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "14",
+            "wp_type": "SPO",
+            "pid": "56,034",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "0:19:07",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          },
+          {
+            "wp_index": "15",
+            "wp_type": "UPD2",
+            "pid": "56,035",
+            "state": "Waiting",
+            "state_info": "",
+            "failures": "",
+            "sem_locked": "",
+            "sem_locking": "",
+            "cpu": "0:01:07",
+            "elapsed_time": "",
+            "priority": "",
+            "wait_priority": "",
+            "program": "",
+            "client": "",
+            "user": "",
+            "current_action": "",
+            "action_info": ""
+          }
+        ],
+        "screenshot_captured": true,
+        "analysis": {
+          "health": "HEALTHY",
+          "summary": {
+            "total": 16,
+            "running": 1,
+            "waiting": 15,
+            "stopped": 0,
+            "held": 0,
+            "state_counts": {
+              "Waiting": 15,
+              "Running": 1
+            }
+          },
+          "findings": []
+        },
+        "evidence_id": "EV-CENTOR_QAS-SM50-20260828-052850-933E9F",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:50",
+        "finished_at": "2026-08-28T10:58:54"
+      }
+    },
+    {
+      "tcode": "SM66",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "running_processes": 1,
+        "evidence_id": "EV-CENTOR_QAS-SM66-20260828-052854-79BDA5",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:54",
+        "finished_at": "2026-08-28T10:58:58"
+      }
+    },
+    {
+      "tcode": "SMLG",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "instance_count": 0,
+        "instances": [],
+        "screenshot_captured": true,
+        "evidence_id": "EV-CENTOR_QAS-SMLG-20260828-052858-C8DAAC",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:58:58",
+        "finished_at": "2026-08-28T10:59:02"
+      }
+    },
+    {
+      "tcode": "SMQ1",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "entries_displayed": 0,
+        "queues_displayed": 0,
+        "evidence_id": "EV-CENTOR_QAS-SMQ1-20260828-052902-FCD2EF",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:59:02",
+        "finished_at": "2026-08-28T10:59:05"
+      }
+    },
+    {
+      "tcode": "SMQ2",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "entries_displayed": 0,
+        "queues_displayed": 0,
+        "evidence_id": "EV-CENTOR_QAS-SMQ2-20260828-052905-ECFDD6",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:59:05",
+        "finished_at": "2026-08-28T10:59:09"
+      }
+    },
+    {
+      "tcode": "SOST",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "send_requests": 0,
+        "waiting": 0,
+        "sent": 0,
+        "errors": 0,
+        "evidence_id": "EV-CENTOR_QAS-SOST-20260828-052909-2DFA36",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:59:09",
+        "finished_at": "2026-08-28T10:59:15"
+      }
+    },
+    {
+      "tcode": "SP01",
+      "display_value": "captured (1)",
+      "extra_data": {
+        "spool_count_visible": 0,
+        "evidence_id": "EV-CENTOR_QAS-SP01-20260828-052915-4E0566",
+        "attempts": 1,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [],
+        "started_at": "2026-08-28T10:59:15",
+        "finished_at": "2026-08-28T10:59:20"
+      }
+    },
+    {
+      "tcode": "ST03N",
+      "display_value": "failed",
+      "extra_data": {
+        "evidence_id": "EV-CENTOR_QAS-ST03N-20260828-052920-C4FB59",
+        "attempts": 3,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [
+          "session_recovery_after_attempt_1",
+          "session_reacquired_before_attempt_2",
+          "session_recovery_after_attempt_2",
+          "session_reacquired_before_attempt_3"
+        ],
+        "started_at": "2026-08-28T10:59:20",
+        "finished_at": "2026-08-28T10:59:48"
+      }
+    },
+    {
+      "tcode": "ST22",
+      "display_value": "failed",
+      "extra_data": {
+        "evidence_id": "EV-CENTOR_QAS-ST22-20260828-052948-1CE9C4",
+        "attempts": 3,
+        "system": "CENTOR_QAS",
+        "client": "100",
+        "recovery_actions": [
+          "session_recovery_after_attempt_1",
+          "session_reacquired_before_attempt_2",
+          "session_recovery_after_attempt_2",
+          "session_reacquired_before_attempt_3"
+        ],
+        "started_at": "2026-08-28T10:59:48",
+        "finished_at": "2026-08-28T11:00:09"
+      }
+    }
+  ],
+  "generated_at": "2026-08-28 11:00:12"
+}
