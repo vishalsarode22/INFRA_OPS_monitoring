@@ -130,9 +130,10 @@ class Recompress(unittest.TestCase):
         from PIL import Image
         import sap_gui.screenshot as ss
         import glob
-        src = sorted(glob.glob('reports/**/screenshots/*.png', recursive=True))
+        src = [f for f in sorted(glob.glob('reports/**/screenshots/*.png', recursive=True))
+               if os.path.getsize(f) > 400_000]
         if not src:
-            self.skipTest("no sample screenshots")
+            self.skipTest("no uncompressed screenshots available")
         import shutil, tempfile
         tmp = os.path.join(tempfile.mkdtemp(), "shot.png")
         shutil.copy(src[0], tmp)
