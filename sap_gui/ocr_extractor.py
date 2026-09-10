@@ -118,12 +118,27 @@ def _preprocess_for_ocr(image_path: str) -> Image.Image:
     return img
 
 
+# Tesseract tuning knob, left overridable but NOT defaulted to --psm 6.
+#
+# PSM 6 ("single uniform block") is the usual advice for screenshots, on the
+# theory that skipping page-layout analysis is faster. Measured on this
+# project's own SAP screens it was 0.94x -- i.e. very slightly SLOWER, not
+# faster -- because Tesseract's cost here is dominated by LSTM recognition of
+# the text itself, not by layout detection. Left at Tesseract's default so the
+# accuracy characteristics of the existing ocr_patterns.yaml regexes do not
+# change for no gain. Set IBO_TESSERACT_CONFIG to experiment per site.
+_TESSERACT_CONFIG = os.getenv("IBO_TESSERACT_CONFIG", "").strip()
+
+
 def run_ocr(image_path: str) -> str:
     """Returns the full OCR text extracted from a screenshot, after preprocessing."""
     _configure_tesseract()
     try:
         img = _preprocess_for_ocr(image_path)
-        text = pytesseract.image_to_string(img)
+        if _TESSERACT_CONFIG:
+            text = pytesseract.image_to_string(img, config=_TESSERACT_CONFIG)
+        else:
+            text = pytesseract.image_to_string(img)
         return text
     except Exception as e:
         log.error(f"OCR failed for {image_path}: {e}")

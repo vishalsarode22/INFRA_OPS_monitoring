@@ -1947,10 +1947,12 @@ def read_live(system: str, cfg: dict, use_cache: bool = True, resolve_names: boo
                     return None
                 return value
 
-            cpu, memory = number("EV_CPU_UTIL_PCT"), number("EV_MEM_UTIL_PCT")
-            payload["cpu"] = None if cpu == 0 else cpu
-            payload["memory"] = None if memory == 0 else memory
-            payload["load_1m"] = number("EV_LOAD_1M")   # 0.00 is a real value
+            # OS tiles are NOT read from the FM. Its EV_CPU_UTIL_PCT /
+            # EV_MEM_UTIL_PCT / EV_LOAD_1M exports were SXPG command output
+            # (S_LOG_COM, since withdrawn -- abap/SXPG_REMOVAL.md). A system
+            # still running the older FM returns numbers for them, and those
+            # numbers must be ignored, not displayed. SMON and CCMS below are
+            # the only sources for cpu / memory / load_1m.
             payload["users"] = number("EV_ACTIVE_USERS")
             payload["db_type"] = str(fm.get("EV_DB_TYPE", "") or "").strip() or None
             payload["server_time"] = str(fm.get("EV_SYS_TIME", "") or "").strip() or None
@@ -2000,6 +2002,7 @@ def read_live(system: str, cfg: dict, use_cache: bool = True, resolve_names: boo
             for key in ("cpu", "memory", "load_1m"):
                 if smon.get(key) is not None:
                     payload[key] = smon[key]
+                    payload["os_source"] = "SMON"
             if smon.get("sessions") is not None:
                 payload["sessions"] = smon["sessions"]
 
@@ -2035,12 +2038,22 @@ def read_live(system: str, cfg: dict, use_cache: bool = True, resolve_names: boo
             for key in ("cpu", "memory", "load_1m"):
                 if payload.get(key) is None and ccms.get(key) is not None:
                     payload[key] = ccms[key]
+                    payload.setdefault("os_source", "CCMS")
                     payload.setdefault("fallback_sources", {})[key] = {
                         "source": ccms.get("source", "RFC · CCMS RZ20"), "age_minutes": 0}
             if payload.get("load_1m") is None and ccms.get("load_5m") is not None:
                 payload["load_5m"] = ccms["load_5m"]
                 payload.setdefault("fallback_sources", {})["load_5m"] = {
                     "source": ccms.get("source", "RFC · CCMS RZ20"), "age_minutes": 0}
+
+        # Tell the operator WHY the OS tiles are empty, rather than leaving
+        # three blank cards. The usual cause is /SDF/SMON not scheduled.
+        if all(payload.get(k) is None for k in ("cpu", "memory", "load_1m")):
+            payload.setdefault("os_source", None)
+            payload["os_hint"] = (
+                "No OS metrics: schedule /SDF/SMON on this system (transaction "
+                "/SDF/SMON, 60s interval), or grant the RFC user S_XMI_PROD so "
+                "the CCMS RZ20 fallback can read saposcol.")
 
         # Full T-code counter set, read on the SAME connection. Calling the
         # collector separately would double the number of RFC logons per poll.

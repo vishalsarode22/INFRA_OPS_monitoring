@@ -971,11 +971,32 @@ def build_rca_prompt(context: dict) -> str:
         ensure_ascii=False,
     )
 
-    intelligence_json = json.dumps(
-        intelligence_block,
-        indent=2,
-        ensure_ascii=False,
-    )
+    # The operational-intelligence section is emitted only when there is
+    # intelligence to show. When present it is keyed by name
+    # ("operational_intelligence") so the provider can tell it apart from
+    # the primary evidence, and it carries its own guardrail text. When
+    # absent, nothing about it appears in the prompt at all -- a legacy
+    # caller that passed no intelligence should not see an empty block or
+    # a guardrail for something that is not there.
+    if intelligence_block:
+        intelligence_json = json.dumps(
+            {"operational_intelligence": intelligence_block},
+            indent=2,
+            ensure_ascii=False,
+        )
+        intelligence_section = f"""
+OPERATIONAL INTELLIGENCE
+------------------------
+The following is supporting evidence only.
+
+It MUST NOT override the authoritative incident severity stated above.
+
+It MUST NOT be presented as a confirmed root cause.
+
+{intelligence_json}
+"""
+    else:
+        intelligence_section = ""
 
     return f"""
 You are an SAP Basis incident-analysis assistant.
@@ -1214,16 +1235,7 @@ IMPORTANT:
 A single ST22 dump without the exact failing ABAP statement should
 normally NOT receive HIGH confidence for an exact code defect.
 
-OPERATIONAL INTELLIGENCE
-------------------------
-The following is supporting evidence only.
-
-It MUST NOT override authoritative severity.
-
-It MUST NOT be presented as a confirmed root cause.
-
-{intelligence_json}
-
+{intelligence_section}
 OUTPUT LIMITS
 -------------
 supporting_evidence: maximum 5 items

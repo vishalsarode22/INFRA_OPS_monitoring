@@ -3,7 +3,10 @@ ROOT = Path(__file__).resolve().parents[1]
 HTML = ROOT / 'dashboard' / 'static' / 'index.html'
 def source(): return HTML.read_text(encoding='utf-8')
 def test_dashboard_has_theme_toggle():
-    s=source(); assert 'data-theme-toggle' in s; assert 'infrabeatops-theme' in s
+    # The theme is persisted under localStorage key "ibo-theme" -- the same
+    # key every other page under dashboard/static reads, so a choice made on
+    # one page holds on all of them. (Was "infrabeatops-theme" originally.)
+    s=source(); assert 'data-theme-toggle' in s; assert '"ibo-theme"' in s
 def test_dashboard_is_responsive():
     s=source(); assert '@media (max-width: 720px)' in s; assert '@media (max-width: 1000px)' in s
 def test_dashboard_consumes_unified_overview():

@@ -12,8 +12,57 @@ from datetime import datetime
 
 from utils.logger import get_logger
 from utils.paths import BASE_DIR
+from core import heartbeat
 
 log = get_logger(__name__, "application")
+
+
+def _recompress(filepath: str) -> None:
+    """
+    Re-encode a hardCopy PNG in place, LOSSLESSLY, at roughly 1/100th its size.
+
+    SAP GUI's hardCopy writes an essentially uncompressed PNG: measured on this
+    project's own evidence, a 1920x1008 screen is 5,806,134 bytes. The identical
+    pixels re-encoded by Pillow with optimize=True are 46-138KB depending on
+    screen content -- a 41x to 123x reduction with the image bit-for-bit
+    unchanged.
+
+    That bloat was being paid four separate times per screenshot: writing 5.8MB
+    to disk, the file-ready poll below waiting for that write to flush,
+    Tesseract decoding it during OCR, and pdflatex reading it while building the
+    report. Four days of evidence occupied 944MB; re-encoded it is 6.5MB.
+
+    WHY NOT A PALETTE.
+    Quantising to a 64- or 256-colour palette is smaller still (16-59KB), and it
+    is tempting because SAP GUI looks like flat colour. It is not: the text is
+    subpixel-antialiased, so quantisation moves the greys around the glyph
+    edges. Measured against the originals, OCR output matched only 69-96% with a
+    64-colour palette and 79-94% at 256, while lossless matched 100.00% on every
+    screen tested. Evidence that reads differently after compression is not
+    evidence. The extra 30KB is not worth an OCR-derived lock count being wrong.
+
+    Best-effort by design. A recompression failure leaves the original file in
+    place and the pipeline continues -- evidence that is large is still
+    evidence, and this must never be the reason a sweep fails.
+    """
+    try:
+        from PIL import Image
+    except Exception as e:  # noqa: BLE001 -- Pillow missing is not fatal here
+        log.warning(f"Pillow unavailable, leaving screenshot uncompressed: {e}")
+        return
+
+    try:
+        before = os.path.getsize(filepath)
+        with Image.open(filepath) as img:
+            img.load()
+            img.save(filepath, "PNG", optimize=True)
+        after = os.path.getsize(filepath)
+        log.debug(
+            f"Recompressed {os.path.basename(filepath)}: "
+            f"{before // 1024}KB -> {after // 1024}KB"
+        )
+    except Exception as e:  # noqa: BLE001
+        log.warning(f"Could not recompress {filepath}, keeping original: {e}")
 
 
 def _screenshots_dir_for_today(system_name: str | None = None) -> str:
@@ -52,9 +101,20 @@ def capture_screenshot(session, tcode: str, output_dir: str = None) -> str:
         while time.time() < deadline:
             if os.path.isfile(filepath):
                 try:
-                    if os.path.getsize(filepath) > 0:
-                        log.info(f"Screenshot saved: {filepath}")
-                        return filepath
+                    # A non-zero size is not the same as a finished write:
+                    # hardCopy streams several MB, so a poll can catch the file
+                    # mid-flush. Require the size to hold steady across two
+                    # polls before treating it as complete, otherwise
+                    # _recompress() below can open a truncated PNG.
+                    size = os.path.getsize(filepath)
+                    if size > 0:
+                        time.sleep(0.1)
+                        if os.path.getsize(filepath) == size:
+                            _recompress(filepath)
+                            heartbeat.beat(f"screenshot:{tcode}")
+                            log.info(f"Screenshot saved: {filepath}")
+                            return filepath
+                        continue
                 except OSError:
                     pass
 

@@ -29,6 +29,7 @@ from sap_gui.reliability import (
 )
 from core.config_loader import get_ocr_patterns
 from core.models import MetricResult, Status
+from core import heartbeat
 from utils.logger import get_logger
 from reporting.evidence import EvidenceRecord, create_evidence_id, write_evidence_index
 from reporting.system_paths import system_evidence_root
@@ -79,9 +80,7 @@ def collect_tcode_evidence(
                 path = capture_screenshot(
                     session,
                     name,
-                    output_dir=str(
-    system_evidence_root(system) /
-     "screenshots"),
+                    output_dir=str(system_evidence_root(system) / "screenshots"),
                 )
                 if path:
                     screenshots.append(path)
@@ -129,12 +128,32 @@ def collect_tcode_evidence(
                     capture()
 
                 ocr_patterns = all_ocr_patterns.get(tcode, {})
-                # OCR EVERY captured screen, not only the ones with patterns:
-                # the recognised text is what the report uses to describe
-                # what was captured (rows seen, statuses, counts) once the
-                # screenshots themselves are no longer embedded. Kept short
-                # and only for the final screenshot.
-                if screenshots:
+
+                # OCR ONLY WHERE IT ADDS SOMETHING.
+                #
+                # This used to OCR every captured screen unconditionally, for
+                # the narrative excerpt. Full-page Tesseract on a 1920x1008 SAP
+                # screen is 1.5-3s, so 22 T-codes cost 35-65s per system per
+                # sweep -- and for most of them the result was discarded except
+                # as ocr_excerpt[:1200] filler, because the scripting action had
+                # already returned the real values (SM12 lock counts, SM37 job
+                # rows, ST22 dump attributes, SM50 process states).
+                #
+                # OCR now runs when it is the only way to get a value:
+                #   1. the T-code has OCR patterns defined, or
+                #   2. the scripting action returned nothing usable, so the
+                #      screenshot is the sole evidence of what was on screen.
+                # Everything else keeps its structured data and skips the read.
+                # Set IBO_OCR_ALWAYS=1 to restore the old behaviour.
+                _scripting_gave_data = bool(
+                    {k: v for k, v in extracted_data.items() if v not in (None, "", [], {})}
+                )
+                _ocr_always = os.environ.get("IBO_OCR_ALWAYS", "").strip() in ("1", "true", "yes")
+                _should_ocr = bool(screenshots) and (
+                    _ocr_always or bool(ocr_patterns) or not _scripting_gave_data
+                )
+
+                if _should_ocr:
                     try:
                         ocr_text = run_ocr(screenshots[-1])
                     except Exception:  # noqa: BLE001 -- OCR is best-effort
@@ -147,6 +166,8 @@ def collect_tcode_evidence(
                         ocr_data = extract_patterns(ocr_text, ocr_patterns)
                         for key, value in ocr_data.items():
                             extracted_data.setdefault(key, value)
+                elif screenshots:
+                    extracted_data.setdefault("ocr_skipped", "structured data available")
 
                 # ---------------------------------------------------------------
                 # Structured T-code analysis
@@ -211,6 +232,7 @@ def collect_tcode_evidence(
 
                 DEFAULT_TCODE_POLICY.sleep_before_retry(attempt)
 
+        heartbeat.beat(f"tcode:{tcode}")
         finished_at = time.strftime("%Y-%m-%dT%H:%M:%S")
         evidence_data = {
             **extracted_data,

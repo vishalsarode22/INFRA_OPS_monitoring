@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "system": "PS4",
+  "samples": {
+    "sap.sm37.cancelled_jobs": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 9.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 9.0
+      }
+    ],
+    "sap.sm12.lock_count": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 452.0
+      },
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 132.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 962.0
+      }
+    ],
+    "sap.sm58.stuck_entries": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 500.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 500.0
+      }
+    ],
+    "sap.al08.user_logons": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 0.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 0.0
+      }
+    ],
+    "sap.sm66.wp_saturation_pct": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 7.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 8.0
+      }
+    ],
+    "sap.sm50.priv_mode_wp": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 0.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 0.0
+      }
+    ],
+    "sap.sm50.long_running_wp": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 1.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 1.0
+      }
+    ],
+    "sap.sm66.max_instance_saturation_pct": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 7.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 8.0
+      }
+    ],
+    "sap.st03.dialog_resp_ms": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 54879.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 101220.0
+      }
+    ],
+    "sap.st03.top_report_db_ms": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 36149855.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 97937488.0
+      }
+    ],
+    "sap.st03.top_user_memory_mb": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 1688.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 2141.8
+      }
+    ],
+    "sap.st03.max_instance_resp_ms": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 60900.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 130332.0
+      }
+    ],
+    "sap.st03.db_time_pct": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 33.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 42.6
+      }
+    ],
+    "sap.sm12.locks_per_user_max": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 348.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 1027.0
+      }
+    ],
+    "sap.sm12.users_with_many_locks": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 2.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 4.0
+      }
+    ],
+    "sap.sm12.oldest_lock_minutes": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 12358.0
+      },
+      {
+        "timestamp": "2026-09-10T16:18:29.438647",
+        "value": 12363.0
+      }
+    ],
+    "sap.sm37.active_jobs": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 0.0
+      }
+    ],
+    "sap.sm51.instances_started": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 2.0
+      }
+    ],
+    "sap.sm66.process_rows": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 26.0
+      }
+    ],
+    "sap.sm66.running_processes": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 14.0
+      }
+    ],
+    "sap.sp01.spool_count": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 0.0
+      }
+    ],
+    "sap.st22.dump_count": [
+      {
+        "timestamp": "2026-09-10T16:12:56.545483",
+        "value": 28.0
+      }
+    ]
+  }
+}

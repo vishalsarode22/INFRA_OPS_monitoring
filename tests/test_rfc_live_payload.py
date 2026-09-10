@@ -182,13 +182,21 @@ def test_read_live_exposes_full_record_and_merged_checklist(monkeypatch):
     assert [r["metric"] for r in p["perf"]["metrics"]] == [
         "sap.sm12.oldest_lock_minutes", "sap.st03.dialog_resp_ms"]
     assert p["perf"]["metrics"][0]["extra"]["owner_clock_offset_min"] == 330
-    # checklist: merged, sorted by severity, tiles excluded
+    # checklist: merged, sorted by severity, tiles excluded.
+    #
+    # sap.st03.dialog_resp_ms is deliberately NOT in the compact grid
+    # (rfc_live._CHECK_GRID_EXCLUDE): it is rendered per instance in the
+    # instances table with a readable duration, and repeating it here as a
+    # bare ms figure was redundant. It must still be present in the full
+    # record and the perf block -- excluded from the grid is not the same as
+    # dropped.
     checklist = [(c["metric"], c["status"]) for c in p["checks"]]
     assert checklist == [
         ("sap.sm12.oldest_lock_minutes", "CRITICAL"),
         ("sap.st22.dumps", "WARNING"),
-        ("sap.st03.dialog_resp_ms", "NORMAL"),
     ]
+    assert "sap.st03.dialog_resp_ms" in names
+    assert "sap.st03.dialog_resp_ms" in [r["metric"] for r in p["perf"]["metrics"]]
     assert p["checks"][0]["label"] == "Oldest lock age"
 
 

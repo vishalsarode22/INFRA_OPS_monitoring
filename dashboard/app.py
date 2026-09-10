@@ -1545,8 +1545,19 @@ def create_system(system: NewSystem):
             alert_receivers=system.alert_receivers,
             alert_receivers_cc=system.alert_receivers_cc,
         )
-    except Exception as exc:
+    except ValueError as exc:
+        # Validation problems (duplicate name, bad field) are the caller's to
+        # fix, and the message is ours, so it is safe to return.
         raise HTTPException(status_code=400, detail=f"Could not add system: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        # Anything else is a server fault. Its message may carry a file path,
+        # a YAML parser trace or a credential fragment -- log it here, where
+        # it belongs, and give the client a fixed string. This used to return
+        # str(exc) in the 400 body, which test_security_hardening exists to
+        # catch.
+        log.error("create_system failed for %r: %s: %s",
+                  system.name, type(exc).__name__, exc)
+        raise HTTPException(status_code=500, detail="Unable to create system.")
 
     # New credentials deserve an immediate retry rather than inheriting a
     # cooldown left over from a previous failure for the same name.

@@ -49,6 +49,11 @@ def _by_key(session, client="100"):
     rp._shape_cache.clear()
     rp._sap_clock.clear()       # clock is learned per poll; never carry it between tests
     rp._owner_offset_min.clear()
+    # "SQL Monitor is off for PRD" is remembered for the whole process once
+    # learned (rp._sqlm_off), so a test that saw an empty SQLMD would make
+    # every later SQLMD test in the session skip the scan and KeyError. Each
+    # test gets its own session, so each starts with a clean memo.
+    rp.reset_sqlm_off()
     return {m.name: m for m in rp.build_metrics("PRD", session, client)}
 
 
@@ -108,7 +113,11 @@ def test_response_time_from_real_all_statrecs_shape():
     s = FakeSession({"TH_SERVER_LIST": SERVERS, "SWNC_GET_STATRECS_FRAME": stat})
     m = _by_key(s)
     r = m["sap.st03.dialog_resp_ms"]
-    assert r.value == round((800 + 800 + 2400) / 3)
+    # The tile value is the MEDIAN step response, not the mean: one stuck
+    # 460s step used to drag a 300ms system to "464549 ms" on the wall. The
+    # mean is still published (mean_resp_ms) and the detail names both.
+    assert r.value == 800                                   # median of 800, 800, 2400
+    assert r.extra_data["mean_resp_ms"] == round((800 + 800 + 2400) / 3)
     assert r.extra_data["per_instance"] == {"sapprd01_PRD_00": 800, "sapprd02_PRD_00": 2400}
     assert r.extra_data["note"] == ""
     assert r.extra_data["task_mix"] == {"DIALOG": 3, "RFC": 1, "BTC": 1}

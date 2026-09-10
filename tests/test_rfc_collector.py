@@ -96,12 +96,26 @@ class TestNoCommandDerivedOsMetrics:
             def __exit__(self, *a): return False
             def call(self, name, **kw):
                 return {"EV_ACTIVE_USERS": 3} if name == "Z_GET_OBSERVABILITY_DATA" else None
-            def read_table(self, table, *a, **k):
+            def read_table(self, table, fields=None, *a, **k):
                 if table == "/SDF/SMON_HEADER":
-                    # Decimal comma, as RFC_READ_TABLE returns it.
-                    return [["20260901", "143100", "nwtest_TST_02", "3", "2", "95",
-                             "62,0", "4150", "0,18", "1", "1", "0", "0", "3", "4",
-                             "2730", "4,00"]]
+                    # One row in the order of collectors.rfc_live._SMON_FIELDS.
+                    # Positional on purpose: RFC_READ_TABLE returns rows in the
+                    # order of the FIELDS it was asked for, and the collector
+                    # maps them back by name. Decimal comma as the RFC user's
+                    # locale returns it ("0,18" must parse as 0.18, not 18).
+                    row = {
+                        "DATUM": "20260901", "TIME": "143100",
+                        "SERVER": "nwtest_TST_02",
+                        "IDLE_TOTAL": "95",          # cpu = 100 - 95 = 5
+                        "FREE_MEM_PERC": "62,0",     # memory = 100 - 62 = 38
+                        "FREE_MEM_MB": "4150", "FREE_MEM_MB_INC_FS": "5000",
+                        "CPU_CONS": "0,18",          # load_1m
+                        "DIAAVG60": "1", "DIAQ": "0", "UPDQ": "0",
+                        "USERS": "3", "SESSIONS": "4",
+                        "NETRTT": "2730", "AVAILCPUS": "4",
+                    }
+                    from collectors.rfc_live import _SMON_FIELDS
+                    return [[row[f] for f in (fields or _SMON_FIELDS)]]
                 return None
 
         original = L.SapSession

@@ -50,6 +50,7 @@ from reporting.excel_template_writer import fill_metrobrands_template
 from notifications.email_report import send_final_report, send_failure_alert, send_tcode_failure_alert
 from notifications.email_alert import send_critical_alert
 from core.status_snapshot import save_snapshot
+from core import heartbeat
 from core.intelligence_runtime import get_intelligence_runtime, attach_operational_intelligence
 from utils.logger import get_logger
 
@@ -174,32 +175,69 @@ def run_full_pipeline(system: str, client: str):
 
 
 SYSTEM_MAX_ATTEMPTS = 2  # 1 initial try + 1 full retry, per system, per cycle
-PIPELINE_TIMEOUT_SECONDS = 5 * 60  # TEMPORARY: lowered for testing the watchdog -- raise back to 20*60 for normal runs, a full TST cycle (GUI+OS) can take longer than 5 minutes
+
+# Absolute ceiling on one system's pipeline. This is a backstop for a run that
+# somehow keeps beating while achieving nothing; the STALL check below is what
+# normally catches a hang. A PRD sweep with 22 T-codes, a ~2min STAT read and an
+# AI call runs 6-10 minutes legitimately, so this must be generous.
+#
+# HISTORY: this was 5*60 with a "TEMPORARY -- raise back to 20*60" comment, and
+# the debug value was never raised. A normal PS4 run takes ~390s, so the
+# watchdog force-killed healthy runs and re-ran the whole system: 14 times in
+# the four days of logs reviewed, every one of them a run that was working.
+PIPELINE_TIMEOUT_SECONDS = int(
+    os.environ.get("IBO_PIPELINE_TIMEOUT", 20 * 60) or 20 * 60)
+
+# How long the pipeline may go WITHOUT a heartbeat before it is declared hung.
+# Every long stage (per T-code, per collector, per report step) calls
+# core.heartbeat.beat(), so this is the real hang detector. The longest single
+# legitimate gap observed in the logs is the RFC perf collector's STAT read at
+# ~118s, so 180s leaves headroom without waiting five minutes on a dead COM call.
+PIPELINE_STALL_SECONDS = int(
+    os.environ.get("IBO_PIPELINE_STALL", 180) or 180)
+
+# How long to wait for a killed thread to actually unwind before abandoning it.
+# See _run_with_watchdog: abandoning it immediately is what let two threads
+# drive the same SAP GUI at once.
+PIPELINE_JOIN_GRACE_SECONDS = int(
+    os.environ.get("IBO_PIPELINE_JOIN_GRACE", 90) or 90)
 
 
 def _run_with_watchdog(system_config: dict) -> tuple:
     """
-    Runs _run_pipeline_for_system_once() in a background thread with a
-    hard timeout, because some failures don't raise a Python exception
-    at all -- they just block forever (e.g. a modal SAP dialog left in
-    a state that makes a COM call hang instead of erroring out, which
-    can happen if someone manually interferes with the SAP GUI window
-    mid-run). Retrying only helps for failures that actually raise; a
-    genuine hang needs something external to break it, since Python
-    cannot forcibly interrupt a blocked COM call from another thread.
+    Runs _run_pipeline_for_system_once() in a background thread, watched for
+    LACK OF PROGRESS rather than for total elapsed time, because some failures
+    don't raise a Python exception at all -- they just block forever (e.g. a
+    modal SAP dialog left in a state that makes a COM call hang instead of
+    erroring out, which can happen if someone manually interferes with the SAP
+    GUI window mid-run). Retrying only helps for failures that actually raise;
+    a genuine hang needs something external to break it, since Python cannot
+    forcibly interrupt a blocked COM call from another thread.
 
-    If the thread hasn't finished within PIPELINE_TIMEOUT_SECONDS, this
-    force-kills the SAP processes (which unblocks whatever the thread
-    was stuck on, usually causing it to error out on its own shortly
-    after) and returns immediately as a failure, WITHOUT waiting for
-    the stuck thread to actually exit -- otherwise a single hang would
-    freeze the scheduler forever, since run_pipeline_for_system's caller
-    (the dashboard scheduler) can't proceed to the next cycle until this
-    returns. The old thread is abandoned; it may log a delayed error
-    later once its blocked call finally unblocks, which is harmless.
+    PROGRESS, NOT DURATION
+    ----------------------
+    The previous version used one wall-clock deadline, so a slow-but-healthy
+    run and a hung one were indistinguishable. With the deadline set to 5
+    minutes (a debug value left in the file), a normal ~390s PS4 sweep was
+    declared hung and re-run from scratch. The pipeline now calls
+    core.heartbeat.beat() at every stage and after every T-code, so a run that
+    is making progress is never killed, however long it takes, and a real hang
+    is caught in PIPELINE_STALL_SECONDS wherever in the run it happens.
+
+    WAITING FOR THE THREAD TO DIE
+    -----------------------------
+    This used to return the moment it decided the run was hung, abandoning the
+    old thread. The caller then immediately started attempt 2, so TWO threads
+    drove the same single SAP GUI desktop. The log shows exactly that: the
+    abandoned thread's snapshot write landing between the retry's login and its
+    scripting call, which then failed with 'Invalid syntax' and cost the retry
+    all of its GUI evidence. kill_sap_processes() is what unblocks the stuck
+    COM call, so after killing we now WAIT for the thread to unwind before
+    letting anyone else touch the GUI.
 
     Returns (success: bool, result_or_error).
     """
+    name = system_config["name"]
     result_box = {}
 
     def target():
@@ -208,22 +246,50 @@ def _run_with_watchdog(system_config: dict) -> tuple:
         except Exception as e:
             result_box["error"] = e
 
-    thread = threading.Thread(target=target, daemon=True)
-    thread.start()
-    thread.join(timeout=PIPELINE_TIMEOUT_SECONDS)
+    heartbeat.reset(f"{name}:starting")
+    started = time.monotonic()
 
-    if thread.is_alive():
-        name = system_config["name"]
+    thread = threading.Thread(target=target, daemon=True,
+                              name=f"pipeline-{name}")
+    thread.start()
+
+    while True:
+        thread.join(timeout=15)
+        if not thread.is_alive():
+            break
+
+        stalled_for = heartbeat.seconds_since_beat()
+        elapsed = time.monotonic() - started
+
+        if stalled_for < PIPELINE_STALL_SECONDS and elapsed < PIPELINE_TIMEOUT_SECONDS:
+            continue
+
+        if stalled_for >= PIPELINE_STALL_SECONDS:
+            reason = (f"no progress for {stalled_for:.0f}s "
+                      f"(last stage: {heartbeat.last_stage()})")
+        else:
+            reason = (f"exceeded the {PIPELINE_TIMEOUT_SECONDS}s ceiling "
+                      f"while still reporting progress")
+
         log.error(
-            f"Pipeline for {name} appears stuck -- no progress within "
-            f"{PIPELINE_TIMEOUT_SECONDS}s. Force-killing SAP processes to "
-            f"unblock it and moving on (this attempt counts as failed)."
+            f"Pipeline for {name} appears hung -- {reason}. Force-killing SAP "
+            f"processes to unblock it (this attempt counts as failed)."
         )
         try:
             kill_sap_processes()
         except Exception:
             pass
-        return False, TimeoutError(f"Pipeline for {name} did not complete within {PIPELINE_TIMEOUT_SECONDS}s (hung).")
+
+        # Give the unblocked thread a chance to unwind before the caller
+        # retries. Without this the retry shares the GUI with a dying run.
+        thread.join(timeout=PIPELINE_JOIN_GRACE_SECONDS)
+        if thread.is_alive():
+            log.error(
+                f"Pipeline thread for {name} did not exit within "
+                f"{PIPELINE_JOIN_GRACE_SECONDS}s of the SAP kill. Abandoning "
+                f"it; the next attempt may collide with it on the SAP GUI."
+            )
+        return False, TimeoutError(f"Pipeline for {name} hung: {reason}.")
 
     if "error" in result_box:
         raise result_box["error"]
@@ -304,6 +370,7 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
     """
     name = system_config["name"]
     log.info(f"===== Pipeline START for system {name} =====")
+    heartbeat.beat(f"{name}:pipeline-start")
 
     has_os_access = system_config.get("has_os_access", True)
     has_gui_access = system_config.get("has_gui_access", True)
@@ -347,9 +414,11 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
                 connection_name=system_config["connection_name"]
             )
 
+            heartbeat.beat(f"{name}:sap-gui-launch")
             launch_saplogon(launch_config["exe_path"])
             select_connection(launch_config["connection_name"])
             time.sleep(2)
+            heartbeat.beat(f"{name}:sap-gui-login")
 
             login_result = login(
                 client=system_config["client"], username=system_config["username"],
@@ -381,6 +450,7 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
 
     # --- Monitoring cycle: OS metrics run only if has_os_access and ssh_creds has a host ---
     instance_nr = system_config.get("sap_instance_nr") or None
+    heartbeat.beat(f"{name}:monitoring-cycle")
     result = run_monitoring_cycle(
         system=name, client=system_config["client"], ssh_creds=ssh_creds, instance_nr=instance_nr,
         run_ai=False, send_alert=False,
@@ -394,12 +464,10 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
     result.gui_results = gui_results
 
     if gui_available:
+        heartbeat.beat(f"{name}:tcode-evidence")
         tasks = get_monitoring_tasks()
-        gui_results = collect_tcode_evidence(
-            tasks,
-            system=system_config.get("name", "UNKNOWN"),
-            client=system_config.get("client", "UNKNOWN"),
-        )
+        gui_results = collect_tcode_evidence(tasks, system=system_config.get('name', 'UNKNOWN'),
+                                             client=system_config.get('client', 'UNKNOWN'))
 
         # Make SAP GUI evidence available to the AI analysis layer.
         result.gui_results = gui_results
@@ -466,6 +534,7 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
     except Exception as _exc:
         log.warning(f"{name}: dump owner notification failed: {_exc}")
 
+    heartbeat.beat(f"{name}:ai-analysis")
     # Operational intelligence is evaluated only after the complete metric and
     # incident picture exists. The runtime is per-system, so repeated scheduler
     # cycles build baseline history without mixing systems.
@@ -485,8 +554,10 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
             log.error(f"Failed to send final critical alert for {name}: {e}")
             result.errors.append(f"email_alert: {e}")
 
+    heartbeat.beat(f"{name}:snapshot")
     save_snapshot(result, gui_results=gui_results, system_name=name)
 
+    heartbeat.beat(f"{name}:reports")
     report_paths = generate_system_reports(result, gui_results=gui_results)
     pdf_path = report_paths["pdf"]
     excel_history_path = report_paths["excel"]
@@ -499,6 +570,7 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
 
     # Per-system alerting: a PRD alert should not land in a sandbox inbox
     # just because both use the same mail server.
+    heartbeat.beat(f"{name}:final-email")
     smtp_config = get_smtp_config(system_config)
     send_final_report(result, smtp_config, pdf_path, metrobrands_path)
 

@@ -118,11 +118,16 @@ def test_system_instance_number_is_not_taken_from_global_env(monkeypatch):
 
 
 def test_run_now_does_not_start_second_sweep(monkeypatch):
+    # /api/run-now is a mutating endpoint and sits behind require_token, so
+    # an unauthenticated POST is (correctly) 401 before the 409 check is
+    # reached. Authenticate with a throwaway token so the test reaches the
+    # behaviour it is actually about.
+    monkeypatch.setenv("IBO_API_TOKEN", "test-token-8-5B")
     dashboard_app._run_state.update({"running": True, "error": None, "current_system": "TST"})
     try:
         from fastapi.testclient import TestClient
         client = TestClient(dashboard_app.app)
-        response = client.post("/api/run-now")
+        response = client.post("/api/run-now", headers={"X-IBO-Token": "test-token-8-5B"})
         assert response.status_code == 409
     finally:
         dashboard_app._run_state.update({"running": False, "error": None, "current_system": None})

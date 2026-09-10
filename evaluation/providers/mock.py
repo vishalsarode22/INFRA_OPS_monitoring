@@ -11,21 +11,47 @@ from evaluation.providers.base import AIProvider
 class MockAIProvider(AIProvider):
     name = "mock"
 
+    # The prompt is instructions followed by an EVIDENCE section. The mock
+    # must classify on the EVIDENCE, never on the instructions: the
+    # instruction text legitimately mentions ST22, GETWA_NOT_ASSIGNED and a
+    # "dumps" block as worked examples, so scanning the whole prompt made
+    # every incident -- a lock-count alert, a response-time alert -- look
+    # like a short-dump incident and return ABAP_RUNTIME_ERROR. That is
+    # what broke the generic-path tests when the dump-attribution guidance
+    # was added to the template.
+    _EVIDENCE_MARKER = "EVIDENCE\n--------"
+
+    @classmethod
+    def _evidence_part(cls, prompt: str) -> str:
+        text = prompt or ""
+        idx = text.rfind(cls._EVIDENCE_MARKER)
+        return text[idx + len(cls._EVIDENCE_MARKER):] if idx >= 0 else text
+
     def generate(self, prompt: str) -> str:
-        prompt_upper = (prompt or "").upper()
+        evidence = self._evidence_part(prompt)
+        evidence_upper = evidence.upper()
 
         # -------------------------------------------------------------
         # ST22-specific deterministic response
         # -------------------------------------------------------------
+        # A dump INCIDENT, not merely a dump METRIC. sap.st22.dump_count is
+        # part of the normal metric set and appears in the evidence of every
+        # incident on a system that had any dumps today; its presence says
+        # nothing about what the incident under analysis is about. The
+        # signals that do are a named runtime error, the ST22 evidence
+        # narrative, or the "dumps" attribution block that only a dump
+        # incident carries.
         if (
-            "ST22" in prompt_upper
+            "ST22" in evidence_upper
             and (
-                "GETWA_NOT_ASSIGNED" in prompt_upper
-                or "ABAP SHORT DUMP" in prompt_upper
-                or "DUMP_COUNT" in prompt_upper
-                or '"DUMPS"' in prompt_upper
+                "GETWA_NOT_ASSIGNED" in evidence_upper
+                or "ABAP SHORT DUMP" in evidence_upper
+                or '"RUNTIME_ERROR"' in evidence_upper
+                or '"DUMPS"' in evidence_upper
             )
         ):
+            # Field extraction is scoped to the evidence for the same reason.
+            prompt = evidence
             user = self._extract(
                 prompt,
                 r'"user"\s*:\s*"([^"]+)"',

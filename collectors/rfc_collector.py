@@ -391,10 +391,13 @@ _FM_METRICS = {
     "EV_TOTAL_DIA_WP":     ("sap.sm50.total_dia_wp",    "SM50",  "count", "workload"),
     # OS metrics share the SSH collector's names on purpose -- same host,
     # same measurement. The orchestrator keeps whichever arrives first.
-    "EV_CPU_UTIL_PCT":     ("cpu",                      "ST06",  "%",     "os"),
-    "EV_MEM_UTIL_PCT":     ("memory",                   "ST06",  "%",     "os"),
-    "EV_TOTAL_RAM_GB":     ("memory.total_gb",          "ST06",  "GB",    "os"),
-    "EV_LOAD_1M":          ("load_1m",                  "ST06",  "",      "os"),
+    # EV_CPU_UTIL_PCT, EV_MEM_UTIL_PCT, EV_TOTAL_RAM_GB and EV_LOAD_1M are
+    # deliberately NOT mapped. They were fed by SM69 external commands via
+    # SXPG_COMMAND_EXECUTE, which needs S_LOG_COM -- remote command execution
+    # on the application server. That grant was withdrawn (abap/SXPG_REMOVAL.md)
+    # and CPU/memory/load now come from /SDF/SMON_HEADER, with CCMS RZ20 as
+    # the fallback. An older transported FM may still export numbers for these
+    # keys; ignoring them here is what keeps a stale 99% off the dashboard.
 }
 
 # Exports where a literal 0 means the read FAILED. A live host is never at 0%
