@@ -1,193 +1,16 @@
 {
   "system": "TST",
   "client": "000",
-  "cycle_timestamp": "2026-09-01 14:42:35",
-  "overall_status": "WARNING",
-  "metrics": [
-    {
-      "name": "cpu",
-      "display_value": "7.1%",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "memory",
-      "display_value": "24.6%",
-      "status": "NORMAL",
-      "detail": "5855.0MB / 23773.0MB"
-    },
-    {
-      "name": "swap",
-      "display_value": "1.8%",
-      "status": "NORMAL",
-      "detail": "461.0MB / 26200.0MB"
-    },
-    {
-      "name": "disk_/",
-      "display_value": "86.0%",
-      "status": "WARNING",
-      "detail": "mount=/"
-    },
-    {
-      "name": "disk_/usr/sap",
-      "display_value": "71.0%",
-      "status": "NORMAL",
-      "detail": "mount=/usr/sap"
-    },
-    {
-      "name": "disk_/sapmnt",
-      "display_value": "33.0%",
-      "status": "NORMAL",
-      "detail": "mount=/sapmnt"
-    },
-    {
-      "name": "load_1m",
-      "display_value": "0.25",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap_process_disp+work",
-      "display_value": "GREEN",
-      "status": "NORMAL",
-      "detail": "Running"
-    },
-    {
-      "name": "sap_process_igswd_mt",
-      "display_value": "GREEN",
-      "status": "NORMAL",
-      "detail": "Running"
-    },
-    {
-      "name": "sap_process_gwrd",
-      "display_value": "GREEN",
-      "status": "NORMAL",
-      "detail": "Running"
-    },
-    {
-      "name": "sap_process_icman",
-      "display_value": "GREEN",
-      "status": "NORMAL",
-      "detail": "Running"
-    },
-    {
-      "name": "sap.st22.dumps",
-      "display_value": "0 count",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap.sm12.lock_count",
-      "display_value": "0 count",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap.sm13.failed_updates",
-      "display_value": "0 count",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap.sm37.cancelled_jobs",
-      "display_value": "0 count",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap.sm58.stuck_entries",
-      "display_value": "0 count",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap.we02.failed_idocs",
-      "display_value": "0 count",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap.smq1.entries",
-      "display_value": "0 count",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap.smq2.entries",
-      "display_value": "0 count",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap.sm21.errors",
-      "display_value": "0 count",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap.al08.user_logons",
-      "display_value": "3 count",
-      "status": "NORMAL",
-      "detail": "MONITORING, PARTH, SAP_WSRT"
-    },
-    {
-      "name": "sap.su01.locked_users",
-      "display_value": "2 count",
-      "status": "NORMAL",
-      "detail": "SAP*, VISHAL1"
-    },
-    {
-      "name": "sap.sm50.free_dia_wp",
-      "display_value": "9 count",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "memory.total_gb",
-      "display_value": "23 GB",
-      "status": "NORMAL",
-      "detail": ""
-    },
-    {
-      "name": "sap.db12.last_backup",
-      "display_value": "No data",
-      "status": "UNKNOWN",
-      "detail": ""
-    }
-  ],
+  "cycle_timestamp": "2026-09-02 16:25:16",
+  "overall_status": "UNKNOWN",
+  "metrics": [],
   "ai_analysis": null,
   "operational_intelligence": {
     "overall_signal": "NO_SIGNIFICANT_INTELLIGENCE",
     "score": 0.0,
     "signals": [],
     "key_findings": [],
-    "limitations": [
-      "cpu: insufficient baseline history",
-      "memory: insufficient baseline history",
-      "swap: insufficient baseline history",
-      "disk_/: insufficient baseline history",
-      "disk_/usr/sap: insufficient baseline history",
-      "disk_/sapmnt: insufficient baseline history",
-      "load_1m: insufficient baseline history",
-      "sap_process_disp+work: insufficient baseline history",
-      "sap_process_igswd_mt: insufficient baseline history",
-      "sap_process_gwrd: insufficient baseline history",
-      "sap_process_icman: insufficient baseline history",
-      "sap.st22.dumps: insufficient baseline history",
-      "sap.sm12.lock_count: insufficient baseline history",
-      "sap.sm13.failed_updates: insufficient baseline history",
-      "sap.sm37.cancelled_jobs: insufficient baseline history",
-      "sap.sm58.stuck_entries: insufficient baseline history",
-      "sap.we02.failed_idocs: insufficient baseline history",
-      "sap.smq1.entries: insufficient baseline history",
-      "sap.smq2.entries: insufficient baseline history",
-      "sap.sm21.errors: insufficient baseline history",
-      "sap.al08.user_logons: insufficient baseline history",
-      "sap.su01.locked_users: insufficient baseline history",
-      "sap.sm50.free_dia_wp: insufficient baseline history",
-      "memory.total_gb: insufficient baseline history",
-      "sap.db12.last_backup: insufficient baseline history"
-    ]
+    "limitations": []
   },
   "events": [
     {
@@ -198,17 +21,17 @@
       "severity": "WARNING",
       "status": "ACTIVE",
       "first_seen": "2026-08-28T10:56:59.621458",
-      "last_seen": "2026-09-01T14:42:38.388856",
+      "last_seen": "2026-09-01T15:46:00.811785",
       "occurrences": 2,
-      "current_value": 86.0,
-      "display_value": "86.0%",
+      "current_value": 87.0,
+      "display_value": "87.0%",
       "threshold_warning": 80,
       "threshold_critical": 90,
       "source": "linux_collector",
       "tcode": null,
       "detail": "mount=/",
       "resolved_at": null,
-      "duration_seconds": 359138.767398
+      "duration_seconds": 362941.190327
     }
   ],
   "incidents": [],
@@ -1244,7 +1067,7 @@
       "captured_at": "2026-08-28 10:55:03"
     }
   ],
-  "generated_at": "2026-09-01 14:42:38",
+  "generated_at": "2026-09-02 16:25:57",
   "gui_evidence_stale": true,
   "gui_evidence_captured_at": "2026-08-28 10:55:03"
 }

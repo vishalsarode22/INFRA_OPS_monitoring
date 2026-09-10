@@ -9,17 +9,17 @@
       "severity": "WARNING",
       "status": "ACTIVE",
       "first_seen": "2026-08-28T10:56:59.621458",
-      "last_seen": "2026-09-01T14:42:38.388856",
+      "last_seen": "2026-09-01T15:46:00.811785",
       "occurrences": 2,
-      "current_value": 86.0,
-      "display_value": "86.0%",
+      "current_value": 87.0,
+      "display_value": "87.0%",
       "threshold_warning": 80,
       "threshold_critical": 90,
       "source": "linux_collector",
       "tcode": null,
       "detail": "mount=/",
       "resolved_at": null,
-      "duration_seconds": 359138.767398
+      "duration_seconds": 362941.190327
     }
   ]
 }

@@ -12,8 +12,10 @@ Supports:
 
 from __future__ import annotations
 
+import copy as _copy
 import os
 import re
+import threading as _threading
 
 import yaml
 from dotenv import load_dotenv
@@ -306,19 +308,62 @@ def get_ocr_patterns() -> dict:
 # Multi-system configuration
 # ---------------------------------------------------------------------------
 
+_systems_cache: tuple[float, int, list[dict]] | None = None
+_systems_cache_lock = _threading.Lock()
+
+
 def get_systems() -> list[dict]:
-    """Load and resolve all configured SAP systems."""
+    """
+    Load and resolve all configured SAP systems.
+
+    Cached against the file's (mtime, size). This is called on essentially
+    every request -- /api/live, /api/live/{name}, /api/overview and
+    /api/status each call it, and the wall polls several of those -- so it
+    was re-opening and re-parsing YAML, then re-resolving every ${VAR}
+    reference, dozens of times a minute. On Windows with Defender watching
+    the config directory that is not free.
+
+    Keyed on mtime AND size because a same-second edit that happens to keep
+    the mtime can still change the length; the pair is what add_system() and
+    a hand edit in Notepad both move. Anything that writes the file calls
+    invalidate_systems_cache() as well, so this is a backstop, not the only
+    correctness mechanism.
+    """
+    global _systems_cache
     path = os.path.join(CONFIG_DIR, "systems.yaml")
+
+    try:
+        stat = os.stat(path)
+        stamp = (stat.st_mtime, stat.st_size)
+    except OSError:
+        stamp = None
+
+    if stamp is not None:
+        with _systems_cache_lock:
+            hit = _systems_cache
+        if hit is not None and (hit[0], hit[1]) == stamp:
+            # Copy on the way out. Callers mutate the dicts they get back
+            # (read_live writes into cfg), and a shared cache handing out the
+            # same objects would let one system's poll corrupt another's.
+            return [_copy.deepcopy(s) for s in hit[2]]
 
     with open(path, "r", encoding="utf-8") as file:
         data = yaml.safe_load(file) or {}
 
-    systems = data.get("systems", [])
+    systems = [_resolve_system(system) for system in data.get("systems", [])]
 
-    return [
-        _resolve_system(system)
-        for system in systems
-    ]
+    if stamp is not None:
+        with _systems_cache_lock:
+            _systems_cache = (stamp[0], stamp[1], [_copy.deepcopy(s) for s in systems])
+
+    return systems
+
+
+def invalidate_systems_cache() -> None:
+    """Drop the parsed systems.yaml. Call after any write to that file."""
+    global _systems_cache
+    with _systems_cache_lock:
+        _systems_cache = None
 
 
 def _env_path() -> str:
@@ -502,6 +547,8 @@ def add_system(
     with open(path, "w", encoding="utf-8") as file:
         yaml.safe_dump(data, file, default_flow_style=False, sort_keys=False)
 
+    invalidate_systems_cache()
+
 
 def delete_system(name: str) -> bool:
     """Remove a system by name."""
@@ -531,6 +578,7 @@ def delete_system(name: str) -> bool:
             sort_keys=False,
         )
 
+    invalidate_systems_cache()
     return True
 
 

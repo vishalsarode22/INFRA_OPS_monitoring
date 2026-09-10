@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>InfraBeatOps · System Overview</title>
-<link rel="stylesheet" href="/static/shell.css?v=bf941ec8">
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds4">
 <style>
   /* ====================================================================
      InfraBeat palette. Light is default on this page (it is the daytime
@@ -208,7 +210,7 @@
   </div>
 </main>
 
-<script src="/static/shell.js?v=69f382d5"></script>
+<script src="/static/shell.js?v=ds4"></script>
 <script>
 /* Every page here depends on shell.js for the sidebar, theme and helpers.
    If it fails to load the page renders bare with only a console error, which
@@ -219,10 +221,10 @@ if (typeof IB === "undefined") {
     '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
     '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
     '<p style="color:#666;line-height:1.6">This page needs ' +
-    '<code>/static/shell.js?v=69f382d5</code> and <code>/static/shell.css?v=bf941ec8</code>. ' +
+    '<code>/static/shell.js?v=ds4</code> and <code>/static/shell.css?v=ds4</code>. ' +
     'They are missing or the static mount is not serving them.</p>' +
     '<p style="color:#666;line-height:1.6">Check that ' +
-    '<code>dashboard/static/shell.js?v=69f382d5</code> exists, then restart the server. ' +
+    '<code>dashboard/static/shell.js?v=ds4</code> exists, then restart the server. ' +
     'If you are seeing this inside a preview pane rather than at ' +
     '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
     'behind a preview.</p></div>';
@@ -349,8 +351,10 @@ function render() {
 /* Data ------------------------------------------------------------------- */
 async function load() {
   try {
-    const r = await fetch("/api/overview");
-    DATA = await r.json();
+    // /api/overview is a GET. This was IB.post(), which the server answers
+    // with 405; IB.post does not treat that as an error, so r.json() failed
+    // on the error body and the page fell into the catch every time.
+    DATA = await IB.get("/api/overview");
     render();
   } catch (e) {
     $("grid").innerHTML =
@@ -360,30 +364,36 @@ async function load() {
 
 $("search").oninput = render;
 
-$("run").onclick = async () => {
-  const b = $("run");
+// The sweep button (#run) is not in this page's markup, only its handler
+// was. Assigning .onclick on null threw at script top level, which aborted
+// everything after it -- including poll() -- so the page never loaded any
+// data at all. Guard it: the button is optional here; sweeps belong on the
+// Systems page, where launching SAP GUI is the operator's deliberate choice.
+const runBtn = $("run");
+if (runBtn) runBtn.onclick = async () => {
+  const b = runBtn;
   b.disabled = true; b.textContent = "Sweeping…";
-  try { await fetch("/api/run-now", {method: "POST"}); } catch (e) {}
+  try { await fetch("/api/run-now"); } catch (e) {}
   poll();
 };
 
 async function poll() {
-  const b = $("run");
+  const b = $("run");   // optional on this page
   try {
     const r = await fetch("/api/run-status");
     const s = await r.json();
     if (s.running) {
-      b.textContent = "Sweeping" + (s.current_system ? ` ${s.current_system}…` : "…");
+      if (b) b.textContent = "Sweeping" + (s.current_system ? ` ${s.current_system}…` : "…");
       setTimeout(poll, 2000);
       return;
     }
   } catch (e) {}
-  b.disabled = false; b.textContent = "Run sweep";
+  if (b) { b.disabled = false; b.textContent = "Run sweep"; }
   load();
 }
 
 load();
-setInterval(load, 60000);
+IB.poll(load, 60000);   // paused while tab hidden
 </script>
 </body>
 </html>

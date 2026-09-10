@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Profiles</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds4">
+<style>
+  .note{background:var(--info-bg);border:1px solid var(--info-br);border-radius:var(--radius);
+       padding:12px 15px;font-size:12.5px;line-height:1.6;margin-bottom:16px}
+  .prof{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);
+       margin-bottom:14px;overflow:hidden}
+  .prof.off{opacity:.6}
+  .ph{display:flex;align-items:center;gap:10px;padding:12px 15px;
+       border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .ph input.name{background:transparent;border:none;color:var(--fg);font-size:14px;
+       font-weight:800;width:190px;padding:2px 0}
+  .ph .sysname{font-family:var(--mono);font-size:11.5px;color:var(--muted-dim)}
+  .ph .spacer{flex:1}
+  .pb{padding:14px 15px}
+  .row{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px}
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld label{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim)}
+  .fld select,.fld input{background:var(--card-hover);border:1px solid var(--border);
+       color:var(--fg);border-radius:5px;padding:6px 9px;font-size:12.5px;
+       font-family:var(--mono)}
+  .fld input[type=number]{width:74px}
+  .fld input[type=time]{width:104px}
+  h5{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:0 0 8px}
+  .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:5px 10px;
+       margin-bottom:6px}
+  .tgrid label,.chans label,.daysel label{display:flex;align-items:center;gap:6px;
+       font-size:12px;font-family:var(--mono);cursor:pointer;user-select:none}
+  .chans,.daysel{display:flex;gap:14px;flex-wrap:wrap}
+  .chans label{font-family:inherit;font-size:12.5px}
+  .tools{display:flex;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+  .tools button{font-size:11px;padding:3px 9px}
+  .sched-txt{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .warn{color:var(--amber);font-size:12px;margin-top:8px;line-height:1.5}
+  .bar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--border);
+       padding:13px 0;display:flex;gap:10px;align-items:center;margin-top:8px}
+  .bar .msg{font-size:12.5px}
+  .btn.primary{background:var(--brand-live);color:#fff;border-color:transparent}
+  .btn.danger{color:var(--red)}
+  .fld input.wide{width:100%;font-size:12px}
+  .secret{display:flex;gap:8px;align-items:center;margin-top:3px}
+  .secret .state{font-size:11px;font-family:var(--mono)}
+  .secret .ok{color:var(--green)}
+  .secret .no{color:var(--amber)}
+  .alerts{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+  .alertbox{border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;
+       background:var(--card)}
+  .alertbox h4{font-size:12.5px;font-weight:800;margin-bottom:9px}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Profiles</h2>
+      <div class="sub">What each system is checked for, how often, and who gets told</div></div>
+    <div class="top-actions">
+      <button class="btn" id="add">+ Profile</button>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="note">
+      A system can be watched more than one way at once — a short check every couple
+      of hours, and a full sweep once a day. They need different T-codes, frequencies
+      and destinations, so each is its own profile.
+      <br><br>
+      <strong>Alerts route separately, by severity.</strong> A CRITICAL finding is sent
+      when it is found, not when the next profile happens to deliver — otherwise an
+      incident waits for the next scheduled slot before anyone hears about it.
+    </div>
+
+    <div id="list"><div class="card"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading profiles…</span></div></div></div>
+
+    <h3 style="font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:26px 0 10px">Alert routing by severity</h3>
+    <div class="alerts" id="alerts"></div>
+
+    <h3 style="font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:26px 0 10px">Sender accounts</h3>
+    <div class="note" style="margin-bottom:12px">
+      Each account is a mailbox or WhatsApp sender. A profile picks which one it
+      uses, so PRD alerts need not arrive from the same address as QAS noise.
+      <br><br>
+      Passwords and tokens are stored in <code>.env</code> under a key derived from
+      the account id and are never sent back to this page. Leave blank to keep.
+      <div style="margin-top:10px">
+        <button class="btn" id="add-email">+ Email account</button>
+        <button class="btn" id="add-wa">+ WhatsApp account</button>
+      </div>
+    </div>
+    <div id="accounts"></div>
+
+    <h3 style="font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:26px 0 10px">Default sender (.env fallback)</h3>
+    <div class="note" style="margin-bottom:12px">
+      Passwords and tokens are written to <code>.env</code> and are never sent back
+      to this page — you will see <b>configured</b> or <b>not configured</b>, never
+      the value. Leave a secret field blank to keep the current one.
+      <br><br>
+      That is the same rule this project already applies to system credentials. A
+      password that round-trips through a browser ends up in the DOM, then in a
+      screenshot, then in a ticket.
+    </div>
+    <div class="alerts" id="delivery"></div>
+
+    <div class="bar">
+      <button class="btn primary" id="save">Save all</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=ds4"></script>
+<script>
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px"><h2>Shared assets did not load</h2></div>';
+}
+</script>
+<script>
+IB.mountShell("profiles");
+
+let OPTS = null, PROFILES = [], ALERTS = {};
+
+const DAYS = ["mon","tue","wed","thu","fri","sat","sun"];
+
+function profileCard(p, index) {
+  const all = p.tcodes === "all";
+  const chosen = all ? [] : (p.tcodes || []);
+  const enabled = p.schedule.enabled;
+
+  const tcodeBoxes = (OPTS.tcodes || []).map(t => `
+    <label><input type="checkbox" data-i="${index}" class="tc"
+      value="${IB.esc(t.tcode)}" ${all || chosen.includes(t.tcode) ? "checked" : ""}
+      ${all ? "disabled" : ""}> ${IB.esc(t.tcode)}</label>`).join("");
+
+  const dayBoxes = DAYS.map(d => `
+    <label><input type="checkbox" data-i="${index}" class="day" value="${d}"
+      ${(p.schedule.days || []).includes(d) ? "checked" : ""}> ${d}</label>`).join("");
+
+  const chanBoxes = (OPTS.channels || []).map(c => `
+    <label><input type="checkbox" data-i="${index}" class="chan" value="${c}"
+      ${(p.deliver || []).includes(c) ? "checked" : ""}> ${IB.esc(c)}</label>`).join("");
+
+  // A profile that delivers nowhere still captures and files its evidence.
+  // Said plainly so an empty delivery list does not look like a mistake.
+  const noChannel = !(p.deliver || []).length
+    ? `<div class="warn">No destination selected — this profile will still run and
+         file its evidence, but nobody is notified.</div>` : "";
+
+  return `
+  <div class="prof ${enabled ? "" : "off"}">
+    <div class="ph">
+      <input class="name" data-i="${index}" data-f="label"
+             value="${IB.esc(p.label || p.id)}" placeholder="Profile name">
+      <span class="sysname">${IB.esc(p.id)}</span>
+      <span class="spacer"></span>
+      <span class="sched-txt">${IB.esc(p.schedule_text || "")}</span>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12px">
+        <input type="checkbox" data-i="${index}" class="enabled" ${enabled ? "checked" : ""}>
+        enabled</label>
+      <button class="btn" data-i="${index}" data-act="run">Run now</button>
+      <button class="btn danger" data-i="${index}" data-act="del">Delete</button>
+    </div>
+    <div class="pb">
+      <div class="row">
+        <div class="fld"><label>System</label>
+          <select data-i="${index}" data-f="system">
+            ${(OPTS.systems || []).map(sname =>
+              `<option ${sname === p.system ? "selected" : ""}>${IB.esc(sname)}</option>`).join("")}
+          </select></div>
+        <div class="fld"><label>Mode</label>
+          <select data-i="${index}" data-f="mode">
+            ${(OPTS.modes || []).map(m =>
+              `<option ${m === p.schedule.mode ? "selected" : ""}>${IB.esc(m)}</option>`).join("")}
+          </select></div>
+        <div class="fld"><label>Every</label>
+          <input type="number" min="1" data-i="${index}" data-f="every"
+                 value="${IB.esc(String(p.schedule.every))}"></div>
+        <div class="fld"><label>At</label>
+          <input type="time" data-i="${index}" data-f="at"
+                 value="${IB.esc(p.schedule.at)}"></div>
+        <div class="fld"><label>Next run</label>
+          <span class="sched-txt" style="padding-top:7px">${IB.esc(p.next_run || "—")}</span></div>
+      </div>
+
+      <h5>Days</h5>
+      <div class="daysel" style="margin-bottom:16px">${dayBoxes}</div>
+
+      <h5>Send to</h5>
+      <div class="chans" style="margin-bottom:10px">${chanBoxes}</div>
+      ${noChannel}
+
+      <div class="row" style="margin-bottom:4px">
+        <div class="fld" style="min-width:200px">
+          <label>Send email from</label>
+          <select data-i="${index}" data-f="email_account">
+            <option value="">Default (.env)</option>
+            ${(ACCOUNTS.email || []).map(a =>
+              `<option value="${IB.esc(a.id)}" ${a.id === p.email_account ? "selected" : ""}
+                >${IB.esc(a.label)}${a.from_email ? " · " + IB.esc(a.from_email) : ""}</option>`
+             ).join("")}
+          </select></div>
+        <div class="fld" style="min-width:200px">
+          <label>Send WhatsApp from</label>
+          <select data-i="${index}" data-f="whatsapp_account">
+            <option value="">Default (.env)</option>
+            ${(ACCOUNTS.whatsapp || []).map(a =>
+              `<option value="${IB.esc(a.id)}" ${a.id === p.whatsapp_account ? "selected" : ""}
+                >${IB.esc(a.label)}</option>`).join("")}
+          </select></div>
+      </div>
+
+      <div class="row" style="margin-bottom:4px">
+        <div class="fld" style="flex:1;min-width:250px">
+          <label>Email recipients</label>
+          <input data-i="${index}" data-f="email_to" class="wide"
+                 placeholder="basis@example.com, oncall@example.com"
+                 value="${IB.esc((p.email_to || []).join(", "))}"></div>
+        <div class="fld" style="flex:1;min-width:250px">
+          <label>Email cc / alternative</label>
+          <input data-i="${index}" data-f="email_cc" class="wide"
+                 placeholder="lead@example.com"
+                 value="${IB.esc((p.email_cc || []).join(", "))}"></div>
+        <div class="fld" style="flex:1;min-width:250px">
+          <label>WhatsApp numbers</label>
+          <input data-i="${index}" data-f="whatsapp_to" class="wide"
+                 placeholder="919812345678, 919887654321"
+                 value="${IB.esc((p.whatsapp_to || []).join(", "))}"></div>
+      </div>
+      <div class="sched-txt" style="margin-bottom:14px">
+        Leave blank to use the defaults from Delivery settings below.
+        WhatsApp numbers: country code and digits only, no + and no spaces.
+      </div>
+
+      <h5 style="margin-top:16px">T-codes
+        <span style="font-weight:400;text-transform:none;letter-spacing:0">
+          — ${all ? "all" : chosen.length + " selected"}</span></h5>
+      <div class="tools">
+        <button class="btn" data-i="${index}" data-act="all">Use all</button>
+        <button class="btn" data-i="${index}" data-act="none">Clear</button>
+        <button class="btn" data-i="${index}" data-act="quick">Quick set</button>
+      </div>
+      <div class="tgrid">${tcodeBoxes}</div>
+      ${all ? `<div class="sched-txt">Set to <b>all</b> — new T-codes added later are
+                 included automatically.</div>` : ""}
+    </div>
+  </div>`;
+}
+
+function alertCard(sev, cfg) {
+  const chans = (OPTS.channels || []).map(c => `
+    <label style="display:flex;gap:6px;align-items:center;font-size:12.5px">
+      <input type="checkbox" class="achan" data-sev="${sev}" value="${c}"
+        ${(cfg.deliver || []).includes(c) ? "checked" : ""}> ${IB.esc(c)}</label>`).join("");
+  return `
+    <div class="alertbox">
+      <h4>${IB.esc(sev)}</h4>
+      <div class="chans" style="margin-bottom:12px">${chans}</div>
+      <div class="fld"><label>Stay quiet for (minutes)</label>
+        <input type="number" min="0" class="aquiet" data-sev="${sev}"
+               value="${IB.esc(String(cfg.repeat_after_minutes))}"></div>
+      <div class="sched-txt" style="margin-top:8px;line-height:1.5">
+        The same condition will not notify again inside this window.</div>
+    </div>`;
+}
+
+let DELIVERY = null, ACCOUNTS = {email: [], whatsapp: []};
+
+const EMAIL_FIELDS = [["label","Name"],["from_email","Sender address"],
+                      ["username","SMTP username"],["host","SMTP host"],
+                      ["port","Port"]];
+const WA_FIELDS = [["label","Name"],["mode","Mode (cloud_api / webhook)"],
+                   ["phone_number_id","Phone number id"],
+                   ["webhook_url","Webhook URL"]];
+
+function accountCard(kind, a, index) {
+  const fields = (kind === "email" ? EMAIL_FIELDS : WA_FIELDS).map(([f, lbl]) => `
+    <div class="fld" style="min-width:180px;flex:1">
+      <label>${IB.esc(lbl)}</label>
+      <input class="acc" data-kind="${kind}" data-i="${index}" data-f="${f}"
+             value="${IB.esc(String(a[f] ?? ""))}" style="width:100%"></div>`).join("");
+
+  return `<div class="alertbox" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <h4 style="margin:0">${IB.esc(a.label || a.id)}</h4>
+      <span class="sched-txt">${IB.esc(a.id)}</span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="state ${a.secret_configured ? "ok" : "no"}"
+        style="font-size:11px;font-family:var(--mono);color:${a.secret_configured
+          ? "var(--green)" : "var(--amber)"}">${a.secret_configured
+          ? "secret configured" : "secret not set"}</span>
+      <button class="btn danger" data-act="delacc" data-kind="${kind}"
+              data-i="${index}">Delete</button>
+    </div>
+    <div class="row" style="margin-bottom:10px">${fields}</div>
+    <div class="row">
+      <div class="fld" style="flex:1;min-width:220px">
+        <label>${kind === "email" ? "Password / app password" : "Access token"}</label>
+        <input class="accsec" data-key="${IB.esc(a.secret_key)}" type="password"
+               autocomplete="new-password" style="width:100%"
+               placeholder="${a.secret_configured ? "leave blank to keep" : "not set"}">
+      </div>
+      <div class="fld" style="flex:1;min-width:220px">
+        <label>Default for systems (optional)</label>
+        <input class="acc" data-kind="${kind}" data-i="${index}" data-f="systems"
+               value="${IB.esc((a.systems || []).join(", "))}"
+               placeholder="PRD, CENTOR_QAS" style="width:100%"></div>
+    </div></div>`;
+}
+
+function renderAccounts() {
+  const box = document.getElementById("accounts");
+  if (!box) return;
+  const email = (ACCOUNTS.email || []).map((a, i) => accountCard("email", a, i)).join("");
+  const wa = (ACCOUNTS.whatsapp || []).map((a, i) => accountCard("whatsapp", a, i)).join("");
+  box.innerHTML =
+    (email ? `<h5 style="margin-bottom:8px">Email</h5>${email}` : "") +
+    (wa ? `<h5 style="margin:16px 0 8px">WhatsApp</h5>${wa}` : "") ||
+    `<div class="card"><div class="empty">No sender accounts. Profiles use the
+       default from .env until you add one.</div></div>`;
+}
+
+function deliveryCard(group) {
+  const plainKeys = Object.keys(DELIVERY.plain)
+    .filter(k => DELIVERY.groups[k] === group);
+  const secretKeys = Object.keys(DELIVERY.secrets_configured)
+    .filter(k => DELIVERY.groups[k] === group);
+
+  const plain = plainKeys.map(k => `
+    <div class="fld" style="margin-bottom:9px">
+      <label>${IB.esc(DELIVERY.labels[k] || k)}</label>
+      <input class="dset" data-k="${k}" value="${IB.esc(DELIVERY.plain[k] || "")}"
+             style="width:100%"></div>`).join("");
+
+  const secrets = secretKeys.map(k => `
+    <div class="fld" style="margin-bottom:9px">
+      <label>${IB.esc(DELIVERY.labels[k] || k)}</label>
+      <input class="dsec" data-k="${k}" type="password" autocomplete="new-password"
+             placeholder="${DELIVERY.secrets_configured[k]
+               ? "leave blank to keep" : "not set"}" style="width:100%">
+      <div class="secret"><span class="state ${DELIVERY.secrets_configured[k]
+        ? "ok" : "no"}">${DELIVERY.secrets_configured[k]
+        ? "configured" : "not configured"}</span></div></div>`).join("");
+
+  return `<div class="alertbox"><h4>${group === "email" ? "Email" : "WhatsApp"}</h4>
+    ${plain}${secrets}</div>`;
+}
+
+function render() {
+  renderAccounts();
+  if (DELIVERY) {
+    document.getElementById("delivery").innerHTML =
+      ["email", "whatsapp"].map(deliveryCard).join("");
+  }
+  document.getElementById("list").innerHTML =
+    PROFILES.length ? PROFILES.map(profileCard).join("")
+    : `<div class="card"><div class="empty">No profiles. Add one to start.</div></div>`;
+  document.getElementById("alerts").innerHTML =
+    Object.entries(ALERTS).map(([s, c]) => alertCard(s, c)).join("");
+}
+
+function readForm() {
+  document.querySelectorAll("[data-f]").forEach(el => {
+    const p = PROFILES[+el.dataset.i], f = el.dataset.f;
+    if (!p) return;
+    if (f === "label") p.label = el.value;
+    else if (f === "system") p.system = el.value;
+    else if (f === "mode") p.schedule.mode = el.value;
+    else if (f === "every") p.schedule.every = Math.max(1, +el.value || 1);
+    else if (f === "at") p.schedule.at = el.value;
+    else if (f === "email_to" || f === "email_cc" || f === "whatsapp_to") {
+      p[f] = el.value.split(/[,;]/).map(v => v.trim()).filter(Boolean);
+    }
+    else if (f === "email_account" || f === "whatsapp_account") p[f] = el.value;
+  });
+
+  document.querySelectorAll(".acc").forEach(el => {
+    const a = (ACCOUNTS[el.dataset.kind] || [])[+el.dataset.i];
+    if (!a) return;
+    a[el.dataset.f] = el.dataset.f === "systems"
+      ? el.value.split(/[,;]/).map(v => v.trim()).filter(Boolean)
+      : el.value;
+  });
+  PROFILES.forEach((p, i) => {
+    const en = document.querySelector(`.enabled[data-i="${i}"]`);
+    if (en) p.schedule.enabled = en.checked;
+    p.schedule.days = [...document.querySelectorAll(`.day[data-i="${i}"]:checked`)]
+      .map(e => e.value);
+    p.deliver = [...document.querySelectorAll(`.chan[data-i="${i}"]:checked`)]
+      .map(e => e.value);
+    if (p.tcodes !== "all") {
+      p.tcodes = [...document.querySelectorAll(`.tc[data-i="${i}"]:checked`)]
+        .map(e => e.value);
+    }
+  });
+  document.querySelectorAll(".achan").forEach(el => {
+    const sev = el.dataset.sev;
+    ALERTS[sev].deliver = [...document.querySelectorAll(`.achan[data-sev="${sev}"]:checked`)]
+      .map(e => e.value);
+  });
+  document.querySelectorAll(".aquiet").forEach(el => {
+    ALERTS[el.dataset.sev].repeat_after_minutes = Math.max(0, +el.value || 0);
+  });
+}
+
+document.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("[data-act]");
+  if (!btn) return;
+  const i = +btn.dataset.i, act = btn.dataset.act, p = PROFILES[i];
+
+  if (act === "all")  { readForm(); p.tcodes = "all"; render(); }
+  if (act === "none") { readForm(); p.tcodes = []; render(); }
+  if (act === "quick") {
+    readForm();
+    p.tcodes = ["SMLG","SM51","SM12","ST03N","ST06","SMQ1","SMQ2","SM66"]
+      .filter(t => (OPTS.tcodes || []).some(o => o.tcode === t));
+    render();
+  }
+  if (act === "delacc") {
+    const list = ACCOUNTS[btn.dataset.kind];
+    const acc = list[+btn.dataset.i];
+    if (!confirm(`Delete sender account "${acc.label || acc.id}"?\n\n` +
+                 `Profiles using it fall back to the default in .env. ` +
+                 `Its secret stays in .env until removed by hand.`)) return;
+    readForm(); list.splice(+btn.dataset.i, 1); render();
+    return;
+  }
+  if (act === "del") {
+    if (!confirm(`Delete profile "${p.label}"?`)) return;
+    readForm(); PROFILES.splice(i, 1); render();
+  }
+  if (act === "run") {
+    btn.disabled = true; btn.textContent = "Starting…";
+    try {
+      const r = await IB.post("/api/profiles/" + encodeURIComponent(p.id) + "/run");
+      const d = await r.json();
+      msg(r.ok ? `Started ${p.id} on ${d.scope}. ${d.note || ""}` : (d.detail || "Failed"),
+          r.ok ? "var(--green)" : "var(--red)");
+    } catch (e) { msg(String(e.message || e), "var(--red)"); }
+    btn.disabled = false; btn.textContent = "Run now";
+  }
+});
+
+function msg(text, colour) {
+  const el = document.getElementById("msg");
+  el.textContent = text;
+  el.style.color = colour || "var(--muted)";
+}
+
+function newAccount(kind) {
+  readForm();
+  const n = (ACCOUNTS[kind] || []).length + 1;
+  const id = (kind === "email" ? "mail" : "wa") + "-" + Date.now().toString(36);
+  const base = {id, label: (kind === "email" ? "Mailbox " : "WhatsApp ") + n,
+                systems: [], secret_key: "", secret_configured: false};
+  ACCOUNTS[kind].push(kind === "email"
+    ? {...base, host: "smtp.gmail.com", port: "587", username: "", from_email: ""}
+    : {...base, mode: "cloud_api", phone_number_id: "", webhook_url: ""});
+  // The secret key is derived server-side from the id; mirror the same rule
+  // here so the password field has somewhere to post before the first save.
+  const safe = id.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toUpperCase();
+  ACCOUNTS[kind][ACCOUNTS[kind].length - 1].secret_key =
+    (kind === "email" ? "SMTP_PASSWORD__" : "WHATSAPP_TOKEN__") + safe;
+  render();
+}
+document.getElementById("add-email").addEventListener("click", () => newAccount("email"));
+document.getElementById("add-wa").addEventListener("click", () => newAccount("whatsapp"));
+
+document.getElementById("add").addEventListener("click", () => {
+  readForm();
+  const n = PROFILES.length + 1;
+  PROFILES.push({
+    id: "profile-" + Date.now().toString(36),
+    system: (OPTS.systems || ["?"])[0],
+    label: "New profile " + n,
+    description: "",
+    tcodes: [],
+    deliver: [],
+    schedule: {enabled: false, mode: "hours", every: 2, at: "08:00", days: [...DAYS]},
+    schedule_text: "", next_run: null,
+  });
+  render();
+});
+
+document.getElementById("save").addEventListener("click", async () => {
+  readForm();
+  const empty = PROFILES.filter(p => p.tcodes !== "all" && !p.tcodes.length);
+  if (empty.length) {
+    // Caught here as well as server-side: a profile capturing nothing would
+    // run on schedule and deliver an empty message, which reads as "all clear".
+    msg(`${empty.map(p => p.label).join(", ")}: select at least one T-code, or Use all.`,
+        "var(--red)");
+    return;
+  }
+  msg("Saving…");
+  try {
+    const r = await IB.post("/api/profiles", {
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({profiles: PROFILES, alerts: ALERTS}),
+    });
+    const d = await r.json();
+    if (!r.ok) { msg(d.detail || "Save failed", "var(--red)"); return; }
+    // Secrets are only sent when actually typed. A blank field means keep,
+    // so an unrelated save can never wipe a working password.
+    const plain = {}, secrets = {};
+    document.querySelectorAll(".dset").forEach(el => plain[el.dataset.k] = el.value);
+    document.querySelectorAll(".dsec").forEach(el => {
+      if (el.value.trim()) secrets[el.dataset.k] = el.value;
+    });
+    const accSecrets = {};
+    document.querySelectorAll(".accsec").forEach(el => {
+      if (el.value.trim()) accSecrets[el.dataset.key] = el.value;
+    });
+    const ar = await IB.post("/api/delivery-accounts", {
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({accounts: ACCOUNTS, secrets: accSecrets}),
+    });
+    const ard = await ar.json();
+    if (!ar.ok) { msg(ard.detail || "Sender accounts failed", "var(--red)"); return; }
+    ACCOUNTS = ard.accounts;
+
+    const ds = await IB.post("/api/delivery-settings", {
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({plain, secrets}),
+    });
+    const dsd = await ds.json();
+    if (!ds.ok) { msg(dsd.detail || "Delivery settings failed", "var(--red)"); return; }
+    DELIVERY = dsd.settings;
+
+    PROFILES = d.profiles; render();
+    msg(`Saved ${PROFILES.length} profile(s) and delivery settings.`, "var(--green)");
+  } catch (e) { msg(String(e.message || e), "var(--red)"); }
+});
+
+(async () => {
+  try {
+    OPTS = await IB.get("/api/profiles/options");
+    DELIVERY = await IB.get("/api/delivery-settings");
+    ACCOUNTS = await IB.get("/api/delivery-accounts");
+    const d = await IB.get("/api/profiles");
+    PROFILES = d.profiles; ALERTS = d.alerts;
+    render();
+  } catch (e) {
+    document.getElementById("list").innerHTML =
+      `<div class="card"><div class="empty">Could not load: ${IB.esc(String(e))}</div></div>`;
+  }
+})();
+</script>
+</body>
+</html>

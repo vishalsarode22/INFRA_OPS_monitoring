@@ -1,0 +1,184 @@
+{"t":"2026-09-03T14:55:39","m":"cpu","v":1.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-03T14:55:39","m":"memory","v":99.0,"s":"CRITICAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-03T14:55:39","m":"load_1m","v":0.12,"s":"NORMAL","src":"RFC \u00b7 SMON CPU_CONS"}
+{"t":"2026-09-03T14:55:39","m":"dialog_queue","v":5.0,"s":"WARNING","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-03T14:55:39","m":"update_queue","v":0.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-03T14:55:39","m":"sessions","v":8.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-03T14:55:39","m":"db_rtt_ms","v":0.5,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-03T14:55:39","m":"sap.su01.locked_users","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.sm37.cancelled_jobs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.st22.dumps","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.al08.user_logons","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.sm12.lock_count","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.sm13.failed_updates","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.sm21.errors","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.sm58.stuck_entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.smq1.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.smq2.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.we02.failed_idocs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.db12.last_backup","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-03T14:55:39","m":"sap.sm50.wp_in_use","v":1,"s":"NORMAL","src":"RFC \u00b7 TH_WPINFO"}
+{"t":"2026-09-03T14:55:39","m":"sap.dispatcher.state","v":null,"s":"NORMAL","src":"RFC"}
+{"t":"2026-09-03T14:55:39","m":"sap.icm.state","v":null,"s":"NORMAL","src":"RFC \u00b7 ICM_GET_INFO2"}
+{"t":"2026-09-03T14:55:39","m":"sap.gateway.state","v":null,"s":"UNKNOWN","src":"RFC"}
+{"t":"2026-09-04T15:18:24","m":"cpu","v":1.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T15:18:24","m":"memory","v":98.0,"s":"CRITICAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T15:18:24","m":"load_1m","v":0.12,"s":"NORMAL","src":"RFC \u00b7 SMON CPU_CONS"}
+{"t":"2026-09-04T15:18:24","m":"dialog_queue","v":5.0,"s":"WARNING","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T15:18:24","m":"update_queue","v":0.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T15:18:24","m":"sessions","v":8.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T15:18:24","m":"db_rtt_ms","v":0.5,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T15:18:24","m":"sap.su01.locked_users","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.sm37.cancelled_jobs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.al08.user_logons","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.sm12.lock_count","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.sm13.failed_updates","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.sm21.errors","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.sm58.stuck_entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.smq1.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.smq2.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.st22.dumps","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.we02.failed_idocs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.db12.last_backup","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T15:18:24","m":"sap.sm50.wp_in_use","v":1,"s":"NORMAL","src":"RFC \u00b7 TH_WPINFO"}
+{"t":"2026-09-04T15:18:24","m":"sap.dispatcher.state","v":null,"s":"NORMAL","src":"RFC"}
+{"t":"2026-09-04T15:18:24","m":"sap.icm.state","v":null,"s":"NORMAL","src":"RFC \u00b7 ICM_GET_INFO2"}
+{"t":"2026-09-04T15:18:24","m":"sap.gateway.state","v":null,"s":"UNKNOWN","src":"RFC"}
+{"t":"2026-09-04T17:07:47","m":"cpu","v":1.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T17:07:47","m":"memory","v":99.0,"s":"CRITICAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T17:07:47","m":"load_1m","v":0.12,"s":"NORMAL","src":"RFC \u00b7 SMON CPU_CONS"}
+{"t":"2026-09-04T17:07:47","m":"dialog_queue","v":5.0,"s":"WARNING","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T17:07:47","m":"update_queue","v":0.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T17:07:47","m":"sessions","v":8.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T17:07:47","m":"db_rtt_ms","v":0.5,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-04T17:07:47","m":"sap.st22.dumps","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.su01.locked_users","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.sm37.cancelled_jobs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.al08.user_logons","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.sm12.lock_count","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.sm13.failed_updates","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.sm21.errors","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.sm58.stuck_entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.smq1.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.smq2.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.we02.failed_idocs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.db12.last_backup","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-04T17:07:47","m":"sap.sm50.wp_in_use","v":1,"s":"NORMAL","src":"RFC \u00b7 TH_WPINFO"}
+{"t":"2026-09-04T17:07:47","m":"sap.dispatcher.state","v":null,"s":"NORMAL","src":"RFC"}
+{"t":"2026-09-04T17:07:47","m":"sap.icm.state","v":null,"s":"NORMAL","src":"RFC \u00b7 ICM_GET_INFO2"}
+{"t":"2026-09-04T17:07:47","m":"sap.gateway.state","v":null,"s":"UNKNOWN","src":"RFC"}
+{"t":"2026-09-07T10:51:22","m":"cpu","v":null,"s":"UNKNOWN","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T10:51:22","m":"memory","v":null,"s":"UNKNOWN","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T10:51:22","m":"load_1m","v":null,"s":"UNKNOWN","src":"RFC \u00b7 SMON CPU_CONS"}
+{"t":"2026-09-07T10:51:22","m":"sap.dispatcher.state","v":null,"s":"UNKNOWN","src":"RFC"}
+{"t":"2026-09-07T10:51:22","m":"sap.icm.state","v":null,"s":"UNKNOWN","src":"RFC"}
+{"t":"2026-09-07T10:51:22","m":"sap.gateway.state","v":null,"s":"UNKNOWN","src":"RFC"}
+{"t":"2026-09-07T10:51:22","m":"rfc.connection","v":null,"s":"UNKNOWN","src":"RFC"}
+{"t":"2026-09-07T12:59:44","m":"cpu","v":10.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T12:59:44","m":"memory","v":99.0,"s":"CRITICAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T12:59:44","m":"load_1m","v":1.2,"s":"NORMAL","src":"RFC \u00b7 SMON CPU_CONS"}
+{"t":"2026-09-07T12:59:44","m":"dialog_queue","v":5.0,"s":"WARNING","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T12:59:44","m":"update_queue","v":0.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T12:59:44","m":"sessions","v":13.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T12:59:44","m":"db_rtt_ms","v":0.2,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T12:59:44","m":"sap.sm37.cancelled_jobs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.su01.locked_users","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.st22.dumps","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.al08.user_logons","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.sm12.lock_count","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.sm13.failed_updates","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.sm21.errors","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.sm58.stuck_entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.smq1.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.smq2.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.we02.failed_idocs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.db12.last_backup","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T12:59:44","m":"sap.sm50.wp_in_use","v":1,"s":"NORMAL","src":"RFC \u00b7 TH_WPINFO"}
+{"t":"2026-09-07T12:59:44","m":"sap.dispatcher.state","v":null,"s":"NORMAL","src":"RFC"}
+{"t":"2026-09-07T12:59:44","m":"sap.icm.state","v":null,"s":"NORMAL","src":"RFC \u00b7 ICM_GET_INFO2"}
+{"t":"2026-09-07T12:59:44","m":"sap.gateway.state","v":null,"s":"UNKNOWN","src":"RFC"}
+{"t":"2026-09-07T17:55:03","m":"cpu","v":25.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T17:55:03","m":"memory","v":99.0,"s":"CRITICAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T17:55:03","m":"load_1m","v":3.0,"s":"NORMAL","src":"RFC \u00b7 SMON CPU_CONS"}
+{"t":"2026-09-07T17:55:03","m":"dialog_queue","v":5.0,"s":"WARNING","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T17:55:03","m":"update_queue","v":0.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T17:55:03","m":"sessions","v":8.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T17:55:03","m":"db_rtt_ms","v":0.2,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-07T17:55:03","m":"sap.sm37.cancelled_jobs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.su01.locked_users","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.sm21.errors","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.st22.dumps","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.al08.user_logons","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.sm12.lock_count","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.sm13.failed_updates","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.sm58.stuck_entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.smq1.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.smq2.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.we02.failed_idocs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.db12.last_backup","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-07T17:55:03","m":"sap.sm50.wp_in_use","v":1,"s":"NORMAL","src":"RFC \u00b7 TH_WPINFO"}
+{"t":"2026-09-07T17:55:03","m":"sap.dispatcher.state","v":null,"s":"NORMAL","src":"RFC"}
+{"t":"2026-09-07T17:55:03","m":"sap.icm.state","v":null,"s":"NORMAL","src":"RFC \u00b7 ICM_GET_INFO2"}
+{"t":"2026-09-07T17:55:03","m":"sap.gateway.state","v":null,"s":"UNKNOWN","src":"RFC"}
+{"t":"2026-09-08T11:11:03","m":"cpu","v":26.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-08T11:11:03","m":"memory","v":99.0,"s":"CRITICAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-08T11:11:03","m":"load_1m","v":3.12,"s":"NORMAL","src":"RFC \u00b7 SMON CPU_CONS"}
+{"t":"2026-09-08T11:11:03","m":"dialog_queue","v":5.0,"s":"WARNING","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-08T11:11:03","m":"update_queue","v":0.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-08T11:11:03","m":"sessions","v":9.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-08T11:11:03","m":"db_rtt_ms","v":0.2,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-08T11:11:03","m":"sap.su01.locked_users","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm37.cancelled_jobs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.al08.user_logons","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm12.lock_count","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm12.locks_per_user_max","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm12.users_with_many_locks","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm12.oldest_lock_minutes","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm13.failed_updates","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm21.errors","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm50.priv_mode_wp","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm50.long_running_wp","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm58.stuck_entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm66.max_instance_saturation_pct","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.smq1.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.smq2.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.st03.dialog_resp_ms","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.st03.max_instance_resp_ms","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.st03.db_time_pct","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.st22.dumps","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.we02.failed_idocs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.db12.last_backup","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-08T11:11:03","m":"sap.sm50.wp_in_use","v":1,"s":"NORMAL","src":"RFC \u00b7 TH_WPINFO"}
+{"t":"2026-09-08T11:11:03","m":"sap.dispatcher.state","v":null,"s":"NORMAL","src":"RFC"}
+{"t":"2026-09-08T11:11:03","m":"sap.icm.state","v":null,"s":"NORMAL","src":"RFC \u00b7 ICM_GET_INFO2"}
+{"t":"2026-09-08T11:11:03","m":"sap.gateway.state","v":null,"s":"UNKNOWN","src":"RFC"}
+{"t":"2026-09-09T15:47:31","m":"cpu","v":26.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-09T15:47:31","m":"memory","v":98.0,"s":"CRITICAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-09T15:47:31","m":"load_1m","v":3.12,"s":"NORMAL","src":"RFC \u00b7 SMON CPU_CONS"}
+{"t":"2026-09-09T15:47:31","m":"dialog_queue","v":5.0,"s":"WARNING","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-09T15:47:31","m":"update_queue","v":0.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-09T15:47:31","m":"sessions","v":8.0,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-09T15:47:31","m":"db_rtt_ms","v":0.2,"s":"NORMAL","src":"RFC \u00b7 SMON"}
+{"t":"2026-09-09T15:47:31","m":"sap.su01.locked_users","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm37.cancelled_jobs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.al08.user_logons","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm12.lock_count","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm12.locks_per_user_max","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm12.users_with_many_locks","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm12.oldest_lock_minutes","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm13.failed_updates","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm21.errors","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm50.priv_mode_wp","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm50.long_running_wp","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm58.stuck_entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm66.max_instance_saturation_pct","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.smq1.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.smq2.entries","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.st03.max_instance_resp_ms","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.st03.db_time_pct","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.st22.dumps","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.we02.failed_idocs","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.db12.last_backup","v":null,"s":"NORMAL","src":"RFC \u00b7 Z_FM"}
+{"t":"2026-09-09T15:47:31","m":"sap.sm50.wp_in_use","v":1,"s":"NORMAL","src":"RFC \u00b7 TH_WPINFO"}
+{"t":"2026-09-09T15:47:31","m":"sap.dispatcher.state","v":null,"s":"NORMAL","src":"RFC"}
+{"t":"2026-09-09T15:47:31","m":"sap.icm.state","v":null,"s":"NORMAL","src":"RFC \u00b7 ICM_GET_INFO2"}

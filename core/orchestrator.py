@@ -20,6 +20,8 @@ from core.config_loader import (
 from collectors.linux_collector import collect_linux_metrics, parse_linux_metrics
 from collectors.sap_process_collector import collect_sap_process_list, parse_sap_process_list
 from collectors.rfc_collector import collect_rfc_metrics
+from collectors.ase_collector import collect_ase_metrics
+from collectors.rfc_perf import collect_perf_metrics
 from evaluation.threshold_engine import evaluate_all
 from evaluation.ai_analyzer import analyze as run_ai_analysis
 from notifications.email_alert import send_critical_alert
@@ -134,6 +136,45 @@ def run_monitoring_cycle(system: str, client: str, ssh_creds: dict = None, insta
         except Exception as e:
             log.error(f"RFC collector failed entirely: {e}")
             result.errors.append(f"rfc_collector: {e}")
+
+    # --- RFC performance metrics (SM50/SM66/ST03N/SM12/SQLM, all instances) ---
+    #
+    # Second RFC logon per cycle, deliberately separate from the counters
+    # above: this one is heavier (per-instance TH_WPINFO, STAT records,
+    # SQLMD) and a failure here must not cost the T-code counters. Names
+    # are new (sap.sm50.priv_mode_wp, sap.st03.dialog_resp_ms ...) so
+    # nothing is deduped away.
+    if system_cfg and system_cfg.get("rfc"):
+        try:
+            perf_metrics, perf_error = collect_perf_metrics(system, system_cfg)
+            if perf_metrics:
+                result.metrics.extend(perf_metrics)
+                log.info(f"[{system}] RFC perf collector: {len(perf_metrics)} metrics added.")
+            if perf_error:
+                result.errors.append(f"rfc_perf: {perf_error}")
+                log.warning(f"[{system}] RFC perf collector: {perf_error}")
+        except Exception as e:
+            log.error(f"RFC perf collector failed entirely: {e}")
+            result.errors.append(f"rfc_perf: {e}")
+
+    # --- Database metrics (ASE / Sybase MDA tables; the ST04 view) ---
+    #
+    # Reads the ASE monitoring tables directly with a read-only mon_role
+    # login. Needs neither RFC nor OS access. db.ase.* names collide with
+    # nothing else, so no dedupe against earlier collectors is needed.
+    # Same contract as RFC: a failure is an error entry, never a healthy 0.
+    if system_cfg and system_cfg.get("db"):
+        try:
+            db_metrics, db_error = collect_ase_metrics(system, system_cfg)
+            if db_metrics:
+                result.metrics.extend(db_metrics)
+                log.info(f"[{system}] ASE collector: {len(db_metrics)} metrics added.")
+            if db_error:
+                result.errors.append(f"ase_collector: {db_error}")
+                log.warning(f"[{system}] ASE collector: {db_error}")
+        except Exception as e:
+            log.error(f"ASE collector failed entirely: {e}")
+            result.errors.append(f"ase_collector: {e}")
 
     result.compute_overall_status()
 

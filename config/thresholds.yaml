@@ -74,3 +74,116 @@ sap.smq2.entries:
 sap.sost.errors:
   warning: 1
   critical: 10
+
+# ============================================================
+# ASE / Sybase database (ST04 view via MDA tables)
+# ============================================================
+
+# Statements currently executing across all SAP work processes
+db.ase.active_statements:
+  warning: 40
+  critical: 80
+
+# Statements running longer than LONG_RUNNING_SECONDS (60s)
+db.ase.long_running_statements:
+  warning: 1
+  critical: 5
+
+# Sessions waiting on a lock held by another SPID
+db.ase.blocked_sessions:
+  warning: 1
+  critical: 5
+
+# Cached statements averaging more than EXPENSIVE_AVG_LIO (50k) logical reads
+db.ase.expensive_statement_count:
+  warning: 5
+  critical: 20
+
+# Highest average logical I/O of any cached statement, in pages
+db.ase.top_statement_avg_lio:
+  warning: 100000
+  critical: 1000000
+
+# Data cache hit ratio. LOW IS BAD: warning at or below 95, critical at or below 90.
+db.ase.data_cache_hit_pct:
+  warning: 95
+  critical: 90
+
+# ASE engine busy % (delta between polls; absent on the first poll)
+db.ase.engine_cpu_pct:
+  warning: 80
+  critical: 90
+
+# Hottest memory pool from sp_monitorconfig, Pct_act
+db.ase.memory_pool_max_used_pct:
+  warning: 85
+  critical: 95
+
+# ============================================================
+# RFC performance collector (all instances over RFC)
+# ============================================================
+
+# Dialog WPs in PRIV mode (user context spilled to heap; WP pinned to that user)
+sap.sm50.priv_mode_wp:
+  warning: 2
+  critical: 5
+
+# Busy dialog WPs running longer than 600s
+sap.sm50.long_running_wp:
+  warning: 2
+  critical: 5
+
+# Worst single instance's dialog WP saturation
+sap.sm66.max_instance_saturation_pct:
+  warning: 80
+  critical: 90
+
+# Average dialog response over the last 5 minutes, all instances (STAT records)
+sap.st03.dialog_resp_ms:
+  warning: 1000
+  critical: 2500
+
+# Worst single instance's average dialog response
+sap.st03.max_instance_resp_ms:
+  warning: 1500
+  critical: 3500
+
+# Share of dialog response spent in DB calls
+sap.st03.db_time_pct:
+  warning: 50
+  critical: 70
+
+# Most locks held by any one user
+sap.sm12.locks_per_user_max:
+  warning: 20
+  critical: 50
+
+# Users holding 10 or more locks
+sap.sm12.users_with_many_locks:
+  warning: 2
+  critical: 5
+
+# Age of the oldest lock entry
+sap.sm12.oldest_lock_minutes:
+  warning: 30
+  critical: 120
+
+# ABAP programs with >= 60s total DB time in SQL Monitor
+sap.sqlm.expensive_programs:
+  warning: 3
+  critical: 10
+
+# Total DB time of the single most expensive program
+sap.sqlm.top_program_total_s:
+  warning: 300
+  critical: 1800
+
+# Largest per-step memory (MAXBYTES) of any user in the STAT window, MB
+sap.st03.top_user_memory_mb:
+  warning: 1024
+  critical: 2048
+
+# Total DB request time of the single heaviest report in the STAT window, ms
+sap.st03.top_report_db_ms:
+  warning: 60000
+  critical: 300000

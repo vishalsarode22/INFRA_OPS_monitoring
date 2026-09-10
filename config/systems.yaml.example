@@ -70,3 +70,18 @@ systems:
     password: ${QAS_SAP_PASSWORD}
     has_gui_access: true
     has_os_access: false
+
+# ------------------------------------------------------------
+# Optional database block (SAP ASE / Sybase). Read directly with a
+# read-only login holding mon_role -- no RFC, no OS access needed.
+# Put secrets in .env and reference them here exactly like rfc:.
+# ------------------------------------------------------------
+#  db:
+#    type: ase
+#    host: ${SYBASE_TST_HOST}
+#    port: ${SYBASE_TST_PORT}
+#    database: TST
+#    username: ${SYBASE_TST_USER}
+#    password: ${SYBASE_TST_PASS}
+#    driver: Adaptive Server Enterprise   # ODBC driver name; FreeTDS also works
+#    timeout: 15

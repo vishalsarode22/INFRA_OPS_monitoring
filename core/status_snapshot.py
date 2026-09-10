@@ -3,8 +3,10 @@ Writes/reads a JSON snapshot per system, so the dashboard can display
 multiple systems independently.
 """
 
+import copy
 import json
 import os
+import threading
 from datetime import datetime
 
 from core.models import MonitoringResult
@@ -122,15 +124,46 @@ def save_snapshot(result: MonitoringResult, gui_results: list = None, system_nam
         log.error(f"Failed to save status snapshot for {name}: {e}")
 
 
+_snapshot_cache: dict[str, tuple[float, int, dict]] = {}
+_snapshot_cache_lock = threading.Lock()
+
+
 def load_snapshot(system_name: str) -> dict:
+    """
+    The last written snapshot for a system, or None.
+
+    Cached against (mtime, size). /api/overview calls this once per system on
+    every poll and PRD.json alone is 112 KB, so the overview endpoint was
+    parsing roughly a quarter of a megabyte of JSON per request -- multiplied
+    by every open tab. Snapshots change once per sweep, i.e. every couple of
+    hours, so re-parsing them at polling rate bought nothing.
+
+    A dict is returned to callers that will mutate it (get_status splats it
+    into a response, save_snapshot reads the previous one and builds on it),
+    so hand out a copy rather than the cached object.
+    """
     path = _snapshot_path(system_name)
-    if not os.path.exists(path):
+    try:
+        stat = os.stat(path)
+    except OSError:
+        with _snapshot_cache_lock:
+            _snapshot_cache.pop(system_name, None)
         return None
+
+    with _snapshot_cache_lock:
+        hit = _snapshot_cache.get(system_name)
+    if hit is not None and hit[0] == stat.st_mtime and hit[1] == stat.st_size:
+        return copy.deepcopy(hit[2])
+
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
     except Exception:
         return None
+
+    with _snapshot_cache_lock:
+        _snapshot_cache[system_name] = (stat.st_mtime, stat.st_size, data)
+    return copy.deepcopy(data)
 
 
 def list_snapshot_systems() -> list[str]:

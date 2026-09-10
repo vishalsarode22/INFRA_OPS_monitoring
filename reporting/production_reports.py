@@ -141,40 +141,66 @@ def generate_system_pdf(result: MonitoringResult, gui_results=None, output_path=
                            ("FONTSIZE",(0,0),(-1,-1),7),
                            ("GRID",(0,0),(-1,-1),.3,colors.grey),
                            ("VALIGN",(0,0),(-1,-1),"TOP")]))
-    story += [t, Spacer(1,.4*cm), Paragraph("2. T-Code Execution & Recovery", h2)]
-    for m in gui_results or []:
-        d = getattr(m,"extra_data",{}) or {}
-        story.append(Paragraph(f"<b>{m.tcode or ''}</b> — {m.display_value} — "
-                               f"Evidence ID: {d.get('evidence_id','')} — Attempts: {d.get('attempts',0)}", body))
-        actions = d.get("recovery_actions",[]) or []
-        if actions:
-            story.append(Paragraph("Recovery: " + ", ".join(actions), body))
-        for shot in m.screenshot_paths or []:
-            real = _real_path(shot)
-            if os.path.exists(real):
-                try:
-                    story += [Spacer(1,.1*cm), Image(real, width=16*cm, height=9*cm, kind="proportional")]
-                except Exception as exc:
-                    log.warning("Screenshot embedding failed: %s", exc)
-        story.append(Spacer(1,.2*cm))
-    story.append(Paragraph("3. Incidents & RCA", h2))
-    incidents = _incidents(result)
-    if not incidents:
-        story.append(Paragraph("No incidents recorded for this cycle.", body))
-    else:
-        for i in incidents:
-            story.append(Paragraph(f"<b>{i.get('severity', i.get('status',''))}</b> — "
-                                   f"{i.get('title', i.get('name',''))}", body))
-            story.append(Paragraph(str(i.get('description', i.get('detail',''))), body))
-    story.append(Paragraph("4. AI Analysis", h2))
+    # ---- 2. What each T-code capture found -------------------------------
+    # Screenshots are no longer embedded (they made the PDF a 25-page image
+    # dump that nobody reads). Each capture is instead described: what was
+    # seen, its status, the headline count, and what to do about it. The
+    # screenshots remain on disk under the evidence ID for anyone who wants
+    # the raw page.
+    from reporting.check_narratives import narrate_all, summary_counts, deterministic_analysis
+    narratives = narrate_all(gui_results)
+    counts = summary_counts(narratives)
+    story += [t, Spacer(1,.4*cm), Paragraph("2. T-Code Checks — what was captured", h2)]
+    story.append(Paragraph(
+        f"{counts['captured']} of {counts['total']} checks captured · "
+        f"<b>{counts['attention']}</b> need attention · {counts['failed']} failed. "
+        f"Screenshots are retained on the collector under each Evidence ID.", body))
+    small = ParagraphStyle("small", parent=body, fontSize=7, leading=9)
+    crow = [["T-code", "Check", "Status", "Count / Value", "Observation", "Recommendation"]]
+    for n in narratives:
+        crow.append([Paragraph(n.tcode, small), Paragraph(n.task, small),
+                     Paragraph(n.status, small), Paragraph(n.value or "", small),
+                     Paragraph(n.observation, small), Paragraph(n.recommendation or "", small)])
+    ct = Table(crow, colWidths=[1.6*cm, 2.6*cm, 1.9*cm, 2.2*cm, 5.4*cm, 4.3*cm], repeatRows=1)
+    ct_style = [("BACKGROUND",(0,0),(-1,0),colors.HexColor("#37474F")),
+                ("TEXTCOLOR",(0,0),(-1,0),colors.white),
+                ("FONTSIZE",(0,0),(-1,-1),7),
+                ("GRID",(0,0),(-1,-1),.3,colors.grey),
+                ("VALIGN",(0,0),(-1,-1),"TOP")]
+    for i, n in enumerate(narratives, start=1):
+        colour = {"ATTENTION": "#FFE0B2", "FAILED": "#FFCDD2", "OK": "#E8F5E9"}.get(n.status)
+        if colour:
+            ct_style.append(("BACKGROUND", (2, i), (2, i), colors.HexColor(colour)))
+    ct.setStyle(TableStyle(ct_style))
+    story += [ct, Spacer(1,.4*cm)]
+
+    # ---- 3. Analysis --------------------------------------------------------
+    # The model narrative when available, always backed by the rules-based
+    # analysis so the section is never "No AI analysis available" -- the
+    # findings and actions below trace to metric statuses and captured facts.
+    story.append(Paragraph("3. Analysis", h2))
+    da = deterministic_analysis(result, narratives)
     ai = result.ai_analysis
+    story.append(Paragraph(f"<b>Severity:</b> {(getattr(ai, 'severity', None) or da['severity'])}", body))
+    story.append(Paragraph(f"<b>Summary:</b> {da['headline']}", body))
     if ai:
-        story.append(Paragraph(f"<b>Severity:</b> {ai.severity}", body))
-        story.append(Paragraph(f"<b>Likely Root Cause:</b> {ai.likely_root_cause}", body))
-        story.append(Paragraph(f"<b>Recommended Actions:</b> {'; '.join(ai.recommended_actions or [])}", body))
+        story.append(Paragraph(f"<b>Likely root cause (model):</b> {ai.likely_root_cause}", body))
+        for a in (ai.recommended_actions or []):
+            story.append(Paragraph(f"• {a}", body))
         story.append(Paragraph(f"<b>Confidence:</b> {ai.confidence}", body))
     else:
-        story.append(Paragraph("No AI analysis available for this cycle.", body))
+        story.append(Paragraph("<i>Model narrative unavailable this cycle; the findings below are rules-based "
+                               "and trace directly to metric thresholds and captured screens.</i>", body))
+    if da["findings"]:
+        story.append(Paragraph("<b>Findings</b>", body))
+        for f_ in da["findings"]:
+            story.append(Paragraph(f"• {f_}", body))
+    if da["actions"]:
+        story.append(Paragraph("<b>Recommended actions</b>", body))
+        for a in da["actions"]:
+            story.append(Paragraph(f"• {a}", body))
+    if not da["findings"]:
+        story.append(Paragraph("No metric breached a threshold and every captured check read normal.", body))
     doc.build(story)
     return str(path)
 

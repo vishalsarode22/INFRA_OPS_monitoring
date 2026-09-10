@@ -1,0 +1,88 @@
+# Deterministic incident-correlation policy.
+# These values are intentionally conservative defaults and should be tuned
+# against real historical incidents after the baseline dataset is built.
+rules:
+  - id: SAP_LOCK_CONTENTION
+    enabled: true
+    title: SAP application / lock contention
+    severity: CRITICAL
+    description: Elevated SAP locks and dialog response time indicate likely application contention.
+    confidence: 0.87
+    thresholds:
+      lock_count: 10
+      response_time_ms: 500
+      dump_count: 0
+
+    culprit:
+      component: SAP application / ABAP
+      statement: >-
+        A long-running or uncommitted transaction is holding enqueue locks
+        while other dialog work waits behind it. The lock holder is named in
+        the evidence below -- that user or job is the proximate cause, not the
+        host, not the database.
+      confirm_in:
+        - "SM12 -- identify the oldest lock and its owner"
+        - "SM50 -- find that user's work process and its running report"
+        - "SM66 -- check whether the same report is running on other instances"
+    remediation:
+      - "Identify the oldest enqueue entry in SM12 and its holder."
+      - "Confirm in SM50/SM66 whether the holder is still active or orphaned."
+      - "If orphaned (no matching work process), delete the lock entry in SM12."
+      - "If active, contact the owner before cancelling -- deleting a lock under a running update corrupts data."
+      - "Recurring on the same object: the ABAP needs a shorter lock scope, not a bigger server."
+  - id: INFRA_RESOURCE_PRESSURE
+    enabled: true
+    title: Infrastructure resource pressure
+    severity: CRITICAL
+    description: Multiple host resource indicators are saturated or are driving severe response-time degradation.
+    confidence: 0.86
+    thresholds:
+      cpu_percent: 90
+      memory_percent: 90
+      load_1m: 8
+      response_time_ms: 1000
+      minimum_high_resources: 2
+
+    culprit:
+      component: Host / infrastructure
+      statement: >-
+        The application server is short of a host resource, so requests queue
+        before they reach ABAP. This is a capacity or sizing fault: the SAP
+        work is a victim of it, not the cause.
+      confirm_in:
+        - "ST06 -- physical memory, free memory, Page In/Out of RAM"
+        - "ST02 -- extended memory and buffer swaps"
+        - "SM50 -- whether work processes are in PRIV mode (heap exhaustion)"
+      confirm_notes: >-
+        Free memory near zero with Page Out at 0 is ALLOCATED, not exhausted.
+        Sustained Page Out above 0 %/h is the signal that matters.
+    remediation:
+      - "ST06: check Page Out of RAM. Zero means allocated, not exhausted -- do not escalate on free memory alone."
+      - "ST02: any non-zero swap count on program/CUA/screen buffers means the buffer is too small."
+      - "SM50: work processes in PRIV mode indicate heap exhaustion -- review ztta/roll_extension and abap/heap_area_dia."
+      - "Compare em/initial_size_MB and PHYS_MEMSIZE against the real physical memory in ST06."
+      - "If CPU-bound: identify the top consumer in ST03N before adding cores."
+  - id: SAP_PROCESS_FAILURE
+    enabled: true
+    title: SAP application server process failure
+    severity: CRITICAL
+    description: One or more SAP work processes are reporting a critical state.
+    confidence: 0.96
+
+    culprit:
+      component: SAP work process / dispatcher
+      statement: >-
+        One or more work processes are in a failed or stopped state. Until
+        they are restored, capacity is reduced regardless of host headroom,
+        and queueing will look like a performance problem.
+      confirm_in:
+        - "SM50 -- work process status and any error text"
+        - "SM21 -- system log around the failure timestamp"
+        - "ST22 -- dumps raised by the affected process"
+        - "dev_w<n> trace files in the instance work directory"
+    remediation:
+      - "SM50: note the failed process number, type and its last report."
+      - "SM21: read the system log for the same minute -- the cause is usually logged there."
+      - "ST22: check for a dump raised by that process."
+      - "Restart the individual work process in SM50 before considering an instance restart."
+      - "Repeated failure of the same WP type points at a specific report or an exhausted resource, not at SAP generally."

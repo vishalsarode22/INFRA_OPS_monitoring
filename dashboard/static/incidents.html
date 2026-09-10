@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Incidents</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds4">
+<style>
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;
+       margin-bottom:16px}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+       padding:13px 15px}
+  .kpi .k{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim)}
+  .kpi .v{font-family:var(--mono);font-size:23px;font-weight:800;margin-top:3px}
+  .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .inc{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:13px;
+       overflow:hidden;background:var(--card)}
+  .inc.CRITICAL{border-left:3px solid var(--red)}
+  .inc.WARNING{border-left:3px solid var(--amber)}
+  .inc.UNKNOWN{border-left:3px solid var(--muted-dim)}
+  .ih{display:flex;align-items:center;gap:10px;padding:12px 15px;
+       border-bottom:1px solid var(--border);cursor:pointer}
+  .ih h4{font-size:13.5px;font-weight:800;flex:1}
+  .ih .meta{font-family:var(--mono);font-size:11px;color:var(--muted-dim)}
+  .ib{padding:14px 15px;display:none}
+  .inc.open .ib{display:block}
+  .ib h5{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:14px 0 6px}
+  .ib h5:first-child{margin-top:0}
+  .ib ul,.ib ol{margin-left:17px;font-size:12.5px;line-height:1.7}
+  .ev li{color:var(--muted);font-family:var(--mono);font-size:11.5px}
+  .culprit{background:var(--info-bg);border:1px solid var(--info-br);
+       border-radius:var(--radius);padding:12px 14px;font-size:13px;line-height:1.6}
+  .culprit b{font-size:14px}
+  .hyp{background:rgba(120,120,120,.10);border:1px solid var(--border);
+       border-radius:var(--radius);padding:12px 14px;font-size:12.5px;line-height:1.6}
+  .hyp .tag{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.05em;
+       color:var(--muted-dim);display:block;margin-bottom:7px}
+  .why-empty{padding:26px;text-align:center;color:var(--muted);line-height:1.7;font-size:13px}
+  .why-empty b{color:var(--fg)}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Incidents</h2>
+      <div class="sub">Events correlated into problems by deterministic rules</div></div>
+    <div class="top-actions">
+      <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
+      <button class="btn" onclick="load()">Refresh</button>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="kpis" id="kpis"></div>
+    <div class="filters" id="filters"></div>
+    <div id="list"><div class="card"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading incidents…</span></div></div></div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=ds4"></script>
+<script>
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
+    '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
+    '<p style="color:#666;line-height:1.6">This page needs ' +
+    '<code>/static/shell.js?v=ds4</code> and <code>/static/shell.css?v=ds4</code>.</p></div>';
+}
+</script>
+<script>
+IB.mountShell("incidents");
+IB.mountSchedulerControl("sched-ctl");
+
+let STATE = { status: "", data: null };
+
+function fmtDuration(seconds) {
+  if (!seconds && seconds !== 0) return "—";
+  const m = Math.round(seconds / 60);
+  if (m < 60) return m + "m";
+  const h = Math.floor(m / 60);
+  return h + "h " + (m % 60) + "m";
+}
+
+function kpis(counts) {
+  const cells = [
+    ["Open", counts.open, counts.open ? "var(--red)" : ""],
+    ["Resolved", counts.resolved, ""],
+    ["Total", counts.total, ""],
+    ["With AI narrative", counts.with_ai, ""],
+  ];
+  document.getElementById("kpis").innerHTML = cells.map(([k, v, colour]) =>
+    `<div class="kpi"><div class="k">${IB.esc(k)}</div>
+       <div class="v" ${colour ? `style="color:${colour}"` : ""}>${IB.esc(String(v))}</div></div>`
+  ).join("");
+}
+
+function filters() {
+  const options = [["", "All"], ["NEW", "New"], ["ACTIVE", "Active"],
+                   ["ACKNOWLEDGED", "Acknowledged"], ["RESOLVED", "Resolved"]];
+  document.getElementById("filters").innerHTML = options.map(([value, label]) =>
+    `<button class="btn${STATE.status === value ? " on" : ""}"
+       onclick="STATE.status='${value}';load()">${IB.esc(label)}</button>`).join("");
+}
+
+function incidentCard(i) {
+  const severity = String(i.severity || "UNKNOWN").toUpperCase();
+  const ai = i.ai_analysis || null;
+
+  // Only the narrative is model-written. Severity, evidence and the affected
+  // metrics all come from the rule, so they are shown above it and the
+  // narrative is labelled to stop anyone acting on it as a finding.
+  const aiBlock = ai ? `
+      <h5>AI narrative</h5>
+      <div class="hyp">
+        <span class="tag">HYPOTHESIS · CYCLE-LEVEL · NOT A FINDING</span>
+        ${IB.esc(ai.likely_root_cause || ai.summary || "(no narrative returned)")}
+      </div>` : "";
+
+  const cat = i.catalogue || {};
+
+  // The deterministic half. Shown ABOVE the AI narrative on purpose: whoever
+  // opens this at 3am should meet the reviewable attribution first, not a
+  // model paragraph they then have to decide whether to trust.
+  const culprit = (cat.culprit && cat.culprit.component) ? `
+      <h5>Likely culprit · from the rule</h5>
+      <div class="culprit">
+        <b>${IB.esc(cat.culprit.component)}</b><br>
+        ${IB.esc(cat.culprit.statement || "")}
+        ${(cat.culprit.confirm_in || []).length ? `<br><br><b>Confirm before acting</b>
+          <ul>${cat.culprit.confirm_in.map(c => `<li>${IB.esc(c)}</li>`).join("")}</ul>` : ""}
+        ${cat.culprit.confirm_notes
+          ? `<div style="margin-top:9px;padding:8px 10px;border-radius:5px;
+               background:rgba(200,150,0,.10);color:var(--amber)">${
+               IB.esc(cat.culprit.confirm_notes)}</div>` : ""}
+      </div>` : "";
+
+  const remediation = (cat.remediation || []).length ? `
+      <h5>Remediation</h5>
+      <ol>${cat.remediation.map(x => `<li>${IB.esc(x)}</li>`).join("")}</ol>` : "";
+
+  const params = (cat.parameters || []).length ? `
+      <h5>SAP parameters that govern this</h5>
+      <ul class="ev">${cat.parameters.map(x => `<li>${IB.esc(x)}</li>`).join("")}</ul>` : "";
+
+  const sources = (cat.rfc_evidence || []).length ? `
+      <h5>Where this evidence comes from</h5>
+      <ul class="ev">${cat.rfc_evidence.map(e =>
+        `<li>${IB.esc(e.source)} · ${IB.esc(e.kind === "table" ? "table" : "function module")}
+          · ${IB.esc(e.status === "confirmed" ? "confirmed live" : "verify in SE16")}</li>`
+        ).join("")}</ul>` : "";
+
+  const evidence = (i.evidence || []).length ? `
+      <h5>Evidence</h5>
+      <ul class="ev">${i.evidence.map(e => `<li>${IB.esc(e)}</li>`).join("")}</ul>` : "";
+
+  const metrics = (i.affected_metrics || []).length ? `
+      <h5>Affected metrics</h5>
+      <ul class="ev">${i.affected_metrics.map(m => `<li>${IB.esc(m)}</li>`).join("")}</ul>` : "";
+
+  return `
+    <div class="inc ${severity}" id="inc-${IB.esc(i.incident_id)}">
+      <div class="ih" onclick="document.getElementById('inc-${IB.esc(i.incident_id)}').classList.toggle('open')">
+        <span class="chip c-${severity === 'CRITICAL' ? 'crit' : severity === 'WARNING' ? 'warn' : 'unk'}">
+          ${IB.esc(severity)}</span>
+        <h4>${IB.esc(i.title || i.rule_id)}</h4>
+        <span class="meta">${IB.esc(i.system)}/${IB.esc(i.client || "")}</span>
+        <span class="meta">${fmtDuration(i.duration_seconds)}</span>
+        <span class="chip">${IB.esc(i.status || "")}</span>
+      </div>
+      <div class="ib">
+        <h5>Rule</h5>
+        <div style="font-family:var(--mono);font-size:12px">${IB.esc(i.rule_id)}
+          ${i.confidence ? ` · confidence ${IB.esc(String(i.confidence))}` : ""}</div>
+        ${i.description ? `<h5>Description</h5><div style="font-size:12.5px;line-height:1.6">${IB.esc(i.description)}</div>` : ""}
+        ${culprit}
+        ${evidence}
+        ${metrics}
+        ${remediation}
+        ${params}
+        ${sources}
+        <h5>Timing</h5>
+        <div style="font-family:var(--mono);font-size:11.5px;color:var(--muted)">
+          first seen ${IB.esc(i.first_seen || "—")} · last seen ${IB.esc(i.last_seen || "—")}
+          ${i.resolved_at ? ` · resolved ${IB.esc(i.resolved_at)}` : ""}
+        </div>
+        ${aiBlock}
+      </div>
+    </div>`;
+}
+
+async function load() {
+  filters();
+  const box = document.getElementById("list");
+  try {
+    const query = STATE.status ? `?status=${encodeURIComponent(STATE.status)}` : "";
+    const r = await fetch("/api/incidents" + query);
+    const d = await r.json();
+    STATE.data = d;
+    kpis(d.counts || {open: 0, resolved: 0, total: 0, with_ai: 0});
+
+    if (!d.incidents || !d.incidents.length) {
+      // An empty list is a real answer. Saying "no incidents" without saying
+      // what was checked is indistinguishable from a broken screen.
+      box.innerHTML = `<div class="card"><div class="why-empty">
+        <b>No correlated incidents.</b><br>
+        Read ${IB.esc(String((d.systems_read || []).length))} system(s):
+        ${IB.esc((d.systems_read || []).join(", ") || "none")}.<br><br>
+        Incidents appear when a correlation rule matches during a sweep.
+        Events on their own do not create one — a rule has to link them.
+        See <a href="/correlation-page">Correlation</a> for the rules, their
+        thresholds, and how many times each has fired.
+        ${(d.errors || []).length ? "<br><br><span style='color:var(--amber)'>Errors: "
+          + IB.esc(d.errors.join(" | ")) + "</span>" : ""}
+      </div></div>`;
+      return;
+    }
+    box.innerHTML = d.incidents.map(incidentCard).join("");
+  } catch (e) {
+    box.innerHTML = `<div class="card"><div class="empty">
+      Could not load incidents: ${IB.esc(String(e))}</div></div>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>

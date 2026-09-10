@@ -10,13 +10,23 @@ from utils.logger import get_logger
 log = get_logger(__name__, "application")
 
 
-def open_tcode(session, tcode: str, wait_seconds: float = 2.0, max_busy_wait: float = 8.0) -> bool:
+def open_tcode(session, tcode: str, wait_seconds: float = None, max_busy_wait: float = 8.0) -> bool:
     """
     Opens a T-code using the scripting API's command field.
     Waits for the session to report not-busy (data finished loading)
     rather than a fixed sleep, since some T-codes take longer to
     populate data than others.
+
+    SPEED: the fixed pre-wait was 2.0s, paid on every one of ~25 T-codes
+    (~50s per sweep) BEFORE the Busy poll even started -- pure dead time on
+    a screen that had usually already transitioned. It is now 0.3s and the
+    Busy poll does the real waiting. Tunable with IBO_GUI_WAIT / the poll
+    ceiling with IBO_GUI_MAX_BUSY_WAIT for a slow network.
     """
+    import os as _os
+    if wait_seconds is None:
+        wait_seconds = float(_os.environ.get("IBO_GUI_WAIT", "0.3") or 0.3)
+    max_busy_wait = float(_os.environ.get("IBO_GUI_MAX_BUSY_WAIT", str(max_busy_wait)) or max_busy_wait)
     log.info(f"Opening T-code via scripting: {tcode}")
 
     try:
@@ -26,7 +36,7 @@ def open_tcode(session, tcode: str, wait_seconds: float = 2.0, max_busy_wait: fl
         log.error(f"Scripting call failed while opening {tcode}: {e}")
         raise
 
-    # Wait for initial screen transition
+    # Brief transition wait, then let the Busy poll do the real work.
     time.sleep(wait_seconds)
 
     # Then wait for SAP to report "not busy" (data finished loading),
@@ -38,10 +48,10 @@ def open_tcode(session, tcode: str, wait_seconds: float = 2.0, max_busy_wait: fl
                 break
         except Exception:
             break
-        time.sleep(0.3)
+        time.sleep(0.2)
 
     # Small extra settle time after busy clears, for rendering to finish
-    time.sleep(0.5)
+    time.sleep(float(_os.environ.get("IBO_GUI_SETTLE", "0.3") or 0.3))
 
     try:
         current_tcode = session.Info.Transaction
@@ -102,12 +112,18 @@ def recover_session(session):
         log.warning(f"recover_session: could not return to easy-access screen: {e}")
 
 
-def goto_tcode(session, tcode: str, wait_seconds: float = 1.5):
+def goto_tcode(session, tcode: str, wait_seconds: float = None):
     """
     Navigates to a T-code without the verification/return-value logic
     of open_tcode() -- used as the first step inside action functions
     in tcode_actions.py, which then perform additional recorded steps.
+
+    Same speed change as open_tcode: the fixed 1.5s pre-wait is cut to
+    0.3s (IBO_GUI_WAIT) and wait_until_not_busy does the real waiting.
     """
+    import os as _os
+    if wait_seconds is None:
+        wait_seconds = float(_os.environ.get("IBO_GUI_WAIT", "0.3") or 0.3)
     session.findById("wnd[0]/tbar[0]/okcd").text = f"/n{tcode}"
     session.findById("wnd[0]").sendVKey(0)
     time.sleep(wait_seconds)

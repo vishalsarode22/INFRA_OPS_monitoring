@@ -19,10 +19,28 @@ router = APIRouter(prefix="/api", tags=["intelligence"])
 def _snapshot_or_404(system_name: str) -> dict:
     snapshot = load_snapshot(system_name)
     if snapshot is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"System '{system_name}' snapshot not found.",
-        )
+        # Distinguish "no such system" (a real 404) from "known system, no
+        # sweep has succeeded yet" (an expected state for an unreachable
+        # host like SARLOHA PRD). The second is not an error: return an
+        # honest empty snapshot so the page renders the card as UNKNOWN
+        # instead of logging a red 404 on every poll.
+        try:
+            from core.config_loader import get_systems
+            known = any(s.get("name") == system_name for s in get_systems())
+        except Exception:
+            known = False
+        if not known:
+            raise HTTPException(
+                status_code=404,
+                detail=f"System '{system_name}' is not configured.",
+            )
+        return {
+            "system": system_name,
+            "overall_status": "UNKNOWN",
+            "metrics": [], "incidents": [], "events": [],
+            "no_snapshot": True,
+            "note": "no successful sweep has been recorded for this system yet",
+        }
     return snapshot
 
 

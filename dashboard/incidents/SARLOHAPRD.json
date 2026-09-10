@@ -1,0 +1,102 @@
+{
+  "system": "SARLOHA PRD",
+  "incidents": [
+    {
+      "incident_id": "INC-771C86066F",
+      "system": "SARLOHA PRD",
+      "client": "500",
+      "rule_id": "SAP_BATCH_FAILURE",
+      "title": "Background job failures",
+      "severity": "WARNING",
+      "status": "ACTIVE",
+      "first_seen": "2026-09-09T16:12:33.869457",
+      "last_seen": "2026-09-09T16:12:33.869457",
+      "event_ids": [
+        "EVT-17C4249DC2",
+        "EVT-2F03F0C52D",
+        "EVT-9051621A53",
+        "EVT-9E17564FAD",
+        "EVT-B128F7FC78",
+        "EVT-C77D60B1E8",
+        "EVT-CAFAB9D5A4"
+      ],
+      "evidence": [
+        "sap.sm37.cancelled_jobs=3 count (WARNING)",
+        "  detail: CODE_INSPECTOR_DELETION, ZOASHIP_EMAIL_BG, ZTOT_STK_LD_TRACKER_MAIL",
+        "  CODE_INSPECTOR_DELETION (id 01001300)",
+        "      user unknown \u00b7 started 01:00:15 \u00b7 ended 01:00:15 \u00b7 ran 0s (never started)",
+        "      Ended at its start time -- it never actually ran. Check the step user's authorisations in SU53, that the variant still exists, and that a background work process was free.",
+        "  ZOASHIP_EMAIL_BG (id 08301400)",
+        "      user unknown \u00b7 started 08:30:15 \u00b7 ended 08:30:16 \u00b7 ran 1s",
+        "      Ran for 1s then cancelled. The failure is inside the job: check ST22 for a dump at 08:30:16 and the job log in SM37.",
+        "  ZTOT_STK_LD_TRACKER_MAIL (id 08351300)",
+        "      user unknown \u00b7 started 08:35:09 \u00b7 ended 08:35:09 \u00b7 ran 0s (never started)",
+        "      Ended at its start time -- it never actually ran. Check the step user's authorisations in SU53, that the variant still exists, and that a background work process was free."
+      ],
+      "affected_metrics": [
+        "sap.sm37.cancelled_jobs",
+        "sap.sm58.stuck_entries",
+        "sap.st03.dialog_resp_ms",
+        "sap.st03.max_instance_resp_ms",
+        "sap.st03.top_report_db_ms",
+        "sap.st03.top_user_memory_mb",
+        "sap.st22.dumps"
+      ],
+      "confidence": 0.9,
+      "description": "Jobs cancelled or repeatedly failing at start. Housekeeping and backup jobs failing silently is how a system degrades over weeks without anyone noticing.",
+      "resolved_at": null,
+      "acknowledged_at": null,
+      "acknowledged_by": null,
+      "ai_analysis": null,
+      "ai_analysis_at": null,
+      "ai_analysis_fingerprint": "",
+      "resolution": null,
+      "action_history": [],
+      "duration_seconds": 0.0
+    },
+    {
+      "incident_id": "INC-EABBA31315",
+      "system": "SARLOHA PRD",
+      "client": "500",
+      "rule_id": "SAP_DUMP_SPIKE",
+      "title": "ABAP short dump spike",
+      "severity": "WARNING",
+      "status": "ACTIVE",
+      "first_seen": "2026-09-09T16:12:33.869457",
+      "last_seen": "2026-09-09T16:12:33.869457",
+      "event_ids": [
+        "EVT-17C4249DC2",
+        "EVT-2F03F0C52D",
+        "EVT-9051621A53",
+        "EVT-9E17564FAD",
+        "EVT-B128F7FC78",
+        "EVT-C77D60B1E8",
+        "EVT-CAFAB9D5A4"
+      ],
+      "evidence": [
+        "sap.st22.dumps=98 count (CRITICAL)",
+        "  Group by dump class in ST22 before attributing a cause"
+      ],
+      "affected_metrics": [
+        "sap.sm37.cancelled_jobs",
+        "sap.sm58.stuck_entries",
+        "sap.st03.dialog_resp_ms",
+        "sap.st03.max_instance_resp_ms",
+        "sap.st03.top_report_db_ms",
+        "sap.st03.top_user_memory_mb",
+        "sap.st22.dumps"
+      ],
+      "confidence": 0.88,
+      "description": "Short dumps above baseline. The dump class matters far more than the count -- one TSV_TNEW_PAGE_ALLOC_FAILED says more than fifty authorisation dumps.",
+      "resolved_at": null,
+      "acknowledged_at": null,
+      "acknowledged_by": null,
+      "ai_analysis": null,
+      "ai_analysis_at": null,
+      "ai_analysis_fingerprint": "",
+      "resolution": null,
+      "action_history": [],
+      "duration_seconds": 0.0
+    }
+  ]
+}

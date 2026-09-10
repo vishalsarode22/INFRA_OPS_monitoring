@@ -53,8 +53,17 @@ class Finding:
     missing_evidence: list[str] = field(default_factory=list)
     confidence: str = "MEDIUM"
 
+    # Filled from config/correlation_rules.yaml when a rule covers this
+    # metric. Deterministic: the catalogue is a text file, not model output.
+    culprit: dict = field(default_factory=dict)
+    parameters: list[str] = field(default_factory=list)
+    rule_id: str = ""
+    trend: dict = field(default_factory=dict)
+
     def as_dict(self) -> dict:
         return {
+            "culprit": self.culprit, "parameters": self.parameters,
+            "rule_id": self.rule_id, "trend": self.trend,
             "metric": self.metric, "tcode": self.tcode, "severity": self.severity,
             "observation": self.observation, "why_it_matters": self.why_it_matters,
             "solutions": self.solutions, "evidence": self.evidence,
@@ -211,6 +220,72 @@ _DISK_RULE = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Link metrics to the Basis incident catalogue
+# ---------------------------------------------------------------------------
+#
+# RULES above gives a short "why it matters" per metric. The catalogue in
+# config/correlation_rules.yaml carries the rest of what a consultant needs --
+# which component is responsible, the SAP parameters that govern it, and the
+# ordered remediation. Findings pull from the catalogue so that knowledge
+# lives in ONE file: adding an incident type should not mean editing Python.
+#
+# A metric with no catalogue entry still produces a finding. It simply has no
+# culprit attributed, which is honest -- naming one without a rule behind it
+# would be a guess wearing the same styling as a fact.
+
+_METRIC_TO_CATALOGUE: dict[str, str] = {
+    "cpu": "INFRA_RESOURCE_PRESSURE",
+    "memory": "INFRA_RESOURCE_PRESSURE",
+    "memory.total_gb": "INFRA_RESOURCE_PRESSURE",
+    "load_1m": "INFRA_RESOURCE_PRESSURE",
+    "dialog_queue": "INFRA_RESOURCE_PRESSURE",
+    "update_queue": "SAP_UPDATE_FAILURE",
+    "db_rtt_ms": "INFRA_RESOURCE_PRESSURE",
+
+    "sap.sm12.lock_count": "SAP_LOCK_CONTENTION",
+    "sap.sm13.failed_updates": "SAP_UPDATE_FAILURE",
+    "sap.sm37.cancelled_jobs": "SAP_BATCH_FAILURE",
+    "sap.st22.dumps": "SAP_DUMP_SPIKE",
+    "sap.sm58.stuck_trfc": "SAP_INTERFACE_BACKLOG",
+    "sap.smq1.stuck_queues": "SAP_INTERFACE_BACKLOG",
+    "sap.smq2.stuck_queues": "SAP_INTERFACE_BACKLOG",
+    "sap.we02.failed_idocs": "SAP_INTERFACE_BACKLOG",
+    "sap.su01.locked_users": "SAP_USER_SECURITY",
+    "sap.db12.last_backup": "SAP_BACKUP_GAP",
+    "sap.sm21.errors": "SAP_HOUSEKEEPING_GAP",
+    "sap.sm50.wp_in_use": "SAP_PROCESS_FAILURE",
+    "sap.dispatcher.state": "SAP_PROCESS_FAILURE",
+    "sap.icm.state": "SAP_PROCESS_FAILURE",
+    "sap.gateway.state": "SAP_PROCESS_FAILURE",
+    "rfc.connection": "SAP_SYSTEM_UNREACHABLE",
+}
+
+_CATALOGUE_CACHE: dict | None = None
+
+
+def _catalogue() -> dict:
+    """The incident catalogue, loaded once. Never raises: a missing or broken
+    rules file degrades findings, it does not break the report."""
+    global _CATALOGUE_CACHE
+    if _CATALOGUE_CACHE is None:
+        try:
+            from core.correlation import load_correlation_config
+            _CATALOGUE_CACHE = load_correlation_config() or {}
+        except Exception:
+            _CATALOGUE_CACHE = {}
+    return _CATALOGUE_CACHE
+
+
+def _catalogue_for(metric_name: str) -> tuple[str, dict]:
+    rule_id = _METRIC_TO_CATALOGUE.get(metric_name)
+    if not rule_id and metric_name.startswith("disk"):
+        rule_id = "SAP_HOUSEKEEPING_GAP"
+    if not rule_id:
+        return "", {}
+    return rule_id, _catalogue().get(rule_id) or {}
+
+
 def _rule_for(metric_name: str) -> dict | None:
     if metric_name in RULES:
         return RULES[metric_name]
@@ -230,6 +305,21 @@ def _confidence(metric, rule) -> str:
     return "MEDIUM" if len(rule.get("missing", [])) <= 2 else "LOW"
 
 
+def _trend_for(system: str, metric_name: str) -> dict:
+    """
+    Seven-day comparison for this metric, or {} when there is not enough
+    history. A finding that says "memory 99%" is ambiguous; one that says
+    "99%, up from 77% a week ago" is not, and the second is what decides
+    whether anyone acts tonight.
+    """
+    try:
+        from core.metric_history import trend as _trend
+        data = _trend(system, metric_name, days=7)
+        return data if data.get("available") else {}
+    except Exception:
+        return {}
+
+
 def build_findings(result: MonitoringResult) -> list[Finding]:
     findings: list[Finding] = []
 
@@ -237,17 +327,28 @@ def build_findings(result: MonitoringResult) -> list[Finding]:
         if metric.status not in (Status.WARNING, Status.CRITICAL):
             continue
         rule = _rule_for(metric.name)
+        cat_id, cat = _catalogue_for(metric.name)
+
         if rule is None:
-            # No rule: still report it, but do not invent a consequence or a fix.
+            # No short interpretation rule. The catalogue may still cover this
+            # metric, in which case the finding gets a real culprit and real
+            # remediation rather than "review it manually".
             findings.append(Finding(
                 metric=metric.name, tcode=metric.tcode or "—",
                 severity=metric.status.value,
                 observation=f"{metric.name} = {metric.display_value}",
-                why_it_matters="No interpretation rule is defined for this metric yet.",
-                solutions=[f"Review {metric.tcode or metric.name} manually"],
-                evidence=[f"Collected by {metric.source or 'unknown collector'}"],
-                missing_evidence=["Operational rule for this metric"],
-                confidence="LOW",
+                why_it_matters=(cat.get("description")
+                                or "No interpretation rule is defined for this metric yet."),
+                solutions=list(cat.get("remediation") or
+                               [f"Review {metric.tcode or metric.name} manually"]),
+                evidence=[f"Collected by {metric.source or 'unknown collector'}"]
+                + ([f"Detail: {metric.detail[:220]}"] if metric.detail else []),
+                missing_evidence=[] if cat else ["Operational rule for this metric"],
+                confidence="MEDIUM" if cat else "LOW",
+                culprit=dict(cat.get("culprit") or {}),
+                parameters=list(cat.get("parameters") or []),
+                rule_id=cat_id,
+                trend=_trend_for(result.system, metric.name),
             ))
             continue
 
@@ -262,15 +363,39 @@ def build_findings(result: MonitoringResult) -> list[Finding]:
         if metric.detail:
             evidence.append(f"Detail: {metric.detail[:220]}")
 
+        tr = _trend_for(result.system, metric.name)
+        if tr:
+            direction = {"up": "up from", "down": "down from",
+                         "flat": "unchanged from"}[tr["direction"]]
+            line = (f"Trend: {tr['current']} — {direction} {tr['baseline']} "
+                    f"{tr['days']} days ago "
+                    f"({tr['change']:+g}, {tr['change_percent']:+g}%)")
+            if not tr.get("confident"):
+                # Name the thin part. Saying "only 24 samples" when 24 is the
+                # whole series and 1 is the baseline points at the wrong
+                # number and invites dismissing a real trend.
+                line += (f" [baseline rests on {tr.get('baseline_samples', 0)} "
+                         f"sample(s) — treat as indicative]")
+            evidence.append(line)
+
+        # Catalogue remediation wins where it exists: it is ordered, written
+        # for someone acting under pressure, and maintained in one file. The
+        # short RULES list stays as the fallback.
+        solutions = list(cat.get("remediation") or rule["solutions"])
+
         findings.append(Finding(
             metric=metric.name, tcode=metric.tcode or "—",
             severity=metric.status.value,
             observation=f"{metric.name} = {metric.display_value}",
             why_it_matters=rule["why"],
-            solutions=list(rule["solutions"]),
+            solutions=solutions,
             evidence=evidence,
             missing_evidence=list(rule.get("missing", [])),
             confidence=_confidence(metric, rule),
+            culprit=dict(cat.get("culprit") or {}),
+            parameters=list(cat.get("parameters") or []),
+            rule_id=cat_id,
+            trend=_trend_for(result.system, metric.name),
         ))
 
     order = {"CRITICAL": 0, "WARNING": 1}

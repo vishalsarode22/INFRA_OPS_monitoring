@@ -27,7 +27,15 @@ class GeminiProvider(AIProvider):
         timeout: int = 60,
         retries: int = 1,
         api_version: str | None = None,
+        api_key: str | None = None,
+        label: str | None = None,
     ):
+        # The key is held on the instance so several GeminiProvider objects,
+        # each with a different key, can sit in a failover chain. It still
+        # falls back to the environment for single-key setups.
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        self.label = label or "gemini"
+
         self.model = model or os.getenv(
             "GEMINI_MODEL",
             "gemini-3.6-flash",
@@ -93,7 +101,7 @@ class GeminiProvider(AIProvider):
         }
 
     def generate(self, prompt: str) -> str:
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = self.api_key or os.getenv("GEMINI_API_KEY")
 
         if not api_key:
             raise RuntimeError(

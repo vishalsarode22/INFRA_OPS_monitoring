@@ -1520,6 +1520,69 @@ def action_sp01(session, capture):
     )
 
 
+def action_st06(session, capture):
+    """
+    OS monitor screenshot plus the memory and paging figures.
+
+    ST06 is the authority for physical memory on the host. SMON exports free
+    memory but not the total, and deriving the total from free MB and free
+    percent is unreliable because the percent is rounded to whole numbers --
+    on a 15,643 MB host reading 1% free, that derivation returned ~25,000 MB.
+
+    Page Out is the figure that matters most here. Free memory near zero with
+    Page Out at 0 %/h is memory that is ALLOCATED, not exhausted: Linux holds
+    reclaimable page cache and SAP preallocates its pools at startup.
+    Escalating on free memory alone produces false alarms.
+    """
+    from sap_gui.ocr_extractor import run_ocr
+    import re
+
+    goto_tcode(session, "ST06")
+
+    path = capture()
+    if not path:
+        return {}
+
+    text = run_ocr(path)
+    out = {}
+
+    # SAP renders thousands with a dot: "15.643 MB" is 15,643 MB, not 15.643.
+    # Reading it as a decimal turns 15 GB of RAM into 15 MB.
+    def number(pattern, key, factor=1.0):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            return
+        raw = match.group(1).replace(".", "").replace(",", ".").strip()
+        try:
+            out[key] = round(float(raw) * factor, 2)
+        except ValueError:
+            pass
+
+    number(r"Physical\s+memory\s+([\d.,]+)", "os.memory_total_mb")
+    number(r"Free\s+memory\s+([\d.,]+)", "os.memory_free_mb")
+    number(r"Free\s+memory\s+incl[^\d]*([\d.,]+)", "os.memory_free_inc_cache_mb")
+    number(r"Free\s+swap\s+size\s+([\d.,]+)", "os.swap_free_mb")
+    number(r"Actual\s+swap\s+size\s+([\d.,]+)", "os.swap_total_mb")
+    number(r"Page\s+Out\s+of\s+RAM\s+([\d.,]+)", "os.page_out_pct_hour")
+    number(r"Page\s+In\s+of\s+RAM\s+([\d.,]+)", "os.page_in_pct_hour")
+    number(r"Idle\s+([\d.,]+)", "os.cpu_idle_pct")
+    number(r"Number\s+of\s+CPUs\s+([\d.,]+)", "os.cpus")
+
+    idle = out.get("os.cpu_idle_pct")
+    if idle is not None:
+        # 0% CPU is not a reading. A live application server is never at
+        # exactly 0, so that value means the OS collector supplied nothing.
+        cpu = round(100.0 - idle, 1)
+        out["os.cpu_pct"] = cpu if cpu > 0 else None
+
+    total = out.get("os.memory_total_mb")
+    free = out.get("os.memory_free_mb")
+    if total and free is not None and total > 0:
+        out["os.memory_pct"] = round(100.0 - (free / total * 100.0), 1)
+
+    return out
+
+
 def action_st03n(session, capture):
     """
     Collect structured ST03N workload data through SAP GUI Scripting.
@@ -1954,6 +2017,7 @@ def action_st22_today(session, capture):
 
 
 ACTIONS = {
+    "st06": action_st06,
     "al08": action_al08,
     "db01": action_db01,
     "db02": action_db02,

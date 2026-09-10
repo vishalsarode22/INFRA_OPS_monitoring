@@ -1,34 +1,764 @@
-# Deterministic incident-correlation policy.
-# These values are intentionally conservative defaults and should be tuned
-# against real historical incidents after the baseline dataset is built.
+# ===========================================================================
+# InfraBeatOps -- Basis incident catalogue
+#
+# One entry per problem a Basis consultant actually works on. Each carries:
+#
+#   thresholds     when it fires
+#   culprit        WHICH component is responsible and why that attribution
+#                  follows from the evidence -- not a guess
+#   parameters     the SAP profile parameters that govern this behaviour, so
+#                  the consultant knows what to look at and what to change
+#   rfc_evidence   the table or function module the evidence comes from over
+#                  RFC. Both documentation and the collection spec.
+#   remediation    ordered steps, written so someone woken at 3am can follow
+#                  them without deciding anything first
+#
+# EVERYTHING HERE IS DETERMINISTIC. The model rewrites the summary paragraph
+# and touches nothing in this file. Same input, same output, reviewable in a
+# text file, defensible in a post-incident review.
+#
+# rfc_evidence.status:
+#   confirmed  already read by this project against a live system
+#   verify     readable in principle; confirm the table and fields in SE16 on
+#              your release before relying on it. Guessing an SAP interface
+#              instead of reading it is how earlier work lost five rounds.
+# ===========================================================================
+
 rules:
-  - id: SAP_LOCK_CONTENTION
-    enabled: true
-    title: SAP application / lock contention
-    severity: CRITICAL
-    description: Elevated SAP locks and dialog response time indicate likely application contention.
-    confidence: 0.87
-    thresholds:
-      lock_count: 10
-      response_time_ms: 500
-      dump_count: 0
-
-  - id: INFRA_RESOURCE_PRESSURE
-    enabled: true
-    title: Infrastructure resource pressure
-    severity: CRITICAL
-    description: Multiple host resource indicators are saturated or are driving severe response-time degradation.
-    confidence: 0.86
-    thresholds:
-      cpu_percent: 90
-      memory_percent: 90
-      load_1m: 8
-      response_time_ms: 1000
-      minimum_high_resources: 2
-
-  - id: SAP_PROCESS_FAILURE
-    enabled: true
-    title: SAP application server process failure
-    severity: CRITICAL
-    description: One or more SAP work processes are reporting a critical state.
-    confidence: 0.96
+- id: SAP_LOCK_CONTENTION
+  enabled: true
+  title: SAP application / lock contention
+  severity: CRITICAL
+  description: Elevated enqueue locks alongside rising dialog response time. Users report
+    the system is hanging while CPU and memory look fine, because the wait is on a lock, not
+    on a resource.
+  confidence: 0.87
+  thresholds:
+    lock_count: 10
+    response_time_ms: 500
+    dump_count: 0
+  culprit:
+    component: SAP application / ABAP
+    statement: A long-running or uncommitted transaction is holding enqueue locks while other
+      dialog work queues behind it. The lock holder named in the evidence is the proximate
+      cause -- not the host, not the database.
+    confirm_in:
+    - SM12 -- oldest lock entry and its owner
+    - SM50 -- that user's work process and the report it is running
+    - SM66 -- whether the same report runs on other instances
+    confirm_notes: A lock held by a work process that no longer exists is an orphan and is
+      safe to delete. A lock held by a running update is not -- deleting it corrupts the document
+      being posted.
+  parameters:
+  - enque/table_size -- enqueue table capacity; overflow dumps as ENQUEUE_TAB_FULL
+  - rdisp/max_wprun_time -- how long a dialog step may hold resources
+  - enque/server/replication -- relevant only in HA setups
+  rfc_evidence:
+  - source: ENQUEUE_READ
+    kind: function_module
+    status: confirmed
+    fields:
+    - GNAME
+    - GARG
+    - GUNAME
+    - GTCODE
+    note: Lock list with owner, object and transaction.
+  - source: /SDF/SMON_HEADER
+    kind: table
+    status: confirmed
+    fields:
+    - DIAQ
+    - DIAAVG60
+    - UPDQ
+    note: Dialog queue rising while locks are held is the corroborating signal.
+  remediation:
+  - 'SM12: sort by time, take the oldest entry. Note owner, object and argument.'
+  - 'SM50/SM66: does a work process still exist for that owner?'
+  - No matching work process -> the lock is orphaned. Delete it in SM12.
+  - Work process still active -> contact the owner first. Do not delete a lock under a running
+    update.
+  - 'Recurring on the same object: the ABAP holds its lock too long. That is a code fix, not
+    a sizing fix.'
+- id: INFRA_RESOURCE_PRESSURE
+  enabled: true
+  title: Infrastructure resource pressure
+  severity: CRITICAL
+  description: Two or more host resources saturated, or one saturated resource driving severe
+    response-time degradation. Requests queue before they reach ABAP.
+  confidence: 0.86
+  thresholds:
+    cpu_percent: 90
+    memory_percent: 90
+    load_1m: 8
+    response_time_ms: 1000
+    minimum_high_resources: 2
+  culprit:
+    component: Host / infrastructure
+    statement: The application server is short of a host resource. SAP work is the victim
+      of this, not the cause -- fixing ABAP will not help until the resource is restored.
+    confirm_in:
+    - ST06 -- physical memory, free memory, Page In/Out of RAM
+    - ST02 -- extended memory allocation and buffer swaps
+    - SM50 -- work processes in PRIV mode indicate heap exhaustion
+    confirm_notes: Free memory near zero with Page Out at 0 %/h is ALLOCATED, not exhausted.
+      Linux holds reclaimable page cache and SAP preallocates its pools at startup. Sustained
+      Page Out above 0 is the signal that matters. Escalating on free memory alone produces
+      false alarms and trains people to ignore the tile.
+  parameters:
+  - PHYS_MEMSIZE -- how much RAM SAP assumes it may use. Set above physical RAM and the host
+    over-commits into swap.
+  - em/initial_size_MB -- extended memory allocated at startup
+  - ztta/roll_extension -- per-user extended memory limit before heap is used
+  - abap/heap_area_dia and abap/heap_area_total -- heap ceilings; hitting them puts a WP into
+    PRIV mode
+  - rdisp/wp_no_dia -- dialog work processes; too few turns load into queueing
+  rfc_evidence:
+  - source: /SDF/SMON_HEADER
+    kind: table
+    status: confirmed
+    fields:
+    - IDLE_TOTAL
+    - FREE_MEM_PERC
+    - FREE_MEM_MB
+    - FREE_MEM_MB_INC_FS
+    - CPU_CONS
+    - AVAILCPUS
+    - PAGE_IN_PERC
+    - PAGE_OUT_PERC
+    - STEAL_TIME
+    - READY_TIME
+    note: 'PAGE_OUT_PERC distinguishes real exhaustion from normal allocation. STEAL_TIME
+      matters on virtualised hosts: CPU taken by the hypervisor looks like slowness with no
+      local cause.'
+  - source: TH_WPINFO
+    kind: function_module
+    status: confirmed
+    fields:
+    - WP_TYP
+    - WP_STATUS
+    - WP_ELTIME
+    - WP_REPORT
+    note: PRIV mode work processes indicate heap exhaustion.
+  remediation:
+  - 'ST06 first: read Page Out of RAM. Zero means allocated, not exhausted -- stop here and
+    do not escalate on free memory.'
+  - 'ST02: any non-zero swap on program/CUA/screen buffers means that buffer is undersized.'
+  - 'SM50: work processes in PRIV mode -> heap exhaustion. Review ztta/roll_extension and
+    abap/heap_area_dia.'
+  - Compare PHYS_MEMSIZE and em/initial_size_MB against real physical memory from ST06. Over-commit
+    is a config fault, not a capacity fault.
+  - 'CPU-bound: identify the top consumer in ST03N before requesting more cores.'
+  - 'Virtualised host with high STEAL_TIME: the contention is outside this VM. Escalate to
+    whoever owns the hypervisor.'
+- id: SAP_PROCESS_FAILURE
+  enabled: true
+  title: SAP work process failure
+  severity: CRITICAL
+  description: One or more work processes are stopped, in PRIV mode, or restarting. Capacity
+    is reduced regardless of host headroom.
+  confidence: 0.96
+  thresholds:
+    failed_wp: 1
+  culprit:
+    component: SAP work process / dispatcher
+    statement: Until the affected processes are restored, throughput is limited no matter
+      how idle the host looks. Queueing caused by this reads as a performance problem and
+      gets misdiagnosed as one.
+    confirm_in:
+    - SM50 -- work process status, reason and running report
+    - SM21 -- system log at the failure timestamp
+    - ST22 -- dumps raised by that process
+    - dev_w<n> trace files in the instance work directory
+  parameters:
+  - rdisp/wp_no_dia, rdisp/wp_no_btc, rdisp/wp_no_vb, rdisp/wp_no_enq, rdisp/wp_no_spo --
+    process counts by type
+  - rdisp/max_wprun_time -- runtime ceiling before a dialog step is cancelled
+  - rdisp/wp_auto_restart -- restart behaviour
+  - abap/heap_area_dia -- exceeded, the WP goes PRIV and leaves the pool
+  rfc_evidence:
+  - source: TH_WPINFO
+    kind: function_module
+    status: confirmed
+    fields:
+    - WP_NO
+    - WP_TYP
+    - WP_STATUS
+    - WP_REASON
+    - WP_ELTIME
+    - WP_REPORT
+    - WP_USER
+  - source: SNAP
+    kind: table
+    status: confirmed
+    fields:
+    - DATUM
+    - UZEIT
+    - UNAME
+    note: Correlate dumps by timestamp against the WP failure.
+  remediation:
+  - 'SM50: note process number, type, status and last report.'
+  - SM21 for the same minute -- the cause is usually logged there in plain text.
+  - ST22 for a dump raised by that process.
+  - Restart the individual work process in SM50 before considering an instance restart.
+  - Same WP type failing repeatedly points at one report or an exhausted resource, not at
+    SAP generally.
+- id: SAP_UPDATE_FAILURE
+  enabled: true
+  title: Update terminations / update deactivated
+  severity: CRITICAL
+  description: V1 updates are failing. Users see postings vanish or receive update-terminated
+    mails. If update is deactivated system-wide, every posting is queuing and nothing commits.
+  confidence: 0.92
+  thresholds:
+    failed_updates: 1
+    failed_updates_critical: 10
+  culprit:
+    component: Update service / database
+    statement: Update terminations are almost always downstream of something else -- a full
+      tablespace, a lock timeout, or an ABAP error inside the update module. The failing update
+      is the symptom; the SM13 entry names the module and the real cause.
+    confirm_in:
+    - SM13 -- update records, status and the module that failed
+    - SM14 -- whether update is active system-wide
+    - ST22 -- dumps from the update work process
+    - DB02 -- tablespace and segment space if the error is space-related
+    confirm_notes: 'Update deactivated system-wide is the more serious case: SM14 shows it
+      and every posting is queuing. That is a stop-everything condition.'
+  parameters:
+  - rdisp/wp_no_vb and rdisp/wp_no_vb2 -- V1 and V2 update work processes
+  - rdisp/vbmail -- whether users are mailed on termination
+  - rdisp/vb_stop_active -- update deactivation flag
+  - rdisp/vbdelete -- age at which update records are deleted
+  rfc_evidence:
+  - source: VBHDR
+    kind: table
+    status: confirmed
+    fields:
+    - VBKEY
+    - VBDATE
+    - VBSTATE
+    - VBUSR
+    - VBREPORT
+    note: VBSTATE 5 = error, 8 = terminated. Already read by Z_GET_OBSERVABILITY_DATA.
+  - source: VBMOD
+    kind: table
+    status: verify
+    fields:
+    - VBKEY
+    - VBMODCNT
+    - VBFNAME
+    note: Names the failing function module -- the actual culprit. Confirm fields in SE16.
+  remediation:
+  - 'SM14: confirm update is active. If deactivated, that is the priority -- nothing posts
+    until it is reactivated.'
+  - 'SM13: filter to today, status Error. Open one record and read the failing module name.'
+  - The module name tells you the area (FI, MM, SD). Route accordingly rather than debugging
+    blind.
+  - Check ST22 for a dump from the update WP at the same timestamp.
+  - If the error mentions space, check DB02 before reprocessing -- reprocessing into a full
+    tablespace fails again.
+  - Reprocess update records only after the underlying cause is fixed.
+- id: SAP_BATCH_FAILURE
+  enabled: true
+  title: Background job failures
+  severity: WARNING
+  description: Jobs cancelled or repeatedly failing at start. Housekeeping and backup jobs
+    failing silently is how a system degrades over weeks without anyone noticing.
+  confidence: 0.9
+  thresholds:
+    cancelled_jobs: 1
+    cancelled_jobs_critical: 5
+    zero_duration_repeats: 2
+  culprit:
+    component: Background processing / the job itself
+    statement: A job cancelled with duration 0 never started -- that is an authorisation,
+      variant or resource problem, not a failure inside the report. A job that ran and then
+      cancelled failed in ABAP and has a dump or job log to prove it. The two need different
+      people.
+    confirm_in:
+    - SM37 -- job log for the cancelled run
+    - ST22 -- dumps at the job timestamp
+    - SM21 -- system log if the job died without a dump
+    - SU53 for the job step user if it failed at start
+    confirm_notes: The same job cancelling at duration 0 on consecutive days is a standing
+      fault, not a transient one. It will not fix itself.
+  parameters:
+  - rdisp/wp_no_btc -- background work processes; too few and jobs queue past their window
+  - rdisp/btctime -- scheduler wake interval
+  - rdisp/max_wprun_time -- applies once a job is moved to a dialog work process
+  rfc_evidence:
+  - source: TBTCO
+    kind: table
+    status: confirmed
+    fields:
+    - JOBNAME
+    - JOBCOUNT
+    - STATUS
+    - SDLSTRTDT
+    - SDLSTRTTM
+    - ENDDATE
+    - ENDTIME
+    - AUTHCKNAM
+    note: STATUS A = cancelled, R = running, F = finished. ENDDATE equal to SDLSTRTDT with
+      matching times means duration 0 -- failed at start.
+  - source: TBTCP
+    kind: table
+    status: verify
+    fields:
+    - JOBNAME
+    - JOBCOUNT
+    - PROGNAME
+    - VARIANT
+    note: 'Step detail: which report and variant. Confirm fields in SE16.'
+  remediation:
+  - 'SM37: select the cancelled job, open the Job log. It usually names the cause in one line.'
+  - Duration 0 -> it never started. Check the step user in SU53 and that the variant still
+    exists.
+  - Ran then cancelled -> check ST22 for a dump at the end timestamp.
+  - Same job failing on consecutive days is a standing fault. Fix it or unschedule it; leaving
+    it failing trains everyone to ignore SM37.
+  - Backup jobs (DBA:*) failing take priority over everything else in this list.
+- id: SAP_DUMP_SPIKE
+  enabled: true
+  title: ABAP short dump spike
+  severity: WARNING
+  description: Short dumps above baseline. The dump class matters far more than the count
+    -- one TSV_TNEW_PAGE_ALLOC_FAILED says more than fifty authorisation dumps.
+  confidence: 0.88
+  thresholds:
+    dump_count: 5
+    dump_count_critical: 25
+  culprit:
+    component: Depends on the dump class -- read it before attributing
+    statement: The dump name IS the diagnosis, and different classes have completely different
+      owners. Attributing a spike without reading the class is guessing.
+    confirm_in:
+    - ST22 -- dump class, user, program and the ABAP line
+    - TSV_TNEW_PAGE_ALLOC_FAILED or SYSTEM_NO_ROLL -> memory. Owner depends on WHO HELD the
+      memory, not on the dump name -- see SAP_MEMORY_DUMP_ATTRIBUTION, which decides that.
+    - DBIF_RSQL_* -> database. DBA owns it.
+    - TIME_OUT -> rdisp/max_wprun_time exceeded. Usually a report problem.
+    - GETWA_NOT_ASSIGNED or OBJECTS_OBJREF_NOT_ASSIGNED -> ABAP defect. Developer owns it.
+    - CALL_FUNCTION_REMOTE_ERROR -> the far side of an RFC. Not this system.
+  parameters:
+  - abap/heap_area_dia and abap/heap_area_total -- exceeded gives TSV_TNEW_PAGE_ALLOC_FAILED
+  - ztta/roll_extension -- exceeded gives SYSTEM_NO_ROLL
+  - rdisp/max_wprun_time -- exceeded gives TIME_OUT
+  - rstr/max_diskspace -- unrelated to dumps but fills the same filesystem
+  rfc_evidence:
+  - source: SNAP
+    kind: table
+    status: confirmed
+    fields:
+    - DATUM
+    - UZEIT
+    - UNAME
+    - AHOST
+    - SEQNO
+    note: Read three fields only, not SELECT *. SNAP stores each dump as many chunked rows
+      carrying a large payload; a full day of them on a short poll interval is a real load
+      problem.
+  - source: SNAPT
+    kind: table
+    status: verify
+    fields:
+    - ERRID
+    - SPRSL
+    - TEXT
+    note: Dump class text. Confirm the join key against SNAP in SE16.
+  remediation:
+  - 'ST22: group by dump class first. Do not react to the total.'
+  - One class dominating -> that is the incident. Many classes -> look for a common user,
+    program or time.
+  - 'Memory-class dumps: check ST02 and the heap parameters above.'
+  - 'TIME_OUT: find the report in ST03N. Raising max_wprun_time is a workaround, not a fix.'
+  - 'Developer-class dumps: forward the dump with program name and line. Basis cannot fix
+    these.'
+- id: SAP_MEMORY_DUMP_ATTRIBUTION
+  enabled: true
+  title: Memory dump spike -- owner attributed
+  severity: WARNING
+  description: Three or more memory-class short dumps (TSV_TNEW_PAGE_ALLOC_FAILED, SYSTEM_NO_ROLL
+    and kin). Unlike other dump classes the name does not tell you the owner. A custom report that
+    pulled ten million rows into an internal table produces the same dump as an undersized server,
+    and one is a line of ABAP while the other is a profile parameter. This rule reads who held the
+    memory and routes accordingly. Fires alongside SAP_DUMP_SPIKE, not instead of it.
+  confidence: 0.8
+  thresholds:
+    memory_dump_count: 3
+    hog_memory_mb: 1024
+    dominant_share: 0.5
+    spread_programs: 3
+  culprit:
+    component: Decided per incident -- ABAP, BASIS, FUNCTIONAL or TRIAGE. Read the first evidence line.
+    statement: 'The ladder, first match wins. (1) One customer program takes half or more of the
+      memory dumps -> ABAP, that program. (2) A customer report is in PRIV mode now, or tops the
+      per-step memory ranking above the hog threshold, while the dumps land on OTHER programs ->
+      ABAP, that report; the dumps are collateral. (3) Dumps spread over three or more programs with
+      no customer program holding memory -> BASIS, the server is short. (4) SAP standard code dominates
+      -> FUNCTIONAL: customising, data volume, SAP Note. (5) Otherwise TRIAGE -- say so, do not guess.'
+    confirm_in:
+    - ST22 -- the memory-class dumps, grouped by program, then by user
+    - SM50 -- is the named report in PRIV mode; how long has it held the process
+    - ST22 -> the dump -> Memory Consumption -- how much extended memory and heap it held at termination
+    - ST03N -> Memory Use -- the report's peak memory over the window
+    - ST02 -- whether extended memory and heap were exhausted system-wide at the time
+    confirm_notes: 'A verdict of ABAP with collateral means the other dumps are victims. Do not open
+      tickets for them. A verdict of BASIS with the same dump class means nobody was hogging -- check
+      sizing before touching any code. TRIAGE means the evidence was genuinely ambiguous; the first
+      evidence line says what was seen.'
+  parameters:
+  - ztta/roll_extension -- extended memory per user context; exceeded -> SYSTEM_NO_ROLL
+  - abap/heap_area_dia and abap/heap_area_total -- heap per dialog WP and total; exceeded -> TSV_TNEW_PAGE_ALLOC_FAILED
+  - em/initial_size_MB -- extended memory pool; exhausted -> every user dumps at once (starvation pattern)
+  - abap/heap_area_nondia -- background heap; relevant when the culprit is a batch job
+  rfc_evidence:
+  - source: screenshot_ST22
+    kind: gui_evidence
+    status: confirmed
+    fields:
+    - runtime_error
+    - program
+    - user
+    - host
+    note: The dump list with classes comes from the SAP GUI ST22 collector. The RFC path
+      (Z_GET_OBSERVABILITY_DATA / SNAP count) has no class, so this rule cannot fire from RFC alone.
+  - source: TH_WPINFO
+    kind: function_module
+    status: confirmed
+    fields:
+    - WP_WAITING
+    - WP_BNAME
+    - WP_REPORT
+    - WP_ELTIME
+    note: PRIV mode, per instance (sap.sm50.priv_mode_wp).
+  - source: SWNC_GET_STATRECS_FRAME
+    kind: function_module
+    status: confirmed
+    fields:
+    - MAXBYTES
+    - PRIVMODE
+    - REPORT
+    - ACCOUNT
+    note: Per-step memory by report and user (sap.st03.top_user_memory_mb, top_reports_by_memory).
+  remediation:
+  - 'Read the first evidence line: owner_team, verdict, culprit.'
+  - 'ABAP / single_hog: send the dump with program, include and line to the developer. Look for SELECT
+    without WHERE, SELECT * into an unbounded internal table, missing PACKAGE SIZE on a cursor.'
+  - 'ABAP / hog_with_collateral: same, AND tell Basis the other dumps are downstream of it -- one ticket,
+    not five.'
+  - 'BASIS / system_starvation: ST02 at the time of the dumps. If EM and heap were exhausted with no single
+    large context, this is sizing: em/initial_size_MB and the heap parameters above.'
+  - 'FUNCTIONAL / standard_code: the program is SAP''s. Check the data volume behind the transaction and
+    search for an SAP Note matching runtime error plus program before anyone touches code or parameters.'
+  - 'TRIAGE: open ST22 and group by program yourself; the evidence lines list what was and was not seen.'
+- id: SAP_INTERFACE_BACKLOG
+  enabled: true
+  title: RFC / IDoc / queue backlog
+  severity: WARNING
+  description: tRFC entries in SYSFAIL or CPICERR, qRFC queues stuck, or IDocs held in status
+    51. Interfaces fail quietly and are usually noticed by the business before Basis.
+  confidence: 0.89
+  thresholds:
+    stuck_trfc: 5
+    stuck_queues: 1
+    failed_idocs: 10
+  culprit:
+    component: Usually the REMOTE system or its RFC destination
+    statement: SYSFAIL and CPICERR mean the far side did not answer or rejected the call.
+      The fault is normally at the destination or in the network path, not in this system
+      -- which is why restarting things here rarely helps.
+    confirm_in:
+    - SM58 -- tRFC entries with their error text
+    - SMQ1 and SMQ2 -- outbound and inbound queue state
+    - SM59 -- connection test on the destination named in the error
+    - WE02 or WE05 -- IDoc status 51 with the application error text
+    confirm_notes: A queue stuck with a single entry at the head blocks everything behind
+      it. Clearing the head entry often releases hundreds.
+  parameters:
+  - rdisp/rfc_min_wait_dia_wp -- dialog WPs reserved so RFC cannot consume them all
+  - rdisp/rfc_max_own_used_wp and rdisp/rfc_max_comm_entries -- RFC resource limits
+  - gw/max_conn and gw/max_sys -- gateway connection limits
+  - qRFC scheduler settings in SMQR and SMQS
+  rfc_evidence:
+  - source: ARFCSSTATE
+    kind: table
+    status: confirmed
+    fields:
+    - ARFCIPID
+    - ARFCPID
+    - ARFCSTATE
+    - ARFCDEST
+    note: ARFCSTATE SYSFAIL or CPICERR. ARFCDEST names the destination -- the culprit.
+  - source: TRFCQOUT
+    kind: table
+    status: confirmed
+    fields:
+    - QNAME
+    - QSTATE
+    - QRFCDEST
+  - source: TRFCQIN
+    kind: table
+    status: confirmed
+    fields:
+    - QNAME
+    - QSTATE
+  - source: EDIDC
+    kind: table
+    status: confirmed
+    fields:
+    - DOCNUM
+    - STATUS
+    - MESTYP
+    - RCVPRN
+    - UPDDAT
+    note: Status 51 = application error. MESTYP and RCVPRN identify the interface.
+  remediation:
+  - 'SM58: read the error text, not just the count. It names the destination.'
+  - 'SM59: run a Connection Test on that destination. Failing here means the problem is the
+    far system or the network.'
+  - 'SMQ1/SMQ2: look at the HEAD entry of the stuck queue. One blocked entry holds everything
+    behind it.'
+  - Do not mass-reprocess before the cause is fixed -- it re-fails and doubles the backlog.
+  - 'IDocs in 51: this is an application error, not a Basis one. Route by message type.'
+- id: SAP_HOUSEKEEPING_GAP
+  enabled: true
+  title: Housekeeping gap -- spool, logs, filesystem growth
+  severity: WARNING
+  description: Spool numbers, job logs or trace files accumulating because standard reorganisation
+    jobs are not running. Ends in a full filesystem, which ends in a system that will not
+    start.
+  confidence: 0.85
+  thresholds:
+    spool_requests: 30000
+    disk_percent: 85
+    disk_percent_critical: 92
+  culprit:
+    component: Missing or failing housekeeping jobs
+    statement: This is not a capacity problem -- it is scheduled work that stopped running.
+      Adding disk buys weeks and the same call comes back.
+    confirm_in:
+    - SP01 -- spool request count and age
+    - SM37 -- are RSPO1043, RSBTCDEL2 and RSSNAPDL scheduled and finishing?
+    - ST06 or df -h -- filesystem usage per mount
+    - SM21 for messages about failing writes
+    confirm_notes: Spool number exhaustion (the counter wrapping toward 32000) stops printing
+      entirely and is a hard failure, not a warning.
+  parameters:
+  - rspo/store_location -- spool in database or filesystem
+  - rspo/spool_id/max_number -- spool number ceiling
+  - rstr/max_diskspace -- trace file ceiling
+  - DIR_HOME and DIR_TRANS -- the filesystems that fill
+  rfc_evidence:
+  - source: TSP01
+    kind: table
+    status: verify
+    fields:
+    - RQIDENT
+    - RQCRETIME
+    - RQOWNER
+    - RQDOCTYPE
+    note: Spool request count and age. Confirm fields in SE16 before relying on them.
+  - source: /SDF/SMON_HEADER
+    kind: table
+    status: confirmed
+    fields:
+    - FREE_MEM_MB
+    note: SMON does NOT export filesystem usage. Disk needs the SSH collector or ST06. Where
+      neither is available this rule cannot fire on disk and the tile must show UNKNOWN, not
+      healthy.
+  remediation:
+  - 'SM37: confirm RSPO1043 (spool), RSBTCDEL2 (job logs) and RSSNAPDL (dumps) are scheduled
+    AND finishing.'
+  - 'SP01: check the oldest spool request. Years-old entries mean reorg has not run in years.'
+  - Free space before raising thresholds -- a full DIR_TRANS stops transports, a full DIR_HOME
+    stops the instance.
+  - Do not delete SAP files by hand at OS level. Use the standard reorg reports; they maintain
+    the catalogue too.
+  - 'Recurring: the fix is scheduling, not disk.'
+- id: SAP_USER_SECURITY
+  enabled: true
+  title: User lockouts and security signals
+  severity: WARNING
+  description: A rise in locked users. A slow accumulation is normal housekeeping debt; a
+    sudden jump in failed logons is a security event.
+  confidence: 0.8
+  thresholds:
+    locked_users: 100
+    locked_users_critical: 300
+    failed_logons_hour: 20
+  culprit:
+    component: User administration, or an authentication attack
+    statement: The two cases look identical in a count and could not be more different. A
+      steady total is stale accounts nobody removed. A sharp rise over hours means repeated
+      failed logons -- either a misconfigured interface retrying a stale password, or an attack.
+    confirm_in:
+    - SU01 and USR02 -- UFLAG distinguishes admin lock from failed-logon lock
+    - SM20 -- security audit log for the failed logon pattern
+    - SM19 -- confirm audit logging is even switched on
+    confirm_notes: UFLAG 64 is locked by administrator. 128 is locked by failed logons. Only
+      the second is a security signal -- the distinction is the whole diagnosis, and a bare
+      count of locked users hides it.
+  parameters:
+  - login/fails_to_user_lock -- failed attempts before lock
+  - login/failed_user_auto_unlock -- whether locks clear at midnight
+  - login/password_expiration_time -- dialog users expiring is a common cause of interface
+    breakage
+  - rsau/enable -- security audit log on or off
+  rfc_evidence:
+  - source: USR02
+    kind: table
+    status: confirmed
+    fields:
+    - BNAME
+    - UFLAG
+    - USTYP
+    - TRDAT
+    - LOCNT
+    - CLASS
+    note: UFLAG is the important field -- 64 admin lock, 128 failed logons. LOCNT is the current
+      failed-logon count. USTYP separates dialog users from service and system accounts.
+  remediation:
+  - 'USR02: split the count by UFLAG before doing anything. 64 and 128 are different incidents.'
+  - 'UFLAG 128 rising: check SM20 for the source terminal or program. A stale password in
+    an interface is the usual cause.'
+  - 'UFLAG 64 steady and high: stale accounts. Housekeeping, not an incident.'
+  - Service and system accounts locking is more urgent than dialog users -- interfaces break
+    silently.
+  - Never bulk-unlock. Find why they locked first.
+- id: SAP_BACKUP_GAP
+  enabled: true
+  title: Database backup missing or failing
+  severity: CRITICAL
+  description: No successful database backup within the expected window. The one entry on
+    this list where nothing is visibly wrong until the day it matters absolutely.
+  confidence: 0.95
+  thresholds:
+    hours_since_backup: 26
+    hours_since_backup_critical: 48
+  culprit:
+    component: Backup schedule or the backup tool
+    statement: Either the job is not running, or it runs and fails. A backup missing for days
+      is normally a job that has been failing silently -- often with duration 0, meaning it
+      never started at all.
+    confirm_in:
+    - DB12 -- backup history and status
+    - SM37 -- DBA:* jobs and their outcome
+    - DB13 -- the DBA planning calendar
+    - The backup tool's own log, outside SAP
+    confirm_notes: SDBAH is only populated when backups run through the DBA Planning Calendar.
+      On systems backed up by an external tool it is empty, and empty must be reported as
+      UNKNOWN rather than as no-backup -- a false backup alarm at 3am costs trust.
+  parameters:
+  - Not parameter-driven. Governed by DB13 scheduling and the external backup tool.
+  rfc_evidence:
+  - source: SDBAH
+    kind: table
+    status: confirmed
+    fields:
+    - FUNCT
+    - BEG
+    - ENDE
+    - RC
+    note: FUNCT DBB with RC 0000 is a successful backup. Empty on HANA and on ASE without
+      DB13.
+  - source: TBTCO
+    kind: table
+    status: confirmed
+    fields:
+    - JOBNAME
+    - STATUS
+    - ENDDATE
+    note: DBA:* jobs. Duration 0 means the job never started.
+  remediation:
+  - 'DB12 first: when did a backup last succeed?'
+  - SDBAH empty -> backups do not run through DB13. Check the external tool before raising
+    an alarm.
+  - 'SM37: any DBA:* job cancelled? Duration 0 means it never started -- check authorisations
+    and the variant.'
+  - Never report a missing backup without checking the external tool. A false backup alarm
+    costs credibility for every real one after it.
+- id: SAP_BUFFER_SWAP
+  enabled: true
+  title: SAP buffer swaps
+  severity: WARNING
+  description: Program, CUA, screen or table buffers are being swapped. The system re-reads
+    from the database what it should hold in memory, and everything gets slower by a little
+    at once, with no single slow transaction to point at.
+  confidence: 0.84
+  thresholds:
+    buffer_swaps: 1
+    buffer_hit_ratio_min: 95
+  culprit:
+    component: Undersized SAP buffers
+    statement: Any non-zero swap count means that buffer is too small for the workload. This
+      is a sizing fault, and it usually appears after a transport or an upgrade increases
+      the number of programs in use -- which is why it got slower last week so often traces
+      back here.
+    confirm_in:
+    - ST02 -- swaps and hit ratio per buffer. Non-zero swaps is the signal.
+    - ST02 Detail analysis -- which objects are being displaced
+    confirm_notes: Swaps accumulate since instance start, so a number alone means little.
+      A rising number between two readings is what matters.
+  parameters:
+  - abap/buffersize -- program buffer, the one that most often swaps
+  - zcsa/table_buffer_area and zcsa/db_max_buftab -- generic table buffer
+  - rtbb/buffer_length -- single-record table buffer
+  - sap/bufdir_entries -- program buffer directory entries; can exhaust before the buffer
+    itself does
+  - rsdb/cua/buffersize and zcsa/presentation_buffer_area -- CUA and screen buffers
+  rfc_evidence:
+  - source: /SDF/SMON_HEADER
+    kind: table
+    status: verify
+    fields:
+    - ST02_FLAG
+    note: SMON records that ST02 was measured but not the swap counts themselves. Reading
+      the counts over RFC needs an ST02 source that has not been wired yet -- until then this
+      rule cannot fire and the metric must read UNKNOWN, not healthy.
+  remediation:
+  - 'ST02: read the Swaps column. Any non-zero value on program, CUA or screen buffers is
+    actionable.'
+  - Record the number, wait an hour, read it again. A static number is history; a rising one
+    is the current problem.
+  - Increase the corresponding parameter in RZ10 -- the change needs an instance restart.
+  - Program buffer swapping right after a transport is normal for a short period. Sustained
+    swapping is not.
+  - Check sap/bufdir_entries as well as abap/buffersize. The directory can fill while the
+    buffer still has space.
+- id: SAP_SYSTEM_UNREACHABLE
+  enabled: true
+  title: System unreachable over RFC
+  severity: CRITICAL
+  description: The system did not answer. Nothing about its health is known.
+  confidence: 1.0
+  thresholds:
+    consecutive_failures: 2
+  culprit:
+    component: Unknown until the system answers
+    statement: No culprit can be named. The system may be down, the route may be blocked,
+      or the credentials may have expired -- different incidents with different owners. Reporting
+      any of them as the cause would be a guess presented as a finding.
+    confirm_in:
+    - SM59 connection test from another system
+    - The SAProuter log if the route runs through one
+    - sapcontrol GetProcessList on the host, if OS access exists
+    - The RFC error text itself -- it distinguishes route denial from timeout from bad credentials
+    confirm_notes: 'This rule exists because of a real bug: an unreachable production system
+      displayed 100/100 HEALTHY, because it produced zero cards and the scorer read zero problems
+      as perfect health. Unreachable is CRITICAL and UNKNOWN, never healthy.'
+  parameters:
+  - Not parameter-driven. Network, SAProuter route, or credentials.
+  rfc_evidence:
+  - source: RFC_PING
+    kind: function_module
+    status: confirmed
+    note: Round-trip proof the application server is answering.
+  remediation:
+  - Read the RFC error text before anything else -- it names the failure class.
+  - '''route permission denied'' -> SAProuter. The route entry is missing on the router host.'
+  - WSAETIMEDOUT or 'partner not reached' -> the host or instance is down, or the port is
+    blocked.
+  - '''Name or password is incorrect'' -> credentials. Do NOT retry: repeated attempts lock
+    the account.'
+  - Never let this render as healthy. Zero metrics is UNKNOWN, not perfect.

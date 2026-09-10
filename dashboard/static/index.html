@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>InfraBeatOps · Basis Monitoring</title>
+<title>IBOPS · Basis Monitoring</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   /* The brand light theme is defined with the palette further down.
@@ -13,7 +15,7 @@
   .theme-toggle { padding:7px 10px; border:1px solid var(--border); background:var(--card); color:var(--text); border-radius:8px; cursor:pointer; font-weight:700; font-size:12px; }
   .intel-grid { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr); gap:16px; }
   .intel-score { display:flex; align-items:center; gap:18px; }
-  .intel-ring { width:76px; height:76px; border-radius:50%; display:grid; place-items:center; font-size:19px; font-weight:900; background:conic-gradient(var(--red) var(--score,0%), var(--border) 0); position:relative; flex-shrink:0; }
+  .intel-ring { width:76px; height:76px; border-radius:50%; display:grid; place-items:center; font-size:19px; font-weight:900; background:conic-gradient(var(--ring-color,var(--blue-600)) var(--score,0%), var(--paper-2) 0); position:relative; flex-shrink:0; }
   .intel-ring::after { content:""; position:absolute; inset:8px; border-radius:50%; background:var(--card); }
   .intel-ring span { position:relative; z-index:1; }
   .signal-list { display:grid; gap:9px; }
@@ -36,68 +38,62 @@
      matches the logo red, operators stop seeing it.
      ================================================================== */
   :root {
+    /* ---- Blue scale (brand) ---- */
+    --blue-950:#071A33; --blue-900:#0B2A4A; --blue-800:#0F3D6E; --blue-700:#1554A0;
+    --blue-600:#1F6FD1; --blue-500:#2E86F0; --blue-400:#64AAF7; --blue-200:#BBD8FB;
+    --blue-100:#DCEBFB; --blue-50:#EEF5FD;
+    /* ---- Whites & neutrals ---- */
+    --white:#FFFFFF; --paper:#F5F8FC; --paper-2:#EDF2F8; --line:#E2E9F1; --line-strong:#CBD7E4;
+    --ink:#0F2440; --ink-2:#4A5F78; --ink-3:#7F93A9;
+    /* ---- Red: CTA / critical / priority only ---- */
+    --red-700:#B81F1F; --red-600:#D42A2A; --red-500:#E5322D; --red-200:#F7BDBD; --red-50:#FDEDED;
+
     /* --- Brand --- */
-    --brand:            #0066B3;   /* InfraBeat Blue: primary action    */
-    --brand-hover:      #0078D4;   /* Bright Blue: hover / focus        */
-    --brand-live:       #00A8E8;   /* Electric Cyan: live + interactive */
-    --automation:       #A855F7;   /* Purple: GUI automation / OCR      */
+    --brand:            var(--blue-600);
+    --brand-hover:      var(--blue-700);
+    --brand-live:       var(--blue-500);
+    --automation:       #7C3AED;
 
-    /* --- Surfaces (dark) --- */
-    --bg:               #08111C;   /* Deep Navy: application background */
-    --sidebar:          #06101A;   /* Dark Navy: navigation rail        */
-    --card:             #0D1B2A;   /* Navy: content surface             */
-    --card-hover:       #12283D;   /* Elevated Navy                     */
-    --border:           #1B3449;   /* Blue Gray                         */
+    /* --- Surfaces (light default) --- */
+    --bg:               var(--paper);
+    --sidebar:          var(--blue-950);
+    --card:             var(--white);
+    --card-hover:       var(--blue-50);
+    --border:           var(--line);
 
-    /* --- Type (dark) --- */
-    --text:             #F5F9FC;
-    --muted:            #A8B8C7;
-    --muted-dim:        #6F8293;
+    /* --- Type --- */
+    --text:             var(--ink);
+    --muted:            var(--ink-2);
+    --muted-dim:        var(--ink-3);
 
     /* --- Status --- */
-    --green:            #22C55E;  --green-dim: rgba(34,197,94,0.14);
-    --amber:            #F59E0B;  --amber-dim: rgba(245,158,11,0.14);
-    --red:              #EF4444;  --red-dim:   rgba(239,68,68,0.14);
-    --info:             #38BDF8;  --info-dim:  rgba(56,189,248,0.14);
-    --gray:             #6F8293;  --gray-dim:  rgba(111,130,147,0.14);
+    --green:            #15803D;  --green-dim: rgba(21,128,61,0.10);
+    --amber:            #B45309;  --amber-dim: rgba(180,83,9,0.10);
+    --red:              var(--red-700);  --red-dim: rgba(212,42,42,0.10);
+    --info:             var(--blue-700); --info-dim: rgba(31,111,209,0.10);
+    --gray:             var(--ink-2);    --gray-dim: rgba(74,95,120,0.10);
 
-    /* Collector provenance. An operator must be able to tell at a glance
-       WHERE a number came from, because "SAP is unhealthy" and "our
-       collector failed" are different statements. */
-    --src-rfc:          #00A8E8;
-    --src-ssh:          #22C55E;
-    --src-gui:          #A855F7;
-    --src-none:         #6F8293;
+    --src-rfc:          var(--blue-700);
+    --src-ssh:          #15803D;
+    --src-gui:          #7C3AED;
+    --src-none:         var(--ink-3);
+
+    --radius:12px; --radius-sm:8px;
+    --shadow:0 1px 2px rgba(15,36,64,.05), 0 4px 14px rgba(15,36,64,.06);
   }
 
   /* Light theme: <html data-theme="light"> */
-  html[data-theme="light"] {
-    --bg:               #F4F7FA;
-    --sidebar:          #FFFFFF;
-    --card:             #FFFFFF;
-    --card-hover:       #F7FAFC;
-    --border:           #D9E2EA;
-
-    --text:             #102A43;
-    --muted:            #526579;
-    --muted-dim:        #7A8CA0;
-
-    --brand:            #0066B3;
-    --brand-hover:      #0078D4;
-    --brand-live:       #008CC9;
-
-    /* Darkened for contrast against white: the dark-theme greens and ambers
-       fail WCAG AA on a light surface. */
-    --green:            #15803D;  --green-dim: rgba(21,128,61,0.10);
-    --amber:            #B45309;  --amber-dim: rgba(180,83,9,0.10);
-    --red:              #B91C1C;  --red-dim:   rgba(185,28,28,0.10);
-    --info:             #0369A1;  --info-dim:  rgba(3,105,161,0.10);
-    --gray:             #526579;  --gray-dim:  rgba(82,101,121,0.10);
-
-    --src-rfc:          #008CC9;
-    --src-ssh:          #15803D;
-    --src-gui:          #7E22CE;
-    --src-none:         #7A8CA0;
+  html[data-theme="dark"] {
+    --bg:#08111C; --sidebar:#050D17; --card:#0D1B2A; --card-hover:#12283D; --border:#1B3449;
+    --text:#F2F7FC; --muted:#A8B8C7; --muted-dim:#6F8293;
+    --brand-live:#3C97F5;
+    --green:#22C55E; --green-dim:rgba(34,197,94,0.14);
+    --amber:#F59E0B; --amber-dim:rgba(245,158,11,0.14);
+    --red:#F04444;   --red-dim:rgba(240,68,68,0.14);
+    --info:#5AAAF8;  --info-dim:rgba(90,170,248,0.14);
+    --gray:#8296AC;  --gray-dim:rgba(111,130,147,0.14);
+    --src-rfc:#3C97F5; --src-ssh:#22C55E; --src-gui:#A855F7; --src-none:#6F8293;
+    --shadow:0 2px 10px rgba(0,0,0,.35);
   }
 
   /* Source badges: RFC / SSH / SAP GUI / NO DATA */
@@ -141,35 +137,35 @@
   /* ---------- Sidebar ---------- */
   .sidebar {
     width: 250px; background: var(--sidebar); border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; padding: 22px 16px; flex-shrink: 0;
+    display: flex; flex-direction: column; padding: 48px 16px 22px; flex-shrink: 0;
     position: sticky; top: 0; height: 100vh;
   }
-  .brand { display: flex; align-items: center; gap: 10px; padding: 0 6px 24px; }
-  .brand-icon {
-    width: 34px; height: 34px; border-radius: 8px; background: var(--red);
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 16px; color: white; flex-shrink: 0;
-  }
-  .brand-name { font-weight: 800; font-size: 14px; letter-spacing: 0.4px; }
-  .brand-sub { font-size: 9.5px; color: var(--muted-dim); letter-spacing: 1.2px; font-weight: 700; }
+  .brand { padding: 0 0 14px; }
+  .brand .plate { background:#fff; border-radius: var(--radius); padding: 12px 12px 10px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 8px 20px rgba(0,0,0,.28); }
+  .brand .plate img { display:block; width:100%; height:auto; }
+  .brand .tag { display:flex; justify-content:space-between; margin-top:9px; padding:0 2px;
+    font-size:10.5px; color:#9FB6D2; font-weight:600; }
+  .brand .tag .ver { font-family: var(--mono, monospace); font-size:10px; color:#6F8CAE; }
   .nav-section-label {
-    font-size: 10px; color: var(--muted-dim); font-weight: 800; letter-spacing: 1.2px;
-    padding: 10px 10px 8px;
+    font-size: 11px; color: #7E97B8; font-weight: 600; text-transform: none; letter-spacing: 0;
+    padding: 12px 10px 6px;
   }
   .nav-item {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     padding: 10px 10px; border-radius: 8px; font-size: 13.5px; font-weight: 600;
-    color: var(--muted); cursor: pointer; margin-bottom: 2px; border-left: 2px solid transparent;
+    color: #C7D6E8; cursor: pointer; margin-bottom: 2px; border-left: 2px solid transparent;
   }
-  .nav-item:hover { background: var(--card); color: var(--text); }
-  .nav-item.active { background: var(--card); color: var(--text); border-left-color: var(--red); }
+  .nav-item:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .nav-item.active { background: var(--blue-600); color: #fff; border-left-color: transparent;
+    box-shadow: 0 6px 16px rgba(31,111,209,.35); }
   .nav-item-left { display: flex; align-items: center; gap: 10px; }
   .nav-icon { width: 16px; text-align: center; opacity: 0.85; }
   .nav-badge {
-    background: var(--red); color: white; font-size: 10.5px; font-weight: 800;
-    padding: 1px 7px; border-radius: 10px;
+    background: var(--red-500); color: white; font-size: 10.5px; font-weight: 800;
+    padding: 1px 7px; border-radius: 999px;
   }
-  .sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+  .sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.10); color:#C7D6E8; }
   .collector-status { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 8px 10px; }
   .collector-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 1.8s infinite; }
   .collector-sub { font-size: 10.5px; color: var(--muted-dim); margin-left: 16px; }
@@ -191,7 +187,7 @@
   .live-dot-wrap { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--green); font-weight: 700; }
   .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 1.8s infinite; }
   .avatar {
-    width: 30px; height: 30px; border-radius: 8px; background: #1e293b;
+    width: 30px; height: 30px; border-radius: 8px; background: var(--blue-50); color: var(--blue-700);
     display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800;
   }
 
@@ -286,23 +282,23 @@
   .metric-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 9px; }
   .ai-box { font-size: 13px; line-height: 1.8; color: #d5d8dd; }
   .intel-grid { display:grid; grid-template-columns: 170px 1fr; gap:16px; align-items:stretch; }
-  .intel-score { background:#0e0f12; border:1px solid var(--border); border-radius:10px; padding:16px; text-align:center; }
+  .intel-score { background:var(--paper-2); border:1px solid var(--border); border-radius:10px; padding:16px; text-align:center; }
   .intel-signal { font-size:22px; font-weight:900; letter-spacing:.5px; margin:8px 0 2px; }
   .intel-score-label { color:var(--muted); font-size:10.5px; font-weight:800; letter-spacing:.8px; }
   .intel-score-value { font-size:28px; font-weight:900; }
   .intel-findings { display:grid; gap:8px; }
-  .intel-finding { background:#0e0f12; border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:12px; }
+  .intel-finding { background:var(--paper-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:12px; }
   .intel-signal-row { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); font-size:11.5px; }
   .intel-signal-row:last-child { border-bottom:none; }
   .ai-box b { color: #fca5a5; }
   .evidence-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
-  .evidence-item { background: #0e0f12; border: 1px solid var(--border); border-left: 3px solid var(--red); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #c7cad0; }
+  .evidence-item { background: var(--paper-2); border: 1px solid var(--border); border-left: 3px solid var(--blue-500); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--muted); }
   .evidence-item.no-data { border-left-color: var(--gray); }
   .evidence-tcode { font-weight: 800; color: #fca5a5; margin-bottom: 3px; font-size: 12.5px; }
   canvas { max-height: 200px; }
 
   input {
-    background: #0e0f12; border: 1px solid var(--border); color: var(--text);
+    background: var(--paper-2); border: 1px solid var(--border); color: var(--text);
     padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 9px; width: 100%;
   }
   input:focus { outline: none; border-color: var(--red); }
@@ -356,9 +352,35 @@
   .correlation-note { margin-top:10px; color:var(--muted); font-size:10.5px; line-height:1.45; }
   @media (max-width:760px) { .correlation-graph { grid-template-columns:1fr; } }
 
+
+  /* ---- boot loader (3D brand) ---- */
+  .ibo-loader{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:var(--blue-950);color:#fff;transition:opacity .35s ease}
+  .ibo-loader.hide{opacity:0;pointer-events:none}
+  .ibo-loader .frame{width:min(46vw,300px);aspect-ratio:1/1;border-radius:22px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06)}
+  .ibo-loader video,.ibo-loader img{width:100%;height:100%;object-fit:cover;display:block}
+  .ibo-loader .msg{margin-top:20px;font-size:13px;color:#B9CBE3;font-weight:600;text-align:center}
+  .ibo-loader .lbar{width:160px;height:3px;margin:12px auto 0;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden}
+  .ibo-loader .lbar i{display:block;height:100%;width:40%;background:var(--blue-400);border-radius:2px;animation:ibo-sweep 1.2s ease-in-out infinite}
+  @keyframes ibo-sweep{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
+  @media (prefers-reduced-motion:reduce){.ibo-loader video{display:none}.ibo-loader img{display:block!important}}
 </style>
 </head>
 <body>
+<script>
+/* Boot splash: 3D brand animation, once per tab session, never longer than 6s. */
+(function(){
+  try{ if(sessionStorage.getItem("ibo-booted")==="1") return; sessionStorage.setItem("ibo-booted","1"); }catch(e){}
+  var t0=performance.now();
+  var el=document.createElement("div"); el.className="ibo-loader"; el.setAttribute("role","status");
+  el.innerHTML='<div><div class="frame"><video autoplay muted loop playsinline preload="auto" poster="/static/brand/ibops-3d-poster.jpg"><source src="/static/brand/ibops-3d.mp4" type="video/mp4"></video><img src="/static/brand/ibops-3d-poster.jpg" alt="" style="display:none"></div><div class="msg">Reading systems…</div><div class="lbar"><i></i></div></div>';
+  document.body.appendChild(el);
+  var done=function(){ var wait=Math.max(0,1400-(performance.now()-t0));
+    setTimeout(function(){ el.classList.add("hide"); setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); },400); }, wait); };
+  if(document.readyState==="complete") done(); else window.addEventListener("load",done,{once:true});
+  setTimeout(done,6000);
+})();
+</script>
+
 
 <!-- Return path to the new multi-page UI.
      This page predates that shell and has no link back, so the only way out
@@ -370,23 +392,22 @@
             font-family:'Inter',-apple-system,'Segoe UI',sans-serif;">
   <strong style="color:var(--muted-dim);letter-spacing:.05em;
                  text-transform:uppercase;font-size:10px;">Classic view</strong>
-  <a href="/wall" style="color:#00A8E8;font-weight:700;text-decoration:none;">Live wall</a>
-  <a href="/overview" style="color:#00A8E8;font-weight:700;text-decoration:none;">Overview</a>
-  <a href="/systems-page" style="color:#00A8E8;font-weight:700;text-decoration:none;">Systems</a>
-  <a href="/reports-page" style="color:#00A8E8;font-weight:700;text-decoration:none;">Health reports</a>
+  <a href="/wall" style="color:var(--blue-600);font-weight:700;text-decoration:none;">Live wall</a>
+  <a href="/overview" style="color:var(--blue-600);font-weight:700;text-decoration:none;">Overview</a>
+  <a href="/systems-page" style="color:var(--blue-600);font-weight:700;text-decoration:none;">Systems</a>
+  <a href="/reports-page" style="color:var(--blue-600);font-weight:700;text-decoration:none;">Health reports</a>
 </div>
 <div style="height:34px;"></div>
 
 <div class="sidebar">
   <div class="brand">
-    <div class="brand-icon">S</div>
-    <div>
-      <div class="brand-name">InfraBeatOps</div>
-      <div class="brand-sub">BASIS MONITORING</div>
-    </div>
+    <a href="/overview" aria-label="IBOPS home" style="display:block">
+      <div class="plate"><img src="/static/brand/ibops-logo.png" alt="IBOPS — Reach for the Sky"></div>
+    </a>
+    <div class="tag"><span>SAP Basis intelligence</span><span class="ver">v5.1</span></div>
   </div>
 
-  <div class="nav-section-label">COMMAND CENTER</div>
+  <div class="nav-section-label">Command center</div>
   <div class="nav-item active" data-target="view-overview"><span class="nav-item-left"><span class="nav-icon">▦</span>Overview</span></div>
   <div class="nav-item" data-target="view-systems"><span class="nav-item-left"><span class="nav-icon">☰</span>Systems</span></div>
   <div class="nav-item" data-target="view-registry"><span class="nav-item-left"><span class="nav-icon">☑</span>Check registry</span></div>
@@ -425,7 +446,11 @@
         <div class="greeting-sub">Here's the current pulse across your SAP landscape.</div>
       </div>
       <div style="display:flex; gap:10px;">
-        <button class="btn" id="runBtn" onclick="runNow()">↻ Run sweep</button>
+        <!-- The global "Run sweep" swept every configured system on demand:
+             minutes of SAP GUI driving and an email, from a button that did
+             not say which systems it would touch. Runs start from a named
+             profile, or per-system from that system's card. -->
+        <a class="btn" href="/profiles-page">◧ Profiles</a>
         <button class="btn btn-primary" onclick="exportEvidence()">⭳ Export evidence</button>
       </div>
     </div>
@@ -447,7 +472,7 @@
         <div class="stat-value" id="statAlerts">--</div>
       </div>
       <div class="stat-card">
-        <div class="stat-top"><div class="stat-icon" style="background:#1e293b;color:#93c5fd;">◷</div></div>
+        <div class="stat-top"><div class="stat-icon" style="background:var(--blue-50);color:var(--blue-700);">◷</div></div>
         <div class="stat-label">Data freshness</div>
         <div class="stat-value" id="statFreshness">--</div>
       </div>
@@ -485,7 +510,7 @@
       </div>
     </div>
 
-    <div class="section" id="operationalIntelligence">
+    <div class="section" id="operationalIntelligence" style="display:none">
       <div class="section-head"><div><div class="section-title">Operational intelligence</div><div class="section-sub">Baseline, recurrence and fused signals · advisory only</div></div></div>
       <div class="intel-grid">
         <div class="list-card"><div class="intel-score"><div class="intel-ring" id="intelRing"><span id="intelScore">--</span></div><div><div class="section-title" style="font-size:14px" id="intelSignal">No signal</div><div class="section-sub" id="intelSummary">Select a system to inspect operational intelligence.</div></div></div><div style="margin-top:18px" id="intelFindings"><div class="empty">No findings.</div></div></div>
@@ -557,22 +582,25 @@
           <div id="detailMetrics"><div class="empty">No data.</div></div>
         </div>
         <div class="list-card">
-          <div class="section-title" style="font-size:13px; margin-bottom:12px;">AI assistant</div>
+          <div class="section-title" style="font-size:13px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between;">
+            <span>AI assistant</span>
+            <button id="detailAiRun" style="font-size:11px; font-weight:700; padding:5px 11px; border-radius:6px; border:none; background:#2563eb; color:#fff; cursor:pointer;">✨ Analyse live</button>
+          </div>
           <div class="ai-box" id="detailAi">No analysis available.</div>
         </div>
       </div>
 
-      <div class="list-card" style="margin-bottom:16px;">
+      <div class="list-card" style="margin-bottom:16px;display:none">
         <div class="section-title" style="font-size:13px; margin-bottom:12px;">Operational intelligence</div>
         <div id="detailIntelligence"><div class="empty">No intelligence available.</div></div>
       </div>
 
-      <div class="list-card" style="margin-bottom:16px;">
+      <div class="list-card" style="margin-bottom:16px;display:none">
         <div class="section-title" style="font-size:13px; margin-bottom:12px;">CPU & Memory trend</div>
         <canvas id="trendChart"></canvas>
       </div>
 
-      <div class="list-card">
+      <div class="list-card" style="display:none">
         <div class="section-title" style="font-size:13px; margin-bottom:12px;">T-code evidence</div>
         <div class="evidence-grid" id="detailEvidence"><div class="empty">No data.</div></div>
       </div>
@@ -585,7 +613,7 @@
           <div class="section-sub">Configured T-code checks run every sweep</div>
         </div>
       </div>
-      <div class="registry-grid" id="registryGrid"><div class="empty">Loading...</div></div>
+      <div class="registry-grid" id="registryGrid"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading checks…</span></div></div>
     </div>
 
     <div class="section" id="view-reports">
@@ -641,12 +669,42 @@
 <div class="toast" id="toast"></div>
 
 <script>
+/* Minimal auth helper for the Classic view.
+
+   This page does not load shell.js -- it has its own navigation, and mounting
+   the shell here would render a second one. It still needs the token, because
+   every state-changing endpoint is gated.
+
+   Kept deliberately small and identical in behaviour to IB.post in shell.js:
+   two implementations that drift apart would give one page working buttons
+   and another silent 401s, which is exactly the failure this replaces. */
+const IB = {
+  _token: null,
+  async token() {
+    if (this._token !== null) return this._token;
+    try {
+      const r = await fetch("/api/auth-token", { cache: "no-store" });
+      this._token = r.ok ? (await r.json()).token || "" : "";
+    } catch (e) { this._token = ""; }
+    return this._token;
+  },
+  async post(url, options) {
+    const t = await this.token();
+    return fetch(url, Object.assign(
+      { method: "POST", cache: "no-store" }, options || {},
+      { headers: Object.assign({ "X-IBO-Token": t }, (options || {}).headers || {}) }));
+  },
+  async del(url) { return this.post(url, { method: "DELETE" }); },
+};
+
 const statusColors = { NORMAL: "#22c55e", WARNING: "#f59e0b", CRITICAL: "#ef4444", UNKNOWN: "#6b7280" };
 const statusLabels = { NORMAL: "HEALTHY", WARNING: "WARNING", CRITICAL: "CRITICAL", UNKNOWN: "UNKNOWN" };
 
 let allSystems = [];
 let systemStatuses = {};
 let selectedSystem = null;
+let _detailAiHtml = "";      // last live-AI result, preserved across the 20s refresh
+let _detailAiSystem = "";    // which system that result belongs to
 let chart = null;
 let ackedAlerts = new Set();
 
@@ -664,6 +722,11 @@ function renderIncidentCenter() {
   const list = document.getElementById("incidentList");
   const incidents = [];
   Object.keys(systemStatuses).forEach(system => {
+    // The panel sits under "System detail: <selectedSystem>", so it must show
+    // only that system's incidents. Without this filter it listed every
+    // system's incidents under one system's heading -- PRD incidents appeared
+    // on the CENTOR_QAS page, mislabelled by the header above them.
+    if (selectedSystem && system !== selectedSystem) return;
     const data = systemStatuses[system];
     if (!data || !data.available) return;
     (data.incidents || []).forEach(incident => incidents.push({system, incident}));
@@ -676,7 +739,10 @@ function renderIncidentCenter() {
     if (incidentFilter === "WARNING") return sev === "WARNING" && status !== "RESOLVED";
     return true;
   });
-  if (!filtered.length) { list.innerHTML = '<div class="empty">No incidents match this filter.</div>'; return; }
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty">No incidents for ${selectedSystem ? escapeHtml(selectedSystem) : "this system"} match this filter.</div>`;
+    return;
+  }
   list.innerHTML = "";
   filtered.slice(0, 12).forEach(({system, incident}) => {
     const sev = String(incident.severity || "UNKNOWN").toUpperCase();
@@ -742,11 +808,14 @@ async function loadIncidentRca(incidentId) {
     const payload = await res.json(); const incident = payload.incident || {}; const ai = payload.ai_analysis; const intel = payload.operational_intelligence;
     const evidence = Array.isArray(incident.evidence) ? incident.evidence : [];
     const actions = ai && Array.isArray(ai.recommended_actions) ? ai.recommended_actions : [];
+    // Deterministic detail from config/correlation_rules.yaml. The AI writes
+    // one sentence; this is the part that can be acted on.
+    const cat = incident.catalogue || {};
     const limitations = ai && Array.isArray(ai.limitations) ? ai.limitations : [];
     renderCorrelationView(incident, ai, intel);
     renderSystemCorrelation(incident, ai, intel);
     renderIncidentTimeline(incident, ai, intel);
-    content.innerHTML = `<div class="rca-block" style="margin-bottom:12px;"><div class="rca-label">OPERATOR ACTIONS</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn" onclick="incidentAction('${incidentId}','ACKNOWLEDGE')">Acknowledge</button><button class="btn" onclick="incidentAction('${incidentId}','INVESTIGATE')">Start investigation</button><button class="btn btn-primary" onclick="incidentAction('${incidentId}','RESOLVE')">Resolve incident</button></div><div class="section-sub" style="margin-top:8px;">Lifecycle actions are operator-controlled. Severity remains authoritative and cannot be changed here.</div></div><div class="rca-grid"><div class="rca-block"><div class="rca-label">AUTHORITATIVE SEVERITY</div><div class="rca-value"><strong>${incident.severity || "UNKNOWN"}</strong> · ${incident.status || "UNKNOWN"}</div></div><div class="rca-block"><div class="rca-label">AI HYPOTHESIS</div><div class="rca-value">${ai ? (ai.likely_root_cause || ai.root_cause || "No hypothesis available.") : "No AI analysis available."}</div></div><div class="rca-block"><div class="rca-label">SUPPORTING EVIDENCE</div><ul class="rca-list">${(evidence.length ? evidence : ["No incident evidence recorded."]).map(x => `<li>${x}</li>`).join("")}</ul></div><div class="rca-block"><div class="rca-label">RECOMMENDED INVESTIGATION</div><ul class="rca-list">${(actions.length ? actions : ["Review the incident evidence and relevant SAP transaction logs."]).map(x => `<li>${x}</li>`).join("")}</ul></div></div>${intel ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">OPERATIONAL INTELLIGENCE</div><div class="rca-value">${intel.overall_signal || "NO_SIGNIFICANT_INTELLIGENCE"} · score ${Number(intel.score || 0).toFixed(2)}</div></div>` : ""}${limitations.length ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">LIMITATIONS</div><ul class="rca-list">${limitations.map(x => `<li>${x}</li>`).join("")}</ul></div>` : ""}${Array.isArray(incident.action_history) && incident.action_history.length ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">OPERATOR ACTION HISTORY</div><ul class="rca-list">${incident.action_history.slice(-10).reverse().map(x => `<li>${x.action} · ${x.actor} · ${x.timestamp}</li>`).join("")}</ul></div>` : ""}`;
+    content.innerHTML = `<div class="rca-block" style="margin-bottom:12px;"><div class="rca-label">OPERATOR ACTIONS</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn" onclick="incidentAction('${incidentId}','ACKNOWLEDGE')">Acknowledge</button><button class="btn" onclick="incidentAction('${incidentId}','INVESTIGATE')">Start investigation</button><button class="btn btn-primary" onclick="incidentAction('${incidentId}','RESOLVE')">Resolve incident</button></div><div class="section-sub" style="margin-top:8px;">Lifecycle actions are operator-controlled. Severity remains authoritative and cannot be changed here.</div></div><div class="rca-grid"><div class="rca-block"><div class="rca-label">AUTHORITATIVE SEVERITY</div><div class="rca-value"><strong>${incident.severity || "UNKNOWN"}</strong> · ${incident.status || "UNKNOWN"}</div></div><div class="rca-block"><div class="rca-label">AI HYPOTHESIS</div><div class="rca-value">${ai ? (ai.likely_root_cause || ai.root_cause || "No hypothesis available.") : "No AI analysis available."}</div></div><div class="rca-block"><div class="rca-label">SUPPORTING EVIDENCE</div><ul class="rca-list">${(evidence.length ? evidence : ["No incident evidence recorded."]).map(x => `<li>${x}</li>`).join("")}</ul></div><div class="rca-block"><div class="rca-label">RECOMMENDED INVESTIGATION</div><ul class="rca-list">${(actions.length ? actions : ["Review the incident evidence and relevant SAP transaction logs."]).map(x => `<li>${x}</li>`).join("")}</ul></div></div>${intel ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">OPERATIONAL INTELLIGENCE</div><div class="rca-value">${intel.overall_signal || "NO_SIGNIFICANT_INTELLIGENCE"} · score ${Number(intel.score || 0).toFixed(2)}</div></div>` : ""}${cat.culprit && cat.culprit.component ? `<div class="rca-block" style="margin-top:12px;border-left:3px solid var(--amber,#c69026);"><div class="rca-label">LIKELY CULPRIT · DETERMINISTIC</div><div class="rca-value" style="font-size:15px;font-weight:700;margin-bottom:6px;">${cat.culprit.component}</div><div class="rca-value" style="line-height:1.6;">${cat.culprit.statement || ""}</div>${(cat.culprit.confirm_in || []).length ? `<div class="rca-label" style="margin-top:10px;">CONFIRM BEFORE ACTING</div><ul class="rca-list">${cat.culprit.confirm_in.map(x => `<li>${x}</li>`).join("")}</ul>` : ""}${cat.culprit.confirm_notes ? `<div style="margin-top:10px;padding:9px 11px;border-radius:5px;background:rgba(200,150,0,.10);line-height:1.55;">${cat.culprit.confirm_notes}</div>` : ""}</div>` : ""}${(cat.remediation || []).length ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">REMEDIATION · ORDERED STEPS</div><ol class="rca-list" style="padding-left:18px;">${cat.remediation.map(x => `<li style="margin-bottom:5px;">${x}</li>`).join("")}</ol></div>` : ""}${(cat.parameters || []).length ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">SAP PARAMETERS THAT GOVERN THIS</div><ul class="rca-list" style="font-family:var(--mono,monospace);font-size:12px;">${cat.parameters.map(x => `<li>${x}</li>`).join("")}</ul></div>` : ""}${(cat.rfc_evidence || []).length ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">WHERE THIS EVIDENCE COMES FROM</div><ul class="rca-list" style="font-size:12px;">${cat.rfc_evidence.map(e => `<li><strong>${e.source}</strong> (${e.kind === "table" ? "table" : "function module"}) — ${e.status === "confirmed" ? "confirmed live" : "verify in SE16"}${e.note ? "<br><span style='color:var(--muted-dim,#8b949e)'>" + e.note + "</span>" : ""}</li>`).join("")}</ul></div>` : ""}${limitations.length ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">LIMITATIONS</div><ul class="rca-list">${limitations.map(x => `<li>${x}</li>`).join("")}</ul></div>` : ""}${Array.isArray(incident.action_history) && incident.action_history.length ? `<div class="rca-block" style="margin-top:12px;"><div class="rca-label">OPERATOR ACTION HISTORY</div><ul class="rca-list">${incident.action_history.slice(-10).reverse().map(x => `<li>${x.action} · ${x.actor} · ${x.timestamp}</li>`).join("")}</ul></div>` : ""}`;
   } catch (err) { content.innerHTML = '<div class="empty">RCA is unavailable for this incident. The incident itself remains authoritative.</div>'; }
 }
 
@@ -762,8 +831,7 @@ async function incidentAction(incidentId, action) {
     body.verified = false;
   }
   try {
-    const res = await fetch("/api/incidents/" + encodeURIComponent(incidentId) + "/action", {
-      method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body)
+    const res = await IB.post("/api/incidents/" + encodeURIComponent(incidentId) + "/action", { headers: {"Content-Type":"application/json"}, body: JSON.stringify(body)
     });
     const payload = await res.json();
     if (!res.ok) throw new Error(payload.detail || "Action failed");
@@ -837,9 +905,9 @@ function renderOperationalIntelligence() {
     : '<div class="empty">No signals.</div>';
 }
 function escapeHtml(value){const d=document.createElement("div");d.textContent=value;return d.innerHTML;}
-function toggleTheme(){const root=document.documentElement;const next=root.dataset.theme==="light"?"dark":"light";root.dataset.theme=next;localStorage.setItem("infrabeatops-theme",next);updateThemeButton();}
+function toggleTheme(){const root=document.documentElement;const next=root.dataset.theme==="dark"?"light":"dark";root.dataset.theme=next;try{localStorage.setItem("ibo-theme",next);}catch(e){}updateThemeButton();}
 function updateThemeButton(){const b=document.querySelector("[data-theme-toggle]");if(b)b.textContent=document.documentElement.dataset.theme==="light"?"◐ Dark":"☀ Light";}
-(function initTheme(){document.documentElement.dataset.theme=localStorage.getItem("infrabeatops-theme")||"dark";})();
+(function initTheme(){let t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.dataset.theme=(t==="dark"?"dark":"light");updateThemeButton();})();
 
 function showToast(msg) {
   const t = document.getElementById("toast");
@@ -899,7 +967,7 @@ function renderExistingSystemsList() {
 
 async function deleteConfiguredSystem(name) {
   if (!confirm(`Remove system "${name}"? This cannot be undone.`)) return;
-  const res = await fetch("/api/systems/" + encodeURIComponent(name), { method: "DELETE" });
+  const res = await IB.del("/api/systems/" + encodeURIComponent(name));
   if (!res.ok) { showToast("Failed to remove system."); return; }
   showToast("System removed.");
   loadAllData();
@@ -916,8 +984,7 @@ async function loadSchedulerSettings() {
 async function saveSchedulerInterval() {
   const minutes = parseInt(document.getElementById("schedInterval").value, 10);
   if (!minutes || minutes < 5) { showToast("Interval must be at least 5 minutes."); return; }
-  const res = await fetch("/api/scheduler-settings", {
-    method: "POST", headers: { "Content-Type": "application/json" },
+  const res = await IB.post("/api/scheduler-settings", { headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ interval_minutes: minutes })
   });
   if (!res.ok) { showToast("Failed to update interval."); return; }
@@ -1094,6 +1161,7 @@ async function loadActivity() {
 }
 
 function selectSystem(name) {
+  if (name !== selectedSystem) { _detailAiHtml = ""; _detailAiSystem = ""; }
   selectedSystem = name;
   document.getElementById("detailPanel").classList.add("open");
   document.getElementById("detailName").textContent = name;
@@ -1102,6 +1170,75 @@ function selectSystem(name) {
   renderOperationalIntelligence();
   loadTrend(name);
 }
+
+async function analyseLiveDetail() {
+  // Live RFC read + one model call for the selected system, via the same
+  // endpoint the standalone system page and AI RCA use. On-demand only.
+  const btn = document.getElementById("detailAiRun");
+  const box = document.getElementById("detailAi");
+  if (!selectedSystem || !btn || !box) return;
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "Reading " + selectedSystem + "…";
+  box.innerHTML = "Live RFC read, then one model call…";
+  try {
+    const r = await IB.post("/api/rca/analyze/" + encodeURIComponent(selectedSystem));
+    const d = await r.json();
+    if (d.analysed === false) {
+      box.innerHTML = `<b>${escapeHtml(selectedSystem)} did not answer over RFC.</b><br>` +
+        `${escapeHtml(d.detail || "")}<br><small>No model call made, no tokens spent.</small>`;
+      return;
+    }
+    const findings = (d.findings || []).length
+      ? "<b>Findings (before the model):</b><br>" + d.findings.map(f =>
+          `· ${escapeHtml(f.name)} — ${escapeHtml(f.value)} <b>${escapeHtml(f.status)}</b>`
+        ).join("<br>") + "<br><br>"
+      : `<small>No metric outside threshold (${escapeHtml(String(d.metric_count))} read).</small><br><br>`;
+    const a = d.analysis || {};
+    const li = arr => (arr && arr.length)
+      ? "<ul style='margin:3px 0 0 16px;line-height:1.6'>" +
+        arr.map(x => `<li>${escapeHtml(x)}</li>`).join("") + "</ul>"
+      : "<span style='color:var(--muted-dim)'>none</span>";
+    const narrative = d.narrative_error
+      ? `<span style="color:var(--red)">Model call failed: ${escapeHtml(d.narrative_error)}</span><br>` +
+        `<small>Findings above are unaffected.</small>`
+      : ((a.root_cause || d.narrative)
+          ? `<b>${escapeHtml(a.finding_status || "HYPOTHESIS")}</b> ` +
+            `<small>${escapeHtml(a.root_cause_category || "")}${a.confidence ? " · " + escapeHtml(a.confidence) : ""}</small><br>` +
+            `${escapeHtml(a.root_cause || d.narrative)}<br><br>` +
+            `<b>Evidence:</b>${li(a.supporting_evidence)}<br>` +
+            `<b>Recommended actions:</b>${li(a.recommended_actions)}` +
+            ((a.limitations && a.limitations.length) ? `<br><b>Limitations:</b>${li(a.limitations)}` : "")
+          : "<small>No narrative returned.</small>");
+    const prov = d.provider && (d.provider.provider || d.provider.name ||
+      (d.provider.configured ? `${(d.provider.available||[]).length}/${d.provider.configured.length} keys live` : null));
+    const A = d.attribution || {};
+    const bullet = arr => arr.map(x => `<li>${x}</li>`).join("");
+    const who = [];
+    if ((A.dumps||{}).total_today > 0) who.push(`<b>Dumps (${escapeHtml(A.dumps.total_today)})</b>: ` +
+      (A.dumps.by_user||[]).map(u => `${u.name ? escapeHtml(u.name)+" ("+escapeHtml(u.user)+")" : escapeHtml(u.user)} ×${u.count}${u.email ? " ("+escapeHtml(u.email)+")" : ""}`).join(", ") +
+      ((A.dumps.by_program||[]).length ? ` · programs: ` + A.dumps.by_program.map(p => `${escapeHtml(p.program)} ×${p.count} [${escapeHtml(p.team)}]`).join(", ") : " · program names need ST22"));
+    for (const c of ((A.jobs||{}).cancelled||[])) who.push(`<b>Job failed</b> ${escapeHtml(c.job)} — owner ${escapeHtml(c.owner||"?")}${c.owner_email?" ("+escapeHtml(c.owner_email)+")":""}: ${escapeHtml(c.why)}`);
+    for (const c of ((A.jobs||{}).long_running||[])) who.push(`<b>Job long-running</b> ${escapeHtml(c.job)} — ${escapeHtml(c.running_for)} — owner ${escapeHtml(c.owner||"?")}: ${escapeHtml(c.why)}`);
+    for (const w of ((A.work_processes||{}).long_running||[])) who.push(`<b>WP ${escapeHtml(w.wp)}</b> ${escapeHtml(w.report)} [${escapeHtml(w.team)}] by ${escapeHtml(w.user)} for ${escapeHtml(w.elapsed)}: ${escapeHtml(w.why)}`);
+    const R = A.response||{};
+    if (R.avg_ms != null && ((R.top_users||[]).length || (R.top_reports_by_response||[]).length))
+      who.push(`<b>Response ${escapeHtml(R.avg_ms)} ms</b> — users: ` + (R.top_users||[]).map(u=>escapeHtml(u.user)).join(", ") +
+        ((R.top_reports_by_response||[]).length ? " · reports: " + R.top_reports_by_response.map(x=>`${escapeHtml(x.report)} [${escapeHtml(x.team)}]`).join(", ") : ""));
+    const whoHtml = who.length ? `<br><b>Who and what:</b><ul style="margin:4px 0 0 16px;line-height:1.6">${bullet(who)}</ul>` : "";
+    _detailAiHtml = findings + narrative + whoHtml +
+      `<br><br><small>${escapeHtml(d.overall_status || "")} · ${escapeHtml(String(d.metric_count || 0))} metrics` +
+      ` · read ${escapeHtml(d.read_at || "—")}${prov ? " · " + escapeHtml(prov) : ""}</small>`;
+    _detailAiSystem = selectedSystem;
+    box.innerHTML = _detailAiHtml;
+  } catch (e) {
+    box.innerHTML = `<span style="color:var(--red)">${escapeHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+document.addEventListener("click", e => {
+  if (e.target && e.target.id === "detailAiRun") analyseLiveDetail();
+});
 
 function renderDetail() {
   const data = systemStatuses[selectedSystem];
@@ -1130,13 +1267,15 @@ function renderDetail() {
   }
 
   const aiEl = document.getElementById("detailAi");
-  if (data.ai_analysis) {
+  if (_detailAiHtml && _detailAiSystem === selectedSystem) {
+    aiEl.innerHTML = _detailAiHtml;                       // keep the live analysis on refresh
+  } else if (data.ai_analysis) {
     aiEl.innerHTML = `
       <b>Severity:</b> ${data.ai_analysis.severity}<br>
       <b>Root Cause:</b> ${data.ai_analysis.root_cause}<br>
       <b>Confidence:</b> ${data.ai_analysis.confidence}`;
   } else {
-    aiEl.innerHTML = "No analysis available.";
+    aiEl.innerHTML = "No analysis available. Click ✨ Analyse live for an on-demand read.";
   }
 
   renderIntelligence(data.operational_intelligence);
@@ -1221,8 +1360,8 @@ async function loadTrend(name) {
       responsive: true,
       plugins: { legend: { labels: { color: "#8b909a", font: { size: 11.5 } } } },
       scales: {
-        x: { ticks: { color: "#5a5f68", maxTicksLimit: 6, font: { size: 10 } }, grid: { color: "#1c1e22" } },
-        y: { ticks: { color: "#5a5f68", font: { size: 10 } }, grid: { color: "#1c1e22" } },
+        x: { ticks: { color: "#7F93A9", maxTicksLimit: 6, font: { size: 10 } }, grid: { color: "rgba(127,147,169,.18)" } },
+        y: { ticks: { color: "#7F93A9", font: { size: 10 } }, grid: { color: "rgba(127,147,169,.18)" } },
       }
     }
   });
@@ -1314,8 +1453,7 @@ async function addSystem() {
     body.sap_instance_nr = document.getElementById("newInstanceNr").value.trim();
   }
 
-  const res = await fetch("/api/systems", {
-    method: "POST", headers: { "Content-Type": "application/json" },
+  const res = await IB.post("/api/systems", { headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
   if (!res.ok) { showToast("Failed to add system."); return; }
@@ -1329,19 +1467,14 @@ async function addSystem() {
   loadAllData();
 }
 
-async function runNow() {
-  const btn = document.getElementById("runBtn");
-  const res = await fetch("/api/run-now", { method: "POST" });
-  if (res.status === 409) { showToast("A sweep is already in progress."); return; }
-
-  btn.disabled = true;
-  btn.textContent = "⏳ Sweeping...";
-  pollRunStatus();
-}
+/* runNow() is gone with its button. Scheduled runs come from profiles; a
+   single system is run from its own card, which names what it will touch. */
 
 async function pollRunStatus() {
   const res = await fetch("/api/run-status");
   const data = await res.json();
+  // The button no longer exists on this page. Guarded rather than removed
+  // wholesale, because the same poll also updates the scheduler line.
   const btn = document.getElementById("runBtn");
 
   if (data.next_run_at) {
@@ -1349,11 +1482,10 @@ async function pollRunStatus() {
   }
 
   if (data.running) {
-    if (data.current_system) btn.textContent = `⏳ Sweeping ${data.current_system}...`;
+    if (btn && data.current_system) btn.textContent = `⏳ Sweeping ${data.current_system}...`;
     setTimeout(pollRunStatus, 4000);
   } else {
-    btn.disabled = false;
-    btn.textContent = "↻ Run sweep";
+    if (btn) { btn.disabled = false; btn.textContent = "↻ Run sweep"; }
     if (data.error) { showToast("Sweep failed: " + data.error); }
     else { showToast("Sweep complete."); }
     loadAllData();
@@ -1366,7 +1498,12 @@ setInterval(setGreeting, 30000);
 loadAllData();
 loadRegistry();
 loadSchedulerSettings();
-setInterval(loadAllData, 20000);
+(function pausable(fn, ms){
+  let t=null; const arm=()=>{ clearInterval(t); t=setInterval(()=>{ if(!document.hidden) fn(); }, ms); };
+  document.addEventListener("visibilitychange",()=>{ if(document.hidden){ clearInterval(t); t=null; } else if(!t){ arm(); fn(); } });
+  window.addEventListener("pagehide",()=>{ clearInterval(t); },{once:true});
+  arm();
+})(loadAllData, 20000);   // paused while tab hidden
 </script>
 
 </body>

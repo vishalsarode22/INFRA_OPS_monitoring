@@ -1,87 +1,88 @@
-# InfraBeatOps system registry.
-# Only ${VAR} references -- no secrets here. Safe to open in a screen share.
-
 systems:
-  - name: TST
-    sap_system_id: TST
-    client: "000"
+- name: CENTOR_QAS
+  sap_system_id: QAS
+  client: '100'
+  language: EN
+  has_gui_access: true
+  connection_name: ${QAS_SAP_CONNECTION_NAME}
+  username: ${QAS_SAP_USERNAME}
+  password: ${QAS_SAP_PASSWORD}
+  has_os_access: false
+  rfc:
+    ashost: ${QAS_RFC_HOST}
+    sysnr: ${QAS_RFC_SYSNR}
+    client: ${QAS_RFC_CLIENT}
+    username: ${QAS_RFC_USER}
+    password: ${QAS_RFC_PASSWORD}
     language: EN
-
-    has_gui_access: true
-    connection_name: ${TST_SAP_CONNECTION_NAME}
-    username: ${TST_SAP_USERNAME}
-    password: ${TST_SAP_PASSWORD}
-
-    has_os_access: true
-    ssh_host: ${TST_SSH_HOST}
-    ssh_port: ${TST_SSH_PORT}
-    ssh_username: ${TST_SSH_USERNAME}
-    ssh_password: ${TST_SSH_PASSWORD}
-    sap_instance_nr: "02"
-
-    rfc:
-      ashost: ${TST_RFC_HOST}
-      sysnr: ${TST_RFC_SYSNR}
-      client: ${TST_RFC_CLIENT}
-      username: ${TST_RFC_USER}
-      password: ${TST_RFC_PASSWORD}
-      language: EN
-
-  - name: FUJI_QAS
-    sap_system_id: CEQ
-    client: "000"
+- name: PRD
+  client: '100'
+  language: EN
+  has_gui_access: true
+  has_os_access: false
+  sap_system_id: PRD
+  connection_name: centaur system
+  username: basis2
+  password: ${PRD_SAP_PASSWORD}
+  rfc:
+    ashost: 10.1.0.193
+    sysnr: '00'
+    client: '100'
+    username: basis2
+    password: ${PRD_RFC_PASSWORD}
     language: EN
-
-    has_gui_access: true
-    connection_name: ${FUJI_QAS_SAP_CONNECTION_NAME}
-    username: ${FUJI_QAS_SAP_USERNAME}
-    password: ${FUJI_QAS_SAP_PASSWORD}
-
-    has_os_access: false    # no OS access on this system
-
-    rfc:
-      ashost: ${FUJI_QAS_RFC_HOST}
-      sysnr: ${FUJI_QAS_RFC_SYSNR}
-      client: ${FUJI_QAS_RFC_CLIENT}
-      username: ${FUJI_QAS_RFC_USER}
-      password: ${FUJI_QAS_RFC_PASSWORD}
-      language: EN
-      saprouter: ${FUJI_QAS_SAPROUTER}
-
-  - name: CENTOR_QAS
-    sap_system_id: QAS
-    client: "100"
+- name: SARLOHA QAS
+  client: '500'
+  language: EN
+  has_gui_access: true
+  has_os_access: false
+  sap_system_id: QA1
+  connection_name: SARLOHA QAS
+  username: basis
+  password: ${SARLOHA_QAS_SAP_PASSWORD}
+  rfc:
+    ashost: 172.22.1.127
+    sysnr: '00'
+    client: '500'
+    username: basis
+    password: ${SARLOHA_QAS_RFC_PASSWORD}
     language: EN
-
-    has_gui_access: true
-    connection_name: ${QAS_SAP_CONNECTION_NAME}
-    username: ${QAS_SAP_USERNAME}
-    password: ${QAS_SAP_PASSWORD}
-
-    has_os_access: false    # no OS access on this system
-
-    rfc:
-      ashost: ${QAS_RFC_HOST}
-      sysnr: ${QAS_RFC_SYSNR}
-      client: ${QAS_RFC_CLIENT}
-      username: ${QAS_RFC_USER}
-      password: ${QAS_RFC_PASSWORD}
-      language: EN
-
-  - name: FUJI_PRD
-    sap_system_id: PRD
-    client: "100"
+- name: SARLOHA PRD
+  client: '500'
+  language: EN
+  has_gui_access: true
+  has_os_access: false
+  sap_system_id: DB1
+  connection_name: SARLOHA PRD
+  username: basis
+  password: ${SARLOHA_PRD_SAP_PASSWORD}
+  rfc:
+    ashost: 172.22.1.123
+    sysnr: '00'
+    client: '500'
+    username: basis
+    password: ${SARLOHA_PRD_RFC_PASSWORD}
     language: EN
-
-    has_gui_access: false   # no SAP Logon entry on this workstation
-
-    has_os_access: false    # no OS access on this system
-
-    rfc:
-      ashost: ${FUJI_PRD_RFC_HOST}
-      sysnr: ${FUJI_PRD_RFC_SYSNR}
-      client: ${FUJI_PRD_RFC_CLIENT}
-      username: ${FUJI_PRD_RFC_USER}
-      password: ${FUJI_PRD_RFC_PASSWORD}
-      language: EN
-      saprouter: ${FUJI_PRD_SAPROUTER}
+- name: CARFOUR QAS
+  client: '800'
+  language: EN
+  has_gui_access: true
+  has_os_access: false
+  sap_system_id: CAQ
+  connection_name: CARFOUR QAS
+  username: CAQ_admin
+  password: ${CARFOUR_QAS_SAP_PASSWORD}
+  rfc:
+    ashost: 172.28.202.213
+    sysnr: '00'
+    client: '800'
+    username: CAQ_admin
+    password: ${CARFOUR_QAS_RFC_PASSWORD}
+    language: EN
+  smtp_host: smtp.gmail.com
+  smtp_port: '587'
+  smtp_username: sarodevishal247@gmail.com
+  smtp_password: ${CARFOUR_QAS_SMTP_PASSWORD}
+  sender_email: sarodevishal347@gmail.com
+  alert_receivers: girish.jadhav@infrabeat.com
+  alert_receivers_cc: vishal.sarode@infrabeat.com

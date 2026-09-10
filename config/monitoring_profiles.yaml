@@ -1,0 +1,109 @@
+# ===========================================================================
+# Monitoring profiles
+#
+# A system can be watched in more than one way at once. A short check every
+# couple of hours answers "is it alive"; a full sweep once a day produces the
+# evidence record. They want different T-codes, different frequencies and
+# different destinations, so each is a profile rather than one compromise
+# schedule that is too heavy to run often and too thin to file.
+#
+# WHY DELIVERY IS PER PROFILE
+# A 2-hourly sweep pushed to email buries the daily report. A 22-T-code sweep
+# pushed to WhatsApp sends 22 phone notifications. The channel that suits a
+# quick check is not the one that suits a full record, so each profile names
+# its own.
+#
+# tcodes: all   -> every task in monitoring_tasks.yaml
+# tcodes: [...] -> only these, in this order
+#
+# Capture and delivery stay separate: a profile that captures a T-code always
+# writes it to the evidence store, whether or not it is delivered anywhere.
+# Muting a notification must never remove a screen from the audit record.
+# ===========================================================================
+
+profiles:
+
+  # --- quick health check, frequent, to phones ---------------------------
+  - id: prd-quick
+    system: PRD
+    label: Quick check
+    description: >-
+      Is it alive and is anything blocking. Four screens a Basis consultant
+      can read on a phone in ten seconds.
+    tcodes: [SM51, SM66, SM12, SMLG]
+    schedule:
+      mode: hours
+      every: 2
+      at: "08:00"
+      days: [mon, tue, wed, thu, fri, sat, sun]
+      enabled: true
+    deliver: [whatsapp]
+
+  # --- full sweep, once daily, to email -----------------------------------
+  - id: prd-full
+    system: PRD
+    label: Full daily sweep
+    description: >-
+      Every configured T-code, the Excel sheet and the health report. This is
+      the evidence record, so it captures everything regardless of what any
+      other profile covers.
+    tcodes: all
+    schedule:
+      mode: daily
+      every: 1
+      at: "07:00"
+      days: [mon, tue, wed, thu, fri, sat, sun]
+      enabled: true
+    deliver: [email]
+
+  # --- same pair for the QAS system ---------------------------------------
+  - id: qas-quick
+    system: CENTOR_QAS
+    label: Quick check
+    tcodes: [SM51, SM66, SM12, SMLG]
+    schedule:
+      mode: hours
+      every: 2
+      at: "08:00"
+      days: [mon, tue, wed, thu, fri]
+      enabled: false
+    deliver: [whatsapp]
+
+  - id: qas-full
+    system: CENTOR_QAS
+    label: Full daily sweep
+    tcodes: all
+    schedule:
+      mode: daily
+      every: 1
+      at: "07:30"
+      days: [mon, tue, wed, thu, fri]
+      enabled: false
+    deliver: [email]
+
+
+# ===========================================================================
+# Alert routing by severity
+#
+# Separate from profiles on purpose. A CRITICAL finding must reach someone
+# whether or not a profile happened to be scheduled at that moment -- tying
+# alerts to a delivery slot is how an incident waits two hours for the next
+# sweep to tell anyone.
+# ===========================================================================
+
+alerts:
+  CRITICAL:
+    deliver: [email, whatsapp]
+    # A persistent condition otherwise re-alerts on every cycle, and anything
+    # that alerts identically at 3am and 3pm gets muted by its recipients
+    # within a week. The same incident stays quiet for this long before it
+    # can notify again.
+    repeat_after_minutes: 120
+  WARNING:
+    deliver: [email]
+    repeat_after_minutes: 480
+  UNKNOWN:
+    # Unreachable is CRITICAL in the rules; this covers individual metrics
+    # that could not be read. Reported in the daily record, not pushed.
+    deliver: []
+    repeat_after_minutes: 1440

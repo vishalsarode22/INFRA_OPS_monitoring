@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Correlation</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds4">
+<style>
+  .rule{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:13px;
+       overflow:hidden;background:var(--card)}
+  .rule.off{opacity:.55}
+  .rh{display:flex;align-items:center;gap:10px;padding:12px 15px;
+       border-bottom:1px solid var(--border);cursor:pointer}
+  .rh h4{font-size:13.5px;font-weight:800;flex:1}
+  .rh .id{font-family:var(--mono);font-size:11px;color:var(--muted-dim)}
+  .rb{padding:14px 15px;display:none}
+  .rule.open .rb{display:block}
+  .rb h5{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:14px 0 6px}
+  .rb h5:first-child{margin-top:0}
+  .rb ul,.rb ol{margin-left:17px;font-size:12.5px;line-height:1.7}
+  .thr{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+  .thr div{background:var(--card-hover);border-radius:5px;padding:8px 10px}
+  .thr .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-dim)}
+  .thr .v{font-family:var(--mono);font-size:13px;font-weight:700}
+  .culprit{background:var(--info-bg);border:1px solid var(--info-br);
+       border-radius:var(--radius);padding:12px 14px;font-size:12.5px;line-height:1.6}
+  .fired{font-family:var(--mono);font-size:11.5px;padding:3px 9px;border-radius:9px;
+       background:var(--card-hover)}
+  .fired.zero{color:var(--muted-dim)}
+  .params li{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .st-ok{color:var(--green)}
+  .st-check{color:var(--amber)}
+  .flds{font-family:var(--mono);font-size:10.5px;color:var(--muted-dim);margin-top:4px;
+       word-break:break-word}
+  .enote{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.5}
+  .evrow{display:grid;grid-template-columns:110px 90px 1fr 150px;gap:10px;
+       padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;
+       align-items:center}
+  .evrow:last-child{border-bottom:none}
+  .evrow .mono{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .note{background:var(--info-bg);border:1px solid var(--info-br);border-radius:var(--radius);
+       padding:13px 15px;font-size:13px;line-height:1.65;margin-bottom:16px}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Correlation</h2>
+      <div class="sub">The deterministic rules that turn events into incidents</div></div>
+    <div class="top-actions">
+      <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
+      <button class="btn" onclick="load()">Refresh</button>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="note">
+      Findings, severities, culprit attribution and remediation all come from
+      <code>config/correlation_rules.yaml</code> — never from the model. Same input,
+      same output, reviewable in a text file. The AI writes only the narrative
+      paragraph shown on the RCA screen.
+    </div>
+    <h3 style="font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin-bottom:10px">Rules</h3>
+    <div id="rules"><div class="card"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading rules…</span></div></div></div>
+
+    <h3 style="font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:22px 0 10px">Recent events · correlation input</h3>
+    <div class="card" id="events"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading rules…</span></div></div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=ds4"></script>
+<script>
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px"><h2>Shared assets did not load</h2></div>';
+}
+</script>
+<script>
+IB.mountShell("correlation");
+IB.mountSchedulerControl("sched-ctl");
+
+function ruleCard(r) {
+  const thresholds = Object.entries(r.thresholds || {});
+  const culprit = r.culprit || {};
+
+  return `
+    <div class="rule ${r.enabled ? "" : "off"}" id="r-${IB.esc(r.id)}">
+      <div class="rh" onclick="document.getElementById('r-${IB.esc(r.id)}').classList.toggle('open')">
+        <span class="chip c-${r.severity === 'CRITICAL' ? 'crit' : 'warn'}">${IB.esc(r.severity || "—")}</span>
+        <h4>${IB.esc(r.title)}</h4>
+        <span class="id">${IB.esc(r.id)}</span>
+        <span class="fired ${r.incidents_matched ? "" : "zero"}"
+          title="Incidents this rule has produced">${IB.esc(String(r.incidents_matched))} fired</span>
+        ${r.enabled ? "" : '<span class="chip">disabled</span>'}
+        ${r.can_fire === false
+          ? '<span class="chip c-crit" title="No matcher function -- this rule can never fire">no matcher</span>'
+          : ""}
+      </div>
+      <div class="rb">
+        <h5>What it detects</h5>
+        <div style="font-size:12.5px;line-height:1.6">${IB.esc(r.description || "—")}</div>
+
+        ${thresholds.length ? `<h5>Thresholds</h5>
+          <div class="thr">${thresholds.map(([k, v]) =>
+            `<div><span class="k">${IB.esc(k)}</span><span class="v">${IB.esc(String(v))}</span></div>`
+          ).join("")}</div>` : ""}
+
+        ${culprit.component ? `<h5>Culprit attribution</h5>
+          <div class="culprit">
+            <b>${IB.esc(culprit.component)}</b><br>
+            ${IB.esc(culprit.statement || "")}
+            ${(culprit.confirm_in || []).length ? `<br><br><b>Confirm before acting:</b>
+              <ul>${culprit.confirm_in.map(c => `<li>${IB.esc(c)}</li>`).join("")}</ul>` : ""}
+            ${culprit.confirm_notes ? `<br><span style="color:var(--amber)">${IB.esc(culprit.confirm_notes)}</span>` : ""}
+          </div>` : ""}
+
+        ${(r.parameters || []).length ? `<h5>SAP parameters that govern this</h5>
+          <ul class="params">${r.parameters.map(p => `<li>${IB.esc(p)}</li>`).join("")}</ul>` : ""}
+
+        ${(r.rfc_evidence || []).length ? `<h5>Evidence over RFC</h5>
+          <div class="thr" style="grid-template-columns:1fr">
+            ${r.rfc_evidence.map(e => `<div>
+              <span class="k">${IB.esc(e.kind === "table" ? "TABLE" : "FUNCTION MODULE")}
+                · <span class="${e.status === "confirmed" ? "st-ok" : "st-check"}">
+                  ${IB.esc(e.status === "confirmed" ? "confirmed live" : "verify in SE16")}</span></span>
+              <span class="v">${IB.esc(e.source)}</span>
+              ${(e.fields || []).length
+                ? `<div class="flds">${e.fields.map(f => IB.esc(f)).join(" · ")}</div>` : ""}
+              ${e.note ? `<div class="enote">${IB.esc(e.note)}</div>` : ""}
+            </div>`).join("")}
+          </div>` : ""}
+
+        ${(r.remediation || []).length ? `<h5>Remediation</h5>
+          <ol>${r.remediation.map(step => `<li>${IB.esc(step)}</li>`).join("")}</ol>` : ""}
+
+        ${r.confidence !== null && r.confidence !== undefined
+          ? `<h5>Confidence</h5><div style="font-family:var(--mono);font-size:12px">${IB.esc(String(r.confidence))}</div>`
+          : ""}
+      </div>
+    </div>`;
+}
+
+async function load() {
+  try {
+    const d = await (await fetch("/api/correlation/rules")).json();
+    const box = document.getElementById("rules");
+    if (d.error) {
+      box.innerHTML = `<div class="card"><div class="empty">Rule config error: ${IB.esc(d.error)}</div></div>`;
+    } else if (!d.rules || !d.rules.length) {
+      box.innerHTML = `<div class="card"><div class="empty">
+        No rules in config/correlation_rules.yaml.</div></div>`;
+    } else {
+      const never = d.rules.filter(r => !r.incidents_matched).length;
+      box.innerHTML = d.rules.map(ruleCard).join("")
+        + (never === d.rules.length ? `<div class="note" style="margin-top:12px">
+             No rule has fired yet. That is either correct — nothing has gone wrong —
+             or the thresholds are set higher than this landscape ever reaches.
+             Worth comparing them against the live values on the wall.
+           </div>` : "");
+    }
+  } catch (e) {
+    document.getElementById("rules").innerHTML =
+      `<div class="card"><div class="empty">Could not load rules: ${IB.esc(String(e))}</div></div>`;
+  }
+
+  try {
+    const d = await (await fetch("/api/events")).json();
+    const box = document.getElementById("events");
+    if (!d.events || !d.events.length) {
+      box.innerHTML = `<div class="empty">No events recorded.
+        Events are raised when a metric crosses a threshold during a sweep;
+        correlation then groups them into incidents.</div>`;
+      return;
+    }
+    box.innerHTML = `
+      <div class="evrow" style="color:var(--muted-dim);font-size:9.5px;
+           text-transform:uppercase;letter-spacing:.05em">
+        <span>System</span><span>Severity</span><span>Metric</span><span>Last seen</span>
+      </div>` + d.events.map(e => `
+      <div class="evrow">
+        <span class="mono">${IB.esc(e.system || "—")}</span>
+        <span class="chip c-${String(e.severity).toUpperCase() === 'CRITICAL' ? 'crit' : 'warn'}">
+          ${IB.esc(e.severity || "—")}</span>
+        <span class="mono">${IB.esc(e.metric_name || e.metric || "—")}
+          ${e.detail ? ` · ${IB.esc(e.detail)}` : ""}</span>
+        <span class="mono">${IB.esc(e.last_seen || e.first_seen || "—")}</span>
+      </div>`).join("");
+  } catch (e) {
+    document.getElementById("events").innerHTML =
+      `<div class="empty">Could not load events: ${IB.esc(String(e))}</div>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>

@@ -123,6 +123,271 @@ def _infra_pressure_evidence(metrics, events, cfg):
     return evidence
 
 
+def _value(metrics, name):
+    item = _metric(metrics, name)
+    return item.value if item and item.value is not None else None
+
+
+def _evidence_for(metrics, names, extra=None):
+    """Evidence lines for whichever of these metrics were actually read.
+
+    A metric that could not be read contributes an explicit "not read" line
+    rather than being dropped. An incident whose evidence silently omits the
+    blind spots reads as better supported than it is.
+    """
+    lines = []
+    for name in names:
+        item = _metric(metrics, name)
+        if item is None:
+            continue
+        if item.value is None and item.status is not Status.UNKNOWN:
+            continue
+        if item.status is Status.UNKNOWN:
+            lines.append(f"{name}=not read ({item.source or 'no source'})")
+        else:
+            lines.append(f"{name}={item.display_value} ({item.status.value})")
+            if item.detail:
+                lines.append(f"  detail: {item.detail[:160]}")
+    lines.extend(extra or [])
+    return lines
+
+
+# --- update failures -------------------------------------------------------
+# Any failed V1 update is worth an incident. Unlike CPU, there is no healthy
+# background level: a posting either committed or it did not.
+
+def _update_failure_match(metrics, events, cfg):
+    t = cfg.get("thresholds", {})
+    return _above(metrics, "sap.sm13.failed_updates",
+                  float(t.get("failed_updates", 1)) - 1)
+
+
+def _update_failure_evidence(metrics, events, cfg):
+    return _evidence_for(metrics, ("sap.sm13.failed_updates", "update_queue",
+                                   "sap.sm50.wp_in_use"))
+
+
+# --- background jobs -------------------------------------------------------
+
+def _batch_failure_match(metrics, events, cfg):
+    t = cfg.get("thresholds", {})
+    return _above(metrics, "sap.sm37.cancelled_jobs",
+                  float(t.get("cancelled_jobs", 1)) - 1)
+
+
+def _batch_failure_evidence(metrics, events, cfg):
+    """
+    Per-job detail, not a count.
+
+    "3 cancelled jobs" tells nobody what to do. Which job, run by whom, at
+    what time, for how long, and whether it started at all is the difference
+    between an authorisation problem and an ABAP failure -- and those are
+    different people's work.
+    """
+    extra = []
+    detail = (cfg.get("_job_detail") or {})
+    cancelled = detail.get("cancelled") or []
+
+    if cancelled:
+        for job in cancelled[:10]:
+            line = f"  {job['job']}"
+            if job.get("job_count"):
+                line += f" (id {job['job_count']})"
+            extra.append(line)
+            extra.append(
+                f"      user {job.get('user') or 'unknown'}"
+                f" · started {job.get('started_at') or '—'}"
+                f" · ended {job.get('ended_at') or '—'}"
+                f" · ran {job.get('duration_text') or 'unknown'}")
+            if job.get("verdict"):
+                extra.append(f"      {job['verdict']}")
+            if job.get("is_backup"):
+                extra.append("      PRIORITY: this is a backup job. A missing "
+                             "backup outranks every other item here.")
+    else:
+        item = _metric(metrics, "sap.sm37.cancelled_jobs")
+        if item and item.detail:
+            for name in [n.strip() for n in str(item.detail).split(",") if n.strip()][:8]:
+                extra.append(f"  job: {name}")
+            extra.append("  (names only -- per-job timing needs the TBTCO detail read)")
+
+    for job in (detail.get("long_running") or [])[:5]:
+        extra.append(f"  LONG RUNNING: {job['job']} · {job.get('duration_text')}"
+                     f" · user {job.get('user') or 'unknown'}")
+
+    return _evidence_for(metrics, ("sap.sm37.cancelled_jobs",), extra)
+
+
+# --- dumps -----------------------------------------------------------------
+
+def _dump_spike_match(metrics, events, cfg):
+    t = cfg.get("thresholds", {})
+    return _above(metrics, "sap.st22.dumps", float(t.get("dump_count", 5)))
+
+
+def _dump_spike_evidence(metrics, events, cfg):
+    extra = []
+    item = _metric(metrics, "sap.st22.dumps")
+    if item and item.detail:
+        # The dump CLASS decides who owns it -- memory, database, ABAP or the
+        # far side of an RFC. A count with no class is not actionable.
+        extra.append(f"  dumps: {str(item.detail)[:400]}")
+    extra.append("  Group by dump class in ST22 before attributing a cause")
+    return _evidence_for(metrics, ("sap.st22.dumps", "memory", "cpu"), extra)
+
+
+# --- interfaces ------------------------------------------------------------
+
+def _interface_backlog_match(metrics, events, cfg):
+    t = cfg.get("thresholds", {})
+    return (
+        _above(metrics, "sap.sm58.stuck_trfc", float(t.get("stuck_trfc", 5)))
+        or _above(metrics, "sap.smq1.stuck_queues", float(t.get("stuck_queues", 1)) - 1)
+        or _above(metrics, "sap.smq2.stuck_queues", float(t.get("stuck_queues", 1)) - 1)
+        or _above(metrics, "sap.we02.failed_idocs", float(t.get("failed_idocs", 10)))
+    )
+
+
+def _interface_backlog_evidence(metrics, events, cfg):
+    return _evidence_for(metrics, (
+        "sap.sm58.stuck_trfc", "sap.smq1.stuck_queues",
+        "sap.smq2.stuck_queues", "sap.we02.failed_idocs"),
+        ["  SYSFAIL/CPICERR points at the DESTINATION, not this system -- "
+         "test it in SM59 before changing anything here"])
+
+
+# --- housekeeping ----------------------------------------------------------
+
+def _housekeeping_match(metrics, events, cfg):
+    t = cfg.get("thresholds", {})
+    if _above(metrics, "sap.sm21.errors", float(t.get("log_errors", 10))):
+        return True
+    for name, metric in metrics.items():
+        if name.startswith("disk") and metric.value is not None:
+            if metric.value >= float(t.get("disk_percent", 85)):
+                return True
+    return False
+
+
+def _housekeeping_evidence(metrics, events, cfg):
+    names = ["sap.sm21.errors"] + sorted(
+        n for n in metrics if n.startswith("disk"))
+    extra = []
+    if not any(n.startswith("disk") for n in metrics):
+        # Say so rather than letting a disk-free evidence list imply the disks
+        # were checked and found fine.
+        extra.append("  disk usage NOT read on this system "
+                     "(needs SSH; RFC and SMON do not expose it)")
+    return _evidence_for(metrics, names, extra)
+
+
+# --- users / security ------------------------------------------------------
+
+def _user_security_match(metrics, events, cfg):
+    t = cfg.get("thresholds", {})
+    return _above(metrics, "sap.su01.locked_users",
+                  float(t.get("locked_users", 100)))
+
+
+def _user_security_evidence(metrics, events, cfg):
+    item = _metric(metrics, "sap.su01.locked_users")
+    detail = cfg.get("_locked_user_detail") or {}
+
+    if detail:
+        # The split IS the diagnosis, so it leads.
+        extra = [
+            f"  {detail.get('admin_locked', 0)} locked by administrator "
+            f"(housekeeping debt, not an incident)",
+            f"  {detail.get('failed_logon_locked', 0)} locked by failed logons "
+            f"(security signal)",
+        ]
+        if detail.get("verdict"):
+            extra.append(f"  {detail['verdict']}")
+        for account in (detail.get("service_accounts_locked") or [])[:8]:
+            # A locked service account breaks an interface silently; a locked
+            # dialog user phones the service desk.
+            extra.append(f"  URGENT: {account['user']} is a {account['type']} "
+                         f"account, {account['failed_attempts']} failed attempt(s)")
+        for account in (detail.get("accounts") or [])[:8]:
+            extra.append(f"  {account['user']} · {account['type']} · "
+                         f"{account['failed_attempts']} failed attempt(s)")
+    else:
+        extra = [
+            "  UFLAG 64 = locked by administrator (housekeeping debt)",
+            "  UFLAG 128 = locked by failed logons (security signal)",
+            "  The count alone cannot tell these apart -- split it in USR02 "
+            "before treating this as either",
+        ]
+    if item and item.value is not None:
+        crit = float((cfg.get("thresholds") or {}).get("locked_users_critical", 300))
+        if item.value >= crit:
+            extra.insert(0, f"  {int(item.value)} locked accounts is above the "
+                            f"critical level of {int(crit)}")
+    return _evidence_for(metrics, ("sap.su01.locked_users",), extra)
+
+
+# --- backup ----------------------------------------------------------------
+
+def _backup_gap_match(metrics, events, cfg):
+    item = _metric(metrics, "sap.db12.last_backup")
+    if item is None:
+        return False
+    # UNKNOWN must not fire this rule. SDBAH is empty on HANA and on ASE
+    # without DB13, so "no row" means "not recorded here", not "no backup".
+    # A false backup alarm at 3am costs credibility for every real one after.
+    if item.status is Status.UNKNOWN:
+        return False
+    return item.status in (Status.WARNING, Status.CRITICAL)
+
+
+def _backup_gap_evidence(metrics, events, cfg):
+    return _evidence_for(metrics, ("sap.db12.last_backup",), [
+        "  SDBAH only records backups run through the DBA Planning Calendar. "
+        "Check the external backup tool before escalating.",
+    ])
+
+
+# --- buffers ---------------------------------------------------------------
+
+def _buffer_swap_match(metrics, events, cfg):
+    t = cfg.get("thresholds", {})
+    return _above(metrics, "sap.st02.buffer_swaps",
+                  float(t.get("buffer_swaps", 1)) - 1)
+
+
+def _buffer_swap_evidence(metrics, events, cfg):
+    return _evidence_for(metrics, ("sap.st02.buffer_swaps", "memory"), [
+        "  Swaps accumulate since instance start -- a rising number between "
+        "two readings is the signal, not the absolute value",
+    ])
+
+
+# --- reachability ----------------------------------------------------------
+# This rule exists because of a real bug: an unreachable production system
+# displayed 100/100 HEALTHY, because it produced zero cards and the scorer
+# read zero problems as perfect health.
+
+def _unreachable_match(metrics, events, cfg):
+    item = _metric(metrics, "rfc.connection")
+    if item is not None and item.status is Status.UNKNOWN:
+        return True
+    readable = [m for m in metrics.values() if m.value is not None]
+    return bool(metrics) and not readable
+
+
+def _unreachable_evidence(metrics, events, cfg):
+    item = _metric(metrics, "rfc.connection")
+    extra = []
+    if item and item.detail:
+        # The RFC error text distinguishes route denial from timeout from bad
+        # credentials. Summarising it destroys the only diagnostic in it.
+        extra.append(f"  RFC error: {str(item.detail)[:300]}")
+    unknown = sum(1 for m in metrics.values() if m.status is Status.UNKNOWN)
+    extra.append(f"  {unknown} of {len(metrics)} metrics unreadable")
+    extra.append("  No culprit can be named until the system answers")
+    return _evidence_for(metrics, ("rfc.connection",), extra)
+
+
 def _process_failure_match(metrics, events, cfg):
     return any(
         e.status == EventStatus.ACTIVE
@@ -143,11 +408,58 @@ def _process_failure_evidence(metrics, events, cfg):
     ]
 
 
+
+# --- memory dump attribution -----------------------------------------------
+# SAP_DUMP_SPIKE counts. This decides who owns a MEMORY-class spike, which is
+# the one class where "the dump name is the diagnosis" is misleading: the
+# same TSV_TNEW_PAGE_ALLOC_FAILED is ABAP when a Z report held the memory
+# and Basis when nobody did. The ladder is in core/dump_attribution.py.
+
+def _memory_dump_match(metrics, events, cfg):
+    from core.dump_attribution import attribute
+    return attribute(metrics, cfg) is not None
+
+
+def _memory_dump_evidence(metrics, events, cfg):
+    from core.dump_attribution import attribute
+    v = attribute(metrics, cfg)
+    if v is None:
+        return []
+    lines = [v.header(), f"  {v.reason}"]
+    if v.culprit_users:
+        lines.append(f"  users: {', '.join(v.culprit_users[:8])}")
+    if v.collateral_programs:
+        lines.append(f"  collateral (do not chase): {', '.join(v.collateral_programs[:8])}")
+    lines.extend(f"  {e}" for e in v.evidence)
+    return lines + _evidence_for(metrics, ("sap.sm50.priv_mode_wp", "sap.st03.top_user_memory_mb",
+                                           "memory", "sap.sm66.max_instance_saturation_pct"))
+
 _MATCHERS = {
     "SAP_LOCK_CONTENTION": (_lock_contention_match, _lock_contention_evidence),
     "INFRA_RESOURCE_PRESSURE": (_infra_pressure_match, _infra_pressure_evidence),
     "SAP_PROCESS_FAILURE": (_process_failure_match, _process_failure_evidence),
+    "SAP_UPDATE_FAILURE": (_update_failure_match, _update_failure_evidence),
+    "SAP_BATCH_FAILURE": (_batch_failure_match, _batch_failure_evidence),
+    "SAP_DUMP_SPIKE": (_dump_spike_match, _dump_spike_evidence),
+    "SAP_MEMORY_DUMP_ATTRIBUTION": (_memory_dump_match, _memory_dump_evidence),
+    "SAP_INTERFACE_BACKLOG": (_interface_backlog_match, _interface_backlog_evidence),
+    "SAP_HOUSEKEEPING_GAP": (_housekeeping_match, _housekeeping_evidence),
+    "SAP_USER_SECURITY": (_user_security_match, _user_security_evidence),
+    "SAP_BACKUP_GAP": (_backup_gap_match, _backup_gap_evidence),
+    "SAP_BUFFER_SWAP": (_buffer_swap_match, _buffer_swap_evidence),
+    "SAP_SYSTEM_UNREACHABLE": (_unreachable_match, _unreachable_evidence),
 }
+
+
+def unmatched_rules(path: str = CORRELATION_CONFIG_PATH) -> list[str]:
+    """Rule IDs in the config that have no matcher and so can never fire.
+
+    Surfaced on the Correlation page. A rule that loads, displays a threshold
+    and is silently skipped by the engine is worse than a missing rule: it
+    looks like coverage that does not exist.
+    """
+    return sorted(rid for rid in load_correlation_config(path)
+                  if rid not in _MATCHERS)
 
 
 def get_correlation_rules(path: str = CORRELATION_CONFIG_PATH) -> tuple[CorrelationRule, ...]:
@@ -204,6 +516,10 @@ def _event_ids_for_rule(rule_id: str, metric_map: dict[str, MetricResult], event
 
 
 def _affected_metrics_for_rule(rule_id: str, metric_map: dict[str, MetricResult]) -> list[str]:
+    if rule_id == "SAP_MEMORY_DUMP_ATTRIBUTION":
+        names = {"sap.st22.dump_count", "sap.st22.dumps", "sap.sm50.priv_mode_wp",
+                 "sap.st03.top_user_memory_mb", "memory"}
+        return sorted(n for n in names if n in metric_map)
     if rule_id == "SAP_LOCK_CONTENTION":
         names = {"sap.sm12.lock_count", "sap.st03n.dialog_response_time", "sap.st22.dump_count"}
     elif rule_id == "INFRA_RESOURCE_PRESSURE":
@@ -247,16 +563,28 @@ class CorrelationEngine:
         self.rules = rules if rules is not None else get_correlation_rules()
         self.incidents = load_incidents(system)
 
-    def correlate(self, metrics, events=None, now=None) -> list[Incident]:
+    def correlate(self, metrics, events=None, now=None, detail=None) -> list[Incident]:
+        """
+        `detail` carries the per-item context a metric cannot hold -- which
+        job failed and for how long, which accounts locked and why. Passed
+        through the rule config so evidence builders can use it when it is
+        available and fall back to counts when it is not, rather than the
+        collectors and the rules having to agree on a schema.
+        """
         now = now or datetime.now()
         metric_map = {metric.name: metric for metric in metrics}
         active_events = list(events) if events is not None else load_events(self.system)
         by_rule = {incident.rule_id: incident for incident in self.incidents}
+        detail = detail or {}
 
         for rule in self.rules:
-            matched = rule.matcher(metric_map, active_events, rule.config or {})
+            config = dict(rule.config or {})
+            config["_job_detail"] = detail.get("job_detail") or {}
+            config["_locked_user_detail"] = detail.get("locked_user_detail") or {}
+
+            matched = rule.matcher(metric_map, active_events, config)
             existing = by_rule.get(rule.rule_id)
-            evidence = rule.evidence_builder(metric_map, active_events, rule.config or {}) if matched else []
+            evidence = rule.evidence_builder(metric_map, active_events, config) if matched else []
             event_ids = _event_ids_for_rule(rule.rule_id, metric_map, active_events) if matched else []
             affected_metrics = _affected_metrics_for_rule(rule.rule_id, metric_map) if matched else []
 

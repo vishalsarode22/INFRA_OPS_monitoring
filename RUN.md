@@ -27,7 +27,26 @@ Expect four systems, all OK.
 ## Run
 
 ```powershell
-python -m uvicorn dashboard.app:app --reload
+python -m uvicorn dashboard.app:app --host 127.0.0.1 --port 8000
+```
+
+**Do NOT use `--reload`.** It was in an earlier version of this file and is
+the wrong flag for this deployment. `--reload` makes uvicorn's StatReload
+poll the ENTIRE install tree for file changes continuously. This tree is
+~165 MB across 700+ files (logs/, reports/, recordings/), and on Windows
+with Defender scanning those folders the constant file-stat storm competes
+with request handling and makes every page feel slow -- the RFC layer can be
+perfectly healthy and the UI still lags because the web server itself is
+busy stat-ing thousands of files. `--reload` is a code-editing convenience;
+in normal operation it only costs you speed.
+
+If you are actively editing code and want auto-restart, scope the watch so
+it does not poll the data directories:
+
+```powershell
+python -m uvicorn dashboard.app:app --reload `
+  --reload-dir dashboard --reload-dir collectors --reload-dir core `
+  --reload-include "*.py"
 ```
 
 | Page | What it answers |

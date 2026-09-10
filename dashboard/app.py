@@ -11,14 +11,16 @@ Also serves:
 """
 
 import sys, os
+import secrets
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
+import re
 import threading
 from contextlib import asynccontextmanager
 import time as time_module
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -35,11 +37,171 @@ from utils.logger import get_logger
 
 log = get_logger(__name__, "dashboard")
 
+
+# ---------------------------------------------------------------------------
+# Background live-read refresher
+#
+# Every RFC call in this app -- SM50/SM12/ST22/ST03/etc over the network to
+# a real SAP gateway -- previously ran INSIDE the HTTP request handler for
+# /api/live and /api/live/{system}. With four systems polled by every open
+# tab (wall every 8s, Sky every 10s, a system page every 10s), an RFC read
+# was in flight almost continuously. If the NetWeaver RFC SDK binding does
+# not release the GIL for the duration of a blocking call -- common for C
+# extensions wrapping synchronous network I/O without an explicit
+# Py_BEGIN_ALLOW_THREADS -- the entire Python process stalls for that call's
+# duration, including serving a plain static HTML file on an unrelated page.
+# That would explain "every page is slow", not just the ones reading RFC.
+#
+# The fix does not require knowing pyrfc's exact GIL behaviour: move every
+# RFC read out of the request path into ONE background loop, and have every
+# HTTP handler read a dict lookup instead. Page loads become independent of
+# RFC latency by construction. Staleness is bounded by _LIVE_REFRESH_S,
+# which is the same order as the polling cadence it replaces.
+# ---------------------------------------------------------------------------
+
+_LIVE_REFRESH_S = int(os.environ.get("IBO_LIVE_REFRESH_SECONDS", "60") or 60)
+
+# Ceiling on one refresh pass. pool.map() waits for every system before the
+# loop sleeps, so without this a single host that neither answers nor resets
+# the connection sets the cadence for all of them. A pass that overruns is
+# abandoned; the systems that did answer have already written their entries
+# into _live_cache, so nothing collected is thrown away.
+_LIVE_PASS_TIMEOUT_S = int(os.environ.get("IBO_LIVE_PASS_TIMEOUT", "45") or 45)
+
+_live_cache: dict[str, dict] = {}          # system name -> payload
+_live_cache_at: dict[str, float] = {}      # system name -> monotonic time of that read
+_live_cache_lock = threading.Lock()
+_live_refresher_started = False
+
+
+_rfc_pool = None
+_rfc_pool_lock = threading.Lock()
+
+
+def _get_rfc_pool():
+    """
+    Worker PROCESSES for RFC reads, created lazily.
+
+    The middleware timing proved the whole interpreter freezes during RFC
+    activity (a static JPEG took 30s, /api/live -- a dict copy -- took 62s,
+    both spanning RFC bursts): pyrfc holds the GIL for the duration of its
+    calls on this build. Threads share that GIL; processes do not. Reads run
+    out-of-process and only the finished payload crosses back.
+
+    Workers are long-lived so rfc_live's caches (perf/deep TTLs, SQLM-off,
+    cooldowns) keep working inside them. IBO_RFC_PROCESSES=0 restores the
+    old in-process behaviour if the pool ever misbehaves.
+    """
+    global _rfc_pool
+    n = int(os.environ.get("IBO_RFC_PROCESSES", "2") or 2)
+    if n <= 0:
+        return None
+    with _rfc_pool_lock:
+        if _rfc_pool is None:
+            from concurrent.futures import ProcessPoolExecutor
+            _rfc_pool = ProcessPoolExecutor(max_workers=n)
+        return _rfc_pool
+
+
+def _refresh_one_live(cfg: dict) -> None:
+    name = cfg.get("name", "?")
+    try:
+        pool = _get_rfc_pool()
+        if pool is not None:
+            from collectors.live_job import read_live_job
+            payload = pool.submit(read_live_job, name, cfg).result()
+        else:
+            # Explicit opt-out (IBO_RFC_PROCESSES=0): old in-process path.
+            from collectors.rfc_live import read_live, attach_snapshot_extras
+            payload = read_live(name, cfg)
+            payload = attach_snapshot_extras(payload, load_snapshot(name))
+    except Exception as exc:
+        payload = {"system": name, "connected": False,
+                  "error": f"{type(exc).__name__}: {exc}"}
+    with _live_cache_lock:
+        _live_cache[name] = payload
+        _live_cache_at[name] = time_module.monotonic()
+
+
+def _live_refresh_loop():
+    from concurrent.futures import ThreadPoolExecutor, wait
+    log.info(f"Live refresher started -- background RFC reads every {_LIVE_REFRESH_S}s "
+             f"(pass ceiling {_LIVE_PASS_TIMEOUT_S}s); HTTP requests never call RFC directly.")
+    while True:
+        started = time_module.monotonic()
+        try:
+            systems = list(get_systems())
+            if systems:
+                # Cap concurrency at 3, not 8. The bound that matters here is
+                # not CPU -- these threads are almost entirely blocked on RFC
+                # network I/O -- it is the SAP side: five simultaneous cold
+                # reads, each running a STAT table scan and a SQLM query, is
+                # what pushed the first pass past its ceiling. Three at a time
+                # keeps every system read within the window while still
+                # finishing a five-system sweep in well under the cadence once
+                # the perf/deep caches are warm. A pool per pass, not shared,
+                # so a wedged RFC worker cannot be inherited by the next pass;
+                # not closed with a context manager because __exit__ joins
+                # every worker, which is the blocking this timeout avoids.
+                workers = min(int(os.environ.get("IBO_LIVE_WORKERS", "3") or 3),
+                              len(systems))
+                pool = ThreadPoolExecutor(max_workers=workers,
+                                          thread_name_prefix="live-rfc")
+                futures = [pool.submit(_refresh_one_live, cfg) for cfg in systems]
+                done, pending = wait(futures, timeout=_LIVE_PASS_TIMEOUT_S)
+                if pending:
+                    log.warning(
+                        f"Live refresh pass hit the {_LIVE_PASS_TIMEOUT_S}s ceiling with "
+                        f"{len(pending)} system(s) still reading. Their cached values "
+                        f"are held and they are left to finish in the background.")
+                pool.shutdown(wait=False)
+        except Exception as exc:  # noqa: BLE001 -- the loop must never die
+            log.warning(f"Live refresh pass failed: {type(exc).__name__}: {exc}")
+
+        # Sleep the REMAINDER of the interval, not a further full interval.
+        # sleep(_LIVE_REFRESH_S) after a pass that itself took 20s produced an
+        # 80-second effective cadence while the log claimed 60.
+        elapsed = time_module.monotonic() - started
+        time_module.sleep(max(1.0, _LIVE_REFRESH_S - elapsed))
+
+
+def start_live_refresher():
+    global _live_refresher_started
+    if _live_refresher_started:
+        return
+    # ON-DEMAND BY DEFAULT. The timer-driven refresher is what read every
+    # system every 60s -- including the unreachable ones -- whether anyone
+    # was looking or not. It is now off unless explicitly enabled, so nothing
+    # touches SAP until a person clicks "Read live" on the wall (which calls
+    # /api/live/refresh). Set IBO_LIVE_AUTO_REFRESH=1 to restore the old
+    # always-on polling.
+    if str(os.environ.get("IBO_LIVE_AUTO_REFRESH", "0")).strip() not in ("1", "true", "yes"):
+        log.info("Live refresher is ON-DEMAND -- systems are read only when "
+                 "'Read live' is clicked (/api/live/refresh). "
+                 "Set IBO_LIVE_AUTO_REFRESH=1 for the old timer-driven mode.")
+        _live_refresher_started = True   # mark started so nothing else launches it
+        return
+    _live_refresher_started = True
+    threading.Thread(target=_live_refresh_loop, daemon=True, name="live-refresher").start()
+
+
+def _cached_live(system_name: str) -> dict | None:
+    with _live_cache_lock:
+        return _live_cache.get(system_name)
+
+
+def _cached_live_age(system_name: str) -> float | None:
+    with _live_cache_lock:
+        at = _live_cache_at.get(system_name)
+    return None if at is None else round(time_module.monotonic() - at, 1)
+
+
 # Milestone 7.6: FastAPI lifespan lifecycle
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Preserve the existing scheduler startup behavior.
     start_scheduler()
+    start_live_refresher()
     try:
         yield
     finally:
@@ -56,7 +218,18 @@ app = FastAPI(
 # Milestone 8.3: safe HTTP security headers.
 @app.middleware("http")
 async def _security_headers_middleware(request, call_next):
+    # Time every request and log anything slow. When "it's still slow" the
+    # only thing that settles WHERE the time goes is this line: it names the
+    # exact path and its server-side duration. If a request is slow here,
+    # the server is the problem. If every request here is fast but the page
+    # still lags, the time is in the browser or the network, not this code.
+    t0 = time_module.perf_counter()
     response = await call_next(request)
+    ms = (time_module.perf_counter() - t0) * 1000
+    slow_ms = float(os.environ.get("IBO_SLOW_REQUEST_MS", "500") or 500)
+    if ms >= slow_ms:
+        log.warning(f"SLOW {request.method} {request.url.path} -> {ms:.0f} ms")
+    response.headers["X-IBO-Server-Ms"] = f"{ms:.0f}"
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -78,7 +251,7 @@ _run_state = {"running": False, "error": None, "current_system": None,
 _run_lock = threading.Lock()
 _run_history_lock = threading.Lock()
 _scheduler_state = {"last_cycle_start": None, "next_run_at": None, "enabled": True,
-                    "snooze_until": None}
+                    "snooze_until": None, "manual_pause": False}
 
 
 @app.get("/healthz")
@@ -101,7 +274,7 @@ def readyz():
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    return _page("index.html")
 
 
 @app.get("/api/status/{system_name}")
@@ -130,31 +303,110 @@ def get_status_default():
 
 @app.get("/api/live/{system_name}")
 def get_live(system_name: str):
-    from collectors.rfc_live import read_live, attach_snapshot_extras
+    return _get_live_impl(system_name)
 
+
+_kicking: set[str] = set()
+_kicking_lock = threading.Lock()
+
+
+def _kick_live_refresh(system_name: str, cfg: dict) -> None:
+    """
+    Read one system in the background, off the request thread.
+
+    Used when a page asks for a system the refresher has not reached yet.
+    The guard stops a burst of page loads (or a fast-polling tab) firing ten
+    concurrent reads of the same cold system -- the first kick reads it, the
+    rest are no-ops until it lands in the cache.
+    """
+    with _kicking_lock:
+        if system_name in _kicking:
+            return
+        _kicking.add(system_name)
+
+    def _run():
+        try:
+            _refresh_one_live(cfg)
+        except Exception as exc:  # noqa: BLE001 -- background best-effort
+            log.warning(f"[{system_name}] kicked refresh failed: "
+                        f"{type(exc).__name__}: {exc}")
+        finally:
+            with _kicking_lock:
+                _kicking.discard(system_name)
+
+    threading.Thread(target=_run, name=f"kick-{system_name}",
+                     daemon=True).start()
+
+
+def _get_live_impl(system_name: str):
     cfg = next((s for s in get_systems() if s.get("name") == system_name), None)
     if cfg is None:
         raise HTTPException(status_code=404, detail=f"Unknown system: {system_name}")
 
-    payload = read_live(system_name, cfg)
-    return attach_snapshot_extras(payload, load_snapshot(system_name))
+    payload = _cached_live(system_name)
+    if payload is None:
+        # Cold miss: the background refresher has not populated this system
+        # yet. DO NOT do a synchronous RFC read here -- that is what made a
+        # page load block for seconds, up to the full connect timeout on an
+        # unreachable system like CEQ. Instead:
+        #   1. kick the background refresher to read this system now, off the
+        #      request thread, so the next poll finds it warm;
+        #   2. answer this request immediately from the last saved snapshot
+        #      (stale but real, clearly labelled), or a "warming" marker if
+        #      there is not even a snapshot yet.
+        # The page's loader animation covers the one poll it takes to warm.
+        _kick_live_refresh(system_name, cfg)
+        snap = load_snapshot(system_name)
+        if snap is not None:
+            payload = attach_snapshot_extras({}, snap)
+            payload["warming"] = True
+            payload["from_snapshot"] = True
+        else:
+            payload = {"system": system_name, "warming": True,
+                       "connected": False, "checks": [],
+                       "note": "First read in progress -- reading live RFC…"}
+        payload["cache_age_seconds"] = None
+        return payload
+    payload = dict(payload)
+    payload["cache_age_seconds"] = _cached_live_age(system_name)
+    return payload
 
 
 @app.get("/api/live")
 def get_live_all():
-    """Every configured system, for the wall display."""
-    from collectors.rfc_live import read_live, attach_snapshot_extras
+    """
+    Every configured system, for the wall display.
 
+    Reads the background refresher's cache only (see start_live_refresher
+    near the top of this file) -- this endpoint never calls RFC itself, so
+    it always returns in the time it takes to copy a few dicts, regardless
+    of how slow or unreachable any SAP system currently is.
+    """
+    systems = list(get_systems())
     out = []
-    for cfg in get_systems():
+    for cfg in systems:
         name = cfg.get("name", "?")
-        try:
-            payload = read_live(name, cfg)
-            out.append(attach_snapshot_extras(payload, load_snapshot(name)))
-        except Exception as exc:
-            # One unreachable system must not blank the whole wall.
-            out.append({"system": name, "connected": False,
-                        "error": f"{type(exc).__name__}: {exc}"})
+        payload = _cached_live(name)
+        if payload is None:
+            # Warming-up stub. It MUST carry the same keys the wall's card()
+            # renderer reads unguarded (dispatcher, icm), or one warming
+            # system throws in card(), the whole .map(card) throws, and the
+            # wall stays stuck on "Reading live RFC…" forever -- which is
+            # exactly the hang this shape prevents. Kicks a background read so
+            # the next poll finds it warm.
+            _kick_live_refresh(name, cfg)
+            payload = {
+                "system": name, "sid": cfg.get("sap_system_id") or name,
+                "client": cfg.get("client", ""),
+                "connected": False, "warming_up": True,
+                "error": None, "cooldown": 0,
+                "cpu": None, "memory": None, "load_1m": None,
+                "smon": {}, "checks": [], "instances": [],
+                "work_processes": {},
+                "dispatcher": {"label": "…", "status": "UNKNOWN", "source": ""},
+                "icm": {"label": "…", "status": "UNKNOWN", "source": ""},
+            }
+        out.append(payload)
 
     live = sum(1 for s in out if s.get("connected"))
     return {
@@ -162,6 +414,7 @@ def get_live_all():
         "live_count": live,
         "total": len(out),
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "cache_age_seconds": max([a for a in (_cached_live_age(c.get("name", "?")) for c in systems) if a is not None], default=None),
     }
 
 
@@ -271,11 +524,56 @@ def get_overview():
 # different question, loads only what it needs, and can be bookmarked or put
 # on a wall display on its own.
 
+def _asset_version() -> str:
+    """
+    A cache-buster derived from shell.js and shell.css mtimes.
+
+    The pages hardcoded ?v=ds3 in forty places. Every patch to shell.js left
+    that tag unchanged, so browsers -- Incognito included, once the session
+    had fetched it -- kept serving the OLD shell.js. Fixes that were on disk
+    never ran. This derives the tag from the files themselves, so changing
+    either file changes the URL and forces a fresh fetch automatically.
+    """
+    stamp = 0
+    for fn in ("shell.js", "shell.css"):
+        try:
+            stamp = max(stamp, int(os.stat(os.path.join(STATIC_DIR, fn)).st_mtime))
+        except OSError:
+            pass
+    return str(stamp) if stamp else "0"
+
+
+_page_cache: dict[str, tuple[float, str]] = {}
+
+
 def _page(name: str):
+    """
+    Serve a page with its asset version stamped in.
+
+    Rewrites any `?v=<tag>` on shell.js / shell.css to the live mtime-based
+    version. The rewritten HTML is cached against the page's own mtime, so
+    this costs a stat per request, not a read + regex.
+    """
+    from fastapi.responses import HTMLResponse
     path = os.path.join(STATIC_DIR, name)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail=f"Page not built: {name}")
-    return FileResponse(path)
+    mtime = os.stat(path).st_mtime
+    ver = _asset_version()
+    key = f"{name}@{ver}"
+    hit = _page_cache.get(key)
+    if hit and hit[0] == mtime:
+        return HTMLResponse(hit[1], headers={"Cache-Control": "no-cache"})
+    with open(path, "r", encoding="utf-8") as f:
+        html = f.read()
+    html = re.sub(r"(shell\.(?:js|css))\?v=[A-Za-z0-9_.-]+", rf"\1?v={ver}", html)
+    _page_cache[key] = (mtime, html)
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/sky")
+def sky_page():
+    return _page("sky.html")
 
 
 @app.get("/overview")
@@ -299,30 +597,742 @@ def systems_list_page():
     return _page("systems.html")
 
 
+# ---------------------------------------------------------------------------
+# Authentication for state-changing endpoints
+# ---------------------------------------------------------------------------
+#
+# Until now the only thing preventing anyone on this host from deleting a
+# monitored system or triggering a sweep was the 127.0.0.1 bind. That is not
+# authentication -- any local process, any browser tab, any XSS on an
+# unrelated page served from localhost could call these.
+#
+# Read endpoints stay open: they are what the dashboard polls, and adding a
+# token to every poll buys little. The mutating ones are gated.
+#
+# Set IBO_API_TOKEN in .env. If it is unset the gate FAILS CLOSED and the
+# mutating endpoints refuse -- an unset token must not silently mean "no
+# security", which is how this kind of control quietly stops working.
+
+def require_token(x_ibo_token: str = Header(default="")):
+    expected = os.getenv("IBO_API_TOKEN", "").strip()
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="IBO_API_TOKEN is not set. State-changing endpoints are "
+                   "disabled until it is configured in .env.")
+    # compare_digest keeps the comparison constant-time so a token cannot be
+    # recovered one character at a time by timing the response.
+    if not secrets.compare_digest(x_ibo_token, expected):
+        raise HTTPException(status_code=401, detail="Invalid or missing X-IBO-Token")
+    return True
+
+
+@app.get("/profiles-page")
+def profiles_page():
+    return _page("profiles.html")
+
+
+def _enabled_profile_count() -> int:
+    """How many profiles will actually run. Zero means a quiet scheduler."""
+    try:
+        from core.profiles import load_profiles
+        return sum(1 for p in load_profiles() if p["schedule"].get("enabled"))
+    except Exception:
+        return 0
+
+
+@app.post("/api/capabilities/reset", dependencies=[Depends(require_token)])
+def api_reset_capabilities(system: str = ""):
+    """
+    Forget which tables and fields each system was found to support.
+
+    Those answers are cached for the life of the process so a system missing
+    a field costs one failed read rather than one every ten seconds. After a
+    transport adds a table or a field, this makes the next poll probe again
+    without restarting the server.
+    """
+    from collectors.rfc_live import reset_capabilities
+    reset_capabilities(system or None)
+    return {"reset": system or "all systems"}
+
+
+@app.get("/api/delivery-accounts")
+def api_delivery_accounts():
+    """Named sender accounts. Secrets reported as configured, never returned."""
+    from core.delivery_accounts import load_accounts
+    return load_accounts()
+
+
+@app.post("/api/delivery-accounts", dependencies=[Depends(require_token)])
+def api_save_delivery_accounts(payload: dict):
+    from core.delivery_accounts import save_accounts
+    try:
+        return {"saved": True,
+                "accounts": save_accounts(payload.get("accounts") or {},
+                                          payload.get("secrets"))}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        log.error(f"Could not save delivery accounts: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/delivery-settings")
+def api_delivery_settings():
+    """
+    Sender configuration.
+
+    Secrets are reported as configured or not -- never their value, not even
+    masked. A masked password is still a length hint, and it still ends up in
+    whatever screenshot gets pasted into a ticket.
+    """
+    from core.delivery_settings import read_settings
+    return read_settings()
+
+
+@app.post("/api/delivery-settings", dependencies=[Depends(require_token)])
+def api_save_delivery_settings(payload: dict):
+    """
+    Update sender configuration in .env.
+
+    Restricted to a fixed allow-list of keys: an endpoint that can set any
+    environment variable could set IBO_API_TOKEN and lock everyone out, or
+    repoint a system at another host.
+    """
+    from core.delivery_settings import save_settings
+    try:
+        return {"saved": True,
+                "settings": save_settings(payload.get("plain"),
+                                          payload.get("secrets"))}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        log.error(f"Could not save delivery settings: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/profiles/options")
+def api_profile_options():
+    """Everything the Profiles page needs to render its pickers."""
+    from core.profiles import VALID_CHANNELS, available_tcodes
+    return {
+        "tcodes": available_tcodes(),
+        "systems": [s.get("name") for s in get_systems() if s.get("name")],
+        "channels": list(VALID_CHANNELS),
+        "modes": ["minutes", "hours", "daily"],
+        "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+    }
+
+
+class ProfilesPayload(BaseModel):
+    profiles: list[dict]
+    alerts: dict | None = None
+
+
+@app.post("/api/profiles", dependencies=[Depends(require_token)])
+def api_save_profiles(payload: ProfilesPayload):
+    """
+    Replace the profile set.
+
+    Validation lives in core.profiles.save_profiles, not here: the YAML can
+    also be edited by hand, and a rule enforced only through this endpoint is
+    not enforced.
+    """
+    from core.profiles import save_profiles, status
+
+    try:
+        save_profiles(payload.profiles, payload.alerts)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        log.error(f"Could not save profiles: {exc}")
+        raise HTTPException(status_code=500, detail=f"Could not save: {exc}")
+
+    return {"saved": True, "profiles": status()}
+
+
+@app.post("/api/profiles/alerts", dependencies=[Depends(require_token)])
+def api_save_alert_routing(payload: dict):
+    from core.profiles import alert_routing, save_alerts
+    try:
+        save_alerts(payload)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"saved": True, "alerts": alert_routing()}
+
+
+@app.get("/api/profiles")
+def api_profiles():
+    """Every monitoring profile with its schedule, T-codes and destinations."""
+    from core.profiles import alert_routing, status
+    return {"profiles": status(), "alerts": alert_routing()}
+
+
+@app.post("/api/profiles/{profile_id}/run",
+          dependencies=[Depends(require_token)])
+def api_profile_run(profile_id: str):
+    """
+    Run one profile now, outside its schedule.
+
+    Gated: a sweep drives SAP GUI on the monitoring host and takes minutes,
+    so it is not something a stray page should be able to start.
+    """
+    from core.profiles import load_profiles, resolve_tcodes
+
+    profile = next((p for p in load_profiles() if p["id"] == profile_id), None)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"No profile {profile_id}")
+
+    tcodes = resolve_tcodes(profile)
+    if not tcodes:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"Profile {profile_id} resolves to no T-codes. Check that "
+                    f"its tcodes exist in monitoring_tasks.yaml."))
+
+    if _run_state["running"]:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A run is already in progress "
+                   f"({_run_state.get('current_system') or 'all systems'}).")
+
+    if not any(s.get("name") == profile["system"] for s in get_systems()):
+        raise HTTPException(status_code=404,
+                            detail=f"Unknown system: {profile['system']}")
+
+    thread = threading.Thread(target=_run_one_system_background,
+                              args=(profile["system"],), daemon=True)
+    thread.start()
+
+    # The sweep currently captures every configured T-code regardless of
+    # profile; the profile decides what is DELIVERED. Restricting capture per
+    # profile is a change inside the pipeline, and until it lands, saying so
+    # here is better than implying a filter that is not applied.
+    return {"started": True, "scope": profile["system"],
+            "profile": profile_id,
+            "delivers": profile["deliver"],
+            "tcodes_selected": tcodes,
+            "note": "All configured T-codes are captured; this profile's "
+                    "selection controls delivery."}
+
+
+@app.get("/api/auth-token")
+def api_auth_token():
+    """
+    Hands the dashboard its own token.
+
+    This is not a secret from anyone who can reach this port -- the app binds
+    to 127.0.0.1, so anybody who can call this endpoint could already call the
+    gated ones from a shell. The gate exists to stop a stray page, an
+    extension, or a script from deleting a monitored system by accident, and
+    to make every state change attributable to a caller that knows the token.
+
+    Returns empty when unset so the UI can say "not configured" rather than
+    failing with an opaque 401 on every button.
+    """
+    return {"token": os.getenv("IBO_API_TOKEN", "").strip(),
+            "configured": bool(os.getenv("IBO_API_TOKEN", "").strip())}
+
+
+@app.get("/incidents-page")
+def incidents_page():
+    return _page("incidents.html")
+
+
+@app.get("/correlation-page")
+def correlation_page():
+    return _page("correlation.html")
+
+
+@app.get("/rca-page")
+def rca_page():
+    return _page("rca.html")
+
+
+def _catalogue_entry(rule_id: str | None) -> dict:
+    """
+    The deterministic half of an incident: which component is responsible, the
+    SAP parameters that govern it, and the remediation steps.
+
+    Attached to every incident so the detail view is more than an AI
+    paragraph. The model writes one sentence; this is the part someone can
+    act on, and it comes from config/correlation_rules.yaml, not a model.
+    """
+    if not rule_id:
+        return {}
+    try:
+        from core.correlation import load_correlation_config
+        raw = (load_correlation_config() or {}).get(rule_id) or {}
+    except Exception:
+        return {}
+    return {
+        "title": raw.get("title") or rule_id,
+        "description": raw.get("description") or "",
+        "confidence": raw.get("confidence"),
+        "culprit": raw.get("culprit") or {},
+        "parameters": raw.get("parameters") or [],
+        "remediation": raw.get("remediation") or [],
+        "rfc_evidence": raw.get("rfc_evidence") or [],
+        "thresholds": raw.get("thresholds") or {},
+    }
+
+
+@app.get("/api/incidents")
+def api_incidents(status: str = "", system: str = ""):
+    """
+    Correlated incidents across all configured systems.
+
+    Empty is a real answer, not a failure: it means no correlation rule
+    matched. The UI says so explicitly rather than showing a blank panel,
+    because "no incidents" and "the screen is broken" look identical
+    otherwise.
+    """
+    from core.incident_store import load_incidents
+
+    wanted_status = status.strip().upper()
+    rows, systems_read, errors = [], [], []
+
+    for cfg in get_systems():
+        name = cfg.get("name")
+        if not name or (system and name != system):
+            continue
+        systems_read.append(name)
+        try:
+            for incident in load_incidents(name):
+                data = incident.to_dict()
+                current = str(data.get("status") or "").upper()
+                if wanted_status and current != wanted_status:
+                    continue
+                data["duration_seconds"] = incident.duration_seconds
+                data["catalogue"] = _catalogue_entry(data.get("rule_id"))
+                rows.append(data)
+        except Exception as exc:
+            errors.append(f"{name}: {type(exc).__name__}: {exc}")
+
+    rows.sort(key=lambda r: str(r.get("last_seen") or ""), reverse=True)
+
+    open_count = sum(1 for r in rows
+                     if str(r.get("status") or "").upper() != "RESOLVED")
+    with_ai = sum(1 for r in rows if r.get("ai_analysis"))
+
+    return {
+        "incidents": rows,
+        "systems_read": systems_read,
+        "counts": {"total": len(rows), "open": open_count,
+                   "resolved": len(rows) - open_count, "with_ai": with_ai},
+        "errors": errors,
+    }
+
+
+@app.get("/api/events")
+def api_events(system: str = ""):
+    """Raw events, the input correlation works from."""
+    import json as _json
+    import os as _os
+    from utils.paths import BASE_DIR as _BASE
+
+    events_dir = _os.path.join(_BASE, "dashboard", "events")
+    rows, errors = [], []
+
+    for cfg in get_systems():
+        name = cfg.get("name")
+        if not name or (system and name != system):
+            continue
+        path = _os.path.join(events_dir, f"{name}.json")
+        if not _os.path.isfile(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                payload = _json.load(handle)
+            items = payload.get("events") if isinstance(payload, dict) else payload
+            for item in items or []:
+                item = dict(item)
+                item.setdefault("system", name)
+                rows.append(item)
+        except Exception as exc:
+            errors.append(f"{name}: {type(exc).__name__}: {exc}")
+
+    rows.sort(key=lambda r: str(r.get("last_seen") or r.get("first_seen") or ""),
+              reverse=True)
+    return {"events": rows, "count": len(rows), "errors": errors}
+
+
+@app.get("/api/correlation/rules")
+def api_correlation_rules():
+    """
+    The deterministic rules, their thresholds, and how many incidents each
+    has actually produced. A rule that has never fired is either wrongly
+    tuned or covering something that does not happen -- both worth seeing.
+    """
+    from core.correlation import load_correlation_config
+    from core.incident_store import load_incidents
+
+    try:
+        config = load_correlation_config()
+    except Exception as exc:
+        return {"rules": [], "error": f"{type(exc).__name__}: {exc}"}
+
+    fired: dict[str, int] = {}
+    for cfg in get_systems():
+        name = cfg.get("name")
+        if not name:
+            continue
+        try:
+            for incident in load_incidents(name):
+                fired[incident.rule_id] = fired.get(incident.rule_id, 0) + 1
+        except Exception:
+            continue
+
+    rules = []
+    for rule_id, raw in config.items():
+        rules.append({
+            "id": rule_id,
+            "title": raw.get("title") or rule_id,
+            "enabled": bool(raw.get("enabled", True)),
+            "severity": raw.get("severity") or "",
+            "description": raw.get("description") or "",
+            "confidence": raw.get("confidence"),
+            "thresholds": raw.get("thresholds") or {},
+            "culprit": raw.get("culprit") or {},
+            "remediation": raw.get("remediation") or [],
+            "incidents_matched": fired.get(rule_id, 0),
+        })
+
+    rules.sort(key=lambda r: (-r["incidents_matched"], r["id"]))
+
+    # A rule with no matcher loads, displays a threshold, and is then silently
+    # skipped by the engine. That is worse than a missing rule: it looks like
+    # coverage that does not exist.
+    try:
+        from core.correlation import unmatched_rules
+        unmatched = unmatched_rules()
+    except Exception:
+        unmatched = []
+    for rule in rules:
+        rule["can_fire"] = rule["id"] not in unmatched
+
+    return {"rules": rules, "total_incidents": sum(fired.values()),
+            "unmatched": unmatched}
+
+
+_refresh_run = {"in_progress": False, "started_at": None, "finished_at": None,
+                "done": 0, "total": 0, "error": None}
+_refresh_run_lock = threading.Lock()
+
+
+@app.post("/api/live/refresh", dependencies=[Depends(require_token)])
+def refresh_live_now():
+    """
+    Read every system once, now, in the background.
+
+    This is the on-demand replacement for the timer. The wall's "Read live"
+    button calls it. It returns immediately with a job marker; the wall then
+    polls /api/live (which serves the cache being filled) and
+    /api/live/refresh/status to know when the pass is done. Reads run
+    concurrently, bounded, and each system lands in the cache as it finishes
+    -- so cards fill in progressively rather than all at the end.
+    """
+    with _refresh_run_lock:
+        if _refresh_run["in_progress"]:
+            return {"started": False, "reason": "already_running", **_refresh_run}
+        systems = list(get_systems())
+        _refresh_run.update(in_progress=True,
+                            started_at=datetime.now().strftime("%H:%M:%S"),
+                            finished_at=None, done=0, total=len(systems),
+                            error=None)
+
+    def _run():
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        try:
+            workers = min(int(os.environ.get("IBO_LIVE_WORKERS", "3") or 3),
+                          max(1, len(systems)))
+            pool = ThreadPoolExecutor(max_workers=workers,
+                                      thread_name_prefix="ondemand-rfc")
+            futures = [pool.submit(_refresh_one_live, cfg) for cfg in systems]
+            for _ in as_completed(futures):
+                with _refresh_run_lock:
+                    _refresh_run["done"] += 1
+            pool.shutdown(wait=False)
+        except Exception as exc:  # noqa: BLE001 -- report, never crash the thread
+            with _refresh_run_lock:
+                _refresh_run["error"] = f"{type(exc).__name__}: {exc}"
+        finally:
+            with _refresh_run_lock:
+                _refresh_run["in_progress"] = False
+                _refresh_run["finished_at"] = datetime.now().strftime("%H:%M:%S")
+
+    threading.Thread(target=_run, daemon=True, name="ondemand-refresh").start()
+    with _refresh_run_lock:
+        return {"started": True, **_refresh_run}
+
+
+@app.get("/api/live/refresh/status")
+def refresh_live_status():
+    with _refresh_run_lock:
+        return dict(_refresh_run)
+
+
+@app.post("/api/rca/analyze/{system_name}", dependencies=[Depends(require_token)])
+def api_rca_analyze(system_name: str):
+    """
+    On-demand RCA for one system, from a LIVE RFC read.
+
+    Deliberately POST and deliberately not on a timer. Every call spends
+    tokens, so it runs when a human asks and never on the scheduler -- four
+    systems on a five-minute cycle would be roughly a thousand model calls a
+    day to say "nothing is wrong" almost every time.
+
+    The split is the same as everywhere else in this project: findings,
+    severities and thresholds are computed here from the live readings, and
+    the model is given those findings to write a narrative around. It cannot
+    add a finding, change a severity or invent a remediation step.
+    """
+    from collectors.rfc_live import read_live
+    from core.models import MonitoringResult, MetricResult, Status
+    from evaluation.ai_analyzer import analyze, get_provider
+
+    systems = {c.get("name"): c for c in get_systems()}
+    cfg = systems.get(system_name)
+    if not cfg:
+        raise HTTPException(status_code=404,
+                            detail=f"{system_name} is not in systems.yaml")
+
+    # The live read runs in a worker process for the same reason the
+    # refresher does: on this pyrfc build an RFC call holds the GIL, and a
+    # read done here froze every other request for its whole duration.
+    pool = _get_rfc_pool()
+    if pool is not None:
+        from collectors.live_job import read_live_job
+        payload = pool.submit(read_live_job, system_name, cfg).result()
+    else:
+        from collectors.rfc_live import read_live
+        payload = read_live(system_name, cfg, use_cache=False)
+
+    if not payload.get("connected", False):
+        # Refuse rather than analyse nothing. Asking a model to explain an
+        # absence of data produces confident prose about a system it never
+        # saw, which is worse than no answer.
+        return {
+            "system": system_name,
+            "analysed": False,
+            "reason": "not_connected",
+            "detail": payload.get("error") or "System did not answer over RFC.",
+            "findings": [],
+        }
+
+    # Findings are computed here, from the live readings, before the model is
+    # called. Thresholds and the zero-handling rules live in core.live_metrics
+    # so this endpoint, the health report and the alert preview cannot drift
+    # apart -- a metric graded WARNING on one screen and NORMAL on another
+    # destroys trust in both.
+    from core.live_metrics import metrics_from_live
+
+    result = MonitoringResult(system=system_name,
+                              client=str(cfg.get("client") or ""))
+    result.metrics = metrics_from_live(payload)
+    result.overall_status = result.compute_overall_status()
+
+    findings = [
+        {"name": m.name, "value": m.display_value,
+         "status": m.status.value, "detail": m.detail, "source": m.source}
+        for m in result.metrics
+        if m.status in (Status.CRITICAL, Status.WARNING, Status.UNKNOWN)
+    ]
+
+    # Dump breakdown as an explicit finding, so the panel names who and what
+    # is dumping even when the model is unavailable. The count alone is in
+    # findings above via the ST22 metric; this adds the attribution behind it
+    # (top users, hosts, programs) as a structured finding the UI can render
+    # without waiting on a narrative.
+    dd = payload.get("dump_detail") or {}
+    dump_count = dd.get("count")
+    if dump_count is None:
+        st22 = next((m for m in result.metrics if m.name == "sap.st22.dumps"), None)
+        dump_count = int(st22.value) if st22 and st22.value is not None else 0
+    if dump_count and dump_count > 0:
+        top_users = dd.get("by_user") or []
+        top_progs = dd.get("by_program") or []
+        bits = []
+        if top_users:
+            bits.append("top users: " + ", ".join(
+                f"{u.get('name') or u.get('user')} ({u.get('count')})"
+                for u in top_users[:3]))
+        if top_progs:
+            bits.append("top programs: " + ", ".join(
+                f"{p.get('program')} ({p.get('count')})" for p in top_progs[:3]))
+        elif dd.get("note"):
+            bits.append(dd["note"])
+        findings.append({
+            "name": "sap.st22.dump_breakdown",
+            "value": f"{dump_count} dumps today",
+            "status": "CRITICAL" if dump_count > 25 else
+                      "WARNING" if dump_count > 5 else "NORMAL",
+            "detail": "; ".join(bits) if bits else "no breakdown available",
+            "source": "RFC · SNAP",
+            "dump_detail": {
+                "count": dump_count,
+                "by_user": top_users[:6],
+                "by_host": dd.get("by_host") or [],
+                "by_program": top_progs[:6],
+                "recent": dd.get("recent") or [],
+                "program_source": dd.get("program_source"),
+                "note": dd.get("note"),
+            },
+        })
+
+    # ---- attribution: the named things behind the counters ---------------
+    from core.attribution import build_attribution
+    try:
+        attribution = build_attribution(payload, result.metrics)
+    except Exception as exc:  # noqa: BLE001 -- never blocks the analysis
+        attribution = {"gaps": [f"attribution failed: {type(exc).__name__}: {exc}"]}
+
+    # ---- the one model call ----------------------------------------------
+    provider = get_provider()
+    narrative, error = "", None
+    analysis = None
+    try:
+        analysis = analyze(result, provider=provider, attribution=attribution)
+        narrative = getattr(analysis, "likely_root_cause", "") or ""
+    except Exception as exc:
+        # A failed model call must not take the findings down with it. They
+        # are the useful part and they were computed before the call.
+        error = f"{type(exc).__name__}: {exc}"
+
+    # Full structured analysis, not just the one-line root cause. The model
+    # already produces severity, category, evidence, actions and limitations
+    # via the RCA schema; the endpoint used to keep only likely_root_cause and
+    # drop the rest. Deterministic severity/findings remain authoritative --
+    # this is the model's explanation OVER them, clearly labelled.
+    detail = None
+    if analysis is not None:
+        detail = {
+            "root_cause": getattr(analysis, "likely_root_cause", "") or "",
+            "root_cause_category": getattr(analysis, "root_cause_category", "") or "",
+            "severity": getattr(analysis, "severity", "") or "",
+            "finding_status": getattr(analysis, "finding_status", "") or "HYPOTHESIS",
+            "confidence": getattr(analysis, "confidence", "") or "",
+            "confidence_score": getattr(analysis, "confidence_score", None),
+            "supporting_evidence": list(getattr(analysis, "evidence", []) or []),
+            "contradicting_evidence": list(getattr(analysis, "contradicting_evidence", []) or []),
+            "recommended_actions": list(getattr(analysis, "recommended_actions", []) or []),
+            "limitations": list(getattr(analysis, "limitations", []) or []),
+        }
+
+    return {
+        "system": system_name,
+        "analysed": True,
+        "overall_status": result.overall_status.value,
+        "metric_count": len(result.metrics),
+        "findings": findings,
+        "attribution": attribution,
+        "narrative": narrative,
+        "analysis": detail,
+        "narrative_error": error,
+        "provider": (provider.status() if hasattr(provider, "status")
+                     else {"provider": getattr(provider, "name", "?")}),
+        "read_at": payload.get("read_at"),
+    }
+
+
+@app.get("/api/rca")
+def api_rca(system: str = ""):
+    """
+    Incidents that carry an AI analysis, newest first.
+
+    Only the narrative is model-written; severity, evidence and remediation
+    come from the rules. The UI labels it so nobody acts on the paragraph as
+    though it were a finding.
+    """
+    from core.incident_store import load_incidents
+
+    rows = []
+    for cfg in get_systems():
+        name = cfg.get("name")
+        if not name or (system and name != system):
+            continue
+        try:
+            for incident in load_incidents(name):
+                if not incident.ai_analysis:
+                    continue
+                data = incident.to_dict()
+                data["duration_seconds"] = incident.duration_seconds
+                data["catalogue"] = _catalogue_entry(data.get("rule_id"))
+                rows.append(data)
+        except Exception:
+            continue
+
+    rows.sort(key=lambda r: str(r.get("ai_analysis_at") or r.get("last_seen") or ""),
+              reverse=True)
+
+    provider_status = {}
+    try:
+        from evaluation.ai_analyzer import get_provider
+        provider = get_provider()
+        provider_status = (provider.status() if hasattr(provider, "status")
+                           else {"provider": getattr(provider, "name", "?")})
+    except Exception as exc:
+        provider_status = {"error": f"{type(exc).__name__}: {exc}"}
+
+    return {"analyses": rows, "count": len(rows), "provider": provider_status}
+
+
 @app.get("/reports-page")
 def reports_page():
     return _page("reports.html")
 
 
 @app.get("/api/report/{system_name}")
-def get_health_report(system_name: str):
+def get_health_report(system_name: str, live: bool = False):
     """
     Findings, recommended solutions and a health summary for one system.
 
-    Built from the last completed sweep, not from a live read: a report needs
-    the full metric set the sweep produces, and rebuilding it on every request
-    would hammer the SAP system.
+    Default is the last completed sweep, which carries the full metric set
+    including GUI evidence. `?live=true` builds the report from a fresh RFC
+    read instead -- everything the RFC path can see, with no sweep and no
+    snapshot required.
+
+    The live report is genuinely smaller, not just fresher: screenshots, OCR
+    evidence and anything SSH-only are absent because RFC cannot produce them.
+    Those metrics are reported UNKNOWN rather than omitted, so a thinner
+    report never reads as a healthier one.
     """
     from core.status_snapshot import load_snapshot as _load
     from evaluation.health_report import build_report
     from core.models import MonitoringResult, MetricResult, Status
     from datetime import datetime as _dt
 
+    if live:
+        from core.live_metrics import build_live_result
+
+        systems = {c.get("name"): c for c in get_systems()}
+        cfg = systems.get(system_name)
+        if not cfg:
+            raise HTTPException(status_code=404,
+                                detail=f"{system_name} is not in systems.yaml")
+
+        result, payload = build_live_result(system_name, cfg)
+
+        if not payload.get("connected", False):
+            raise HTTPException(
+                status_code=503,
+                detail=(f"{system_name} did not answer over RFC. "
+                        f"{payload.get('error') or ''}").strip())
+
+        report = build_report(result)
+        report["source"] = "live_rfc"
+        report["read_at"] = payload.get("read_at")
+        report["note"] = ("Built from a live RFC read. GUI screenshots, OCR "
+                          "evidence and SSH-only metrics are not available on "
+                          "this path and are reported UNKNOWN, not omitted.")
+        return report
+
     snapshot = _load(system_name)
     if not snapshot:
         raise HTTPException(
             status_code=404,
-            detail=f"No monitoring snapshot for {system_name}. Run a sweep first.")
+            detail=f"No monitoring snapshot for {system_name}. "
+                   f"Run a sweep, or request ?live=true for an RFC-only report.")
 
     stamp = snapshot.get("cycle_timestamp") or snapshot.get("generated_at")
     try:
@@ -356,9 +1366,65 @@ def get_health_report(system_name: str):
 
 @app.get("/api/history/{system_name}/{metric_name}")
 def get_history(system_name: str, metric_name: str, days: int = 5):
+    """
+    Historical samples for ONE metric on ONE system.
+
+    This previously called read_metric_history(metric_name) and discarded
+    system_name entirely, so a PRD memory chart contained QAS readings as
+    well. A mixed series is worse than no series: it looks authoritative.
+
+    Falls back to the old Excel reader only when the JSONL store has nothing
+    for this system yet, so existing charts keep working while history builds.
+    """
     if days < 1 or days > 365:
         raise HTTPException(status_code=400, detail="days must be between 1 and 365.")
-    return read_metric_history(metric_name, days=days)
+
+    from core.metric_history import read_series
+    points = read_series(system_name, metric_name, days=days)
+    if points:
+        return points
+
+    legacy = read_metric_history(metric_name, days=days)
+    for point in legacy:
+        point["source"] = "legacy Excel history -- not filtered by system"
+    return legacy
+
+
+@app.get("/api/trend/{system_name}/{metric_name}")
+def get_trend(system_name: str, metric_name: str, days: int = 7):
+    """Current reading against the same metric `days` ago."""
+    if days < 1 or days > 365:
+        raise HTTPException(status_code=400, detail="days must be between 1 and 365.")
+    from core.metric_history import trend
+    return trend(system_name, metric_name, days=days)
+
+
+@app.get("/api/trends/{system_name}")
+def get_trends(system_name: str, days: int = 7):
+    """Trends for every metric with recorded history on this system."""
+    import glob as _glob
+    import json as _json
+    import os as _os
+    from core.metric_history import HISTORY_DIR, trend, _safe
+
+    folder = _os.path.join(HISTORY_DIR, _safe(system_name))
+    names: set[str] = set()
+    for path in _glob.glob(_os.path.join(folder, "*.jsonl")):
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                for line in handle:
+                    try:
+                        names.add(_json.loads(line)["m"])
+                    except (ValueError, KeyError):
+                        continue
+        except OSError:
+            continue
+
+    results = [trend(system_name, name, days=days) for name in sorted(names)]
+    # Movers first: a metric that has not changed is not what anyone opened
+    # this page to see.
+    results.sort(key=lambda t: abs(t.get("change_percent") or 0), reverse=True)
+    return {"system": system_name, "days": days, "trends": results}
 
 
 @app.get("/api/systems")
@@ -453,7 +1519,7 @@ def get_system_config(system_name: str):
     }
 
 
-@app.post("/api/systems")
+@app.post("/api/systems", dependencies=[Depends(require_token)])
 def create_system(system: NewSystem):
     try:
         # NOTE: always call with keyword arguments here -- add_system() has
@@ -511,7 +1577,7 @@ def create_system(system: NewSystem):
     return {"success": True, "monitoring_started": started, "warnings": warnings}
 
 
-@app.delete("/api/systems/{system_name}")
+@app.delete("/api/systems/{system_name}", dependencies=[Depends(require_token)])
 def remove_system(system_name: str):
     removed = delete_system(system_name)
     if not removed:
@@ -543,10 +1609,16 @@ def scheduler_status():
         "last_cycle_start": _scheduler_state["last_cycle_start"],
         "running": bool(_run_state["running"]),
         "current_system": _run_state.get("current_system"),
+        "current_profile": _run_state.get("profile_id"),
+        "last_profile": _scheduler_state.get("last_profile"),
+        # Scheduling is profile-driven. interval_minutes is kept only so the
+        # older Scheduler screen still renders; nothing runs on it.
+        "source": "profiles",
+        "enabled_profiles": _enabled_profile_count(),
     }
 
 
-@app.post("/api/scheduler/snooze")
+@app.post("/api/scheduler/snooze", dependencies=[Depends(require_token)])
 def scheduler_snooze(minutes: int = 60):
     """
     Suppress automatic monitoring for a period, then resume by itself.
@@ -576,7 +1648,7 @@ def scheduler_snooze(minutes: int = 60):
     }
 
 
-@app.post("/api/scheduler/{action}")
+@app.post("/api/scheduler/{action}", dependencies=[Depends(require_token)])
 def scheduler_control(action: str):
     """
     Pause or resume automatic monitoring.
@@ -658,7 +1730,7 @@ class ScheduleUpdate(BaseModel):
     days: list[str] = []
 
 
-@app.post("/api/schedules/{system_name}")
+@app.post("/api/schedules/{system_name}", dependencies=[Depends(require_token)])
 def update_schedule(system_name: str, body: ScheduleUpdate):
     from core.schedules import set_schedule, describe, next_run_at
 
@@ -695,7 +1767,7 @@ def get_scheduler_settings():
     return {"interval_minutes": SCHEDULE_INTERVAL_MINUTES}
 
 
-@app.post("/api/scheduler-settings")
+@app.post("/api/scheduler-settings", dependencies=[Depends(require_token)])
 def update_scheduler_settings(settings: SchedulerSettings):
     global SCHEDULE_INTERVAL_MINUTES
     if settings.interval_minutes < 5:
@@ -853,7 +1925,7 @@ def _run_all_systems_background():
         _run_state["cancel_requested"] = False
 
 
-@app.post("/api/run-stop")
+@app.post("/api/run-stop", dependencies=[Depends(require_token)])
 def stop_run():
     """
     Stop monitoring: the current sweep and everything scheduled after it.
@@ -895,7 +1967,7 @@ def stop_run():
     }
 
 
-@app.post("/api/run-now")
+@app.post("/api/run-now", dependencies=[Depends(require_token)])
 def run_now():
     if _run_state["running"]:
         raise HTTPException(status_code=409, detail="A run is already in progress.")
@@ -904,8 +1976,20 @@ def run_now():
     return {"started": True, "scope": "all"}
 
 
-def _run_one_system_background(system_name: str):
-    """Runs the full pipeline for a single system, then clears run state."""
+def _run_one_system_background(system_name: str, profile_id: str | None = None,
+                               resume_scheduler_after: bool = False):
+    """
+    Runs the full pipeline for a single system, then clears run state.
+
+    `profile_id` records which profile asked for this run, so the UI can say
+    why a sweep is happening. A run that appears with no explanation is the
+    thing this change was made to remove.
+
+    `resume_scheduler_after` is False on purpose for a MANUAL run: stopping
+    is the operator's decision, so a manual run leaves automatic monitoring
+    paused rather than quietly turning it back on and chaining into a
+    scheduled sweep. It clears only the transient manual_pause marker.
+    """
     with _run_lock:
         if _run_state["running"]:
             return
@@ -913,6 +1997,7 @@ def _run_one_system_background(system_name: str):
         _run_state["error"] = None
         _run_state["cancel_requested"] = False
         _run_state["current_system"] = system_name
+        _run_state["profile_id"] = profile_id
     try:
         cfg = next((s for s in get_systems() if s.get("name") == system_name), None)
         if cfg is None:
@@ -926,9 +2011,17 @@ def _run_one_system_background(system_name: str):
         with _run_lock:
             _run_state["running"] = False
             _run_state["current_system"] = None
+            _run_state["profile_id"] = None
+        # Clear the transient manual-pause marker. The scheduler stays
+        # disabled (a manual run does not re-arm it); the operator turns
+        # automatic monitoring back on with Resume when they want it. This
+        # is what stops a manual sweep from chaining into a scheduled one.
+        _scheduler_state["manual_pause"] = False
+        if resume_scheduler_after:
+            _scheduler_state["enabled"] = True
 
 
-@app.post("/api/run-now/{system_name}")
+@app.post("/api/run-now/{system_name}", dependencies=[Depends(require_token)])
 def run_now_single(system_name: str):
     """
     Monitor ONE system.
@@ -946,10 +2039,22 @@ def run_now_single(system_name: str):
     if not any(s.get("name") == system_name for s in get_systems()):
         raise HTTPException(status_code=404, detail=f"Unknown system: {system_name}")
 
+    # A manual run must not silently hand off to a scheduled one. Before this,
+    # the scheduler stayed enabled during a manual sweep, so the moment the
+    # manual run freed _run_state the scheduler's next 20s pass could find a
+    # profile due and launch it -- which is exactly how a manual CARFOUR run
+    # was followed by an unrequested PRD sweep. Snooze automatic monitoring
+    # for the duration; the background worker lifts the snooze when it ends.
+    _scheduler_state["enabled"] = False
+    _scheduler_state["manual_pause"] = True
+
     thread = threading.Thread(target=_run_one_system_background,
-                              args=(system_name,), daemon=True)
+                              args=(system_name,),
+                              kwargs={"resume_scheduler_after": False},
+                              daemon=True)
     thread.start()
-    return {"started": True, "scope": system_name}
+    return {"started": True, "scope": system_name,
+            "note": "Automatic monitoring is paused during this manual run."}
 
 
 @app.get("/api/run-status")
@@ -1000,9 +2105,24 @@ def _scheduler_loop():
         # for. Systems with history keep their real last-run time.
         for cfg in get_systems():
             last_run.setdefault(cfg.get("name"), datetime.now())
-        log.info("Scheduler: no run on startup. Systems will run on their own schedules.")
+        log.info("Scheduler: no run on startup.")
     else:
-        log.info("Scheduler: MONITOR_ON_STARTUP=true -- due systems will run shortly.")
+        log.info("Scheduler: MONITOR_ON_STARTUP=true -- due profiles will run shortly.")
+
+    try:
+        from core.profiles import load_profiles
+        enabled = [p for p in load_profiles() if p["schedule"].get("enabled")]
+        if enabled:
+            log.info("Scheduler: profile-driven. " + "; ".join(
+                f"{p['id']} ({p['system']} -> {','.join(p['deliver']) or 'no destination'})"
+                for p in enabled))
+        else:
+            # Said explicitly. A quiet scheduler and a broken one look
+            # identical in a log that says nothing.
+            log.warning("Scheduler: no enabled profiles -- nothing will run "
+                        "automatically. Add or enable one on the Profiles page.")
+    except Exception as exc:
+        log.error(f"Scheduler: could not read profiles: {exc}")
 
     while True:
         try:
@@ -1013,32 +2133,54 @@ def _scheduler_loop():
                 log.info("Snooze expired -- automatic monitoring resumed.")
 
             if _scheduler_state["enabled"] and not snoozed and not _run_state["running"]:
-                schedules = load_schedules()
-                upcoming = []
+                # PROFILES ARE THE ONLY SOURCE OF SCHEDULED RUNS.
+                #
+                # The previous behaviour ran every system on a global interval
+                # plus a per-system schedule in schedules.json. That meant a
+                # sweep could start at a time nobody had chosen -- and on a
+                # production system a sweep drives SAP GUI for several minutes
+                # and emails a report. Monitoring should happen when someone
+                # asked for it, not because a default interval elapsed.
+                #
+                # Nothing runs now unless a profile says so. A landscape with
+                # no enabled profile is quiet, and that is the correct
+                # behaviour: silence because nothing was scheduled is honest,
+                # where a surprise sweep is not.
+                from core.profiles import (due_profiles, mark_run,
+                                           status as profile_status)
 
-                for cfg in get_systems():
-                    name = cfg.get("name")
-                    sched = schedules.get(name) or {}
-                    if not sched.get("enabled", True):
-                        continue
-
-                    if is_due(sched, last_run.get(name)):
-                        log.info(f"Scheduler: {name} is due ({describe(sched)}).")
-                        _scheduler_state["last_cycle_start"] = \
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        last_run[name] = datetime.now()
-                        _run_one_system_background(name)
-                        # One system per pass: re-evaluate afterwards so a
-                        # long sweep cannot cause a pile-up of due systems.
-                        break
-
-                    nxt = next_run_at(sched, last_run.get(name))
-                    if nxt:
-                        upcoming.append(nxt)
-
-                _scheduler_state["next_run_at"] = (
-                    min(upcoming).strftime("%Y-%m-%d %H:%M:%S") if upcoming else None
-                )
+                due = due_profiles()
+                if due:
+                    profile = due[0]
+                    log.info(f"Scheduler: profile '{profile['id']}' is due "
+                             f"({profile['system']}, "
+                             f"{len(profile['resolved_tcodes'])} T-code(s), "
+                             f"-> {profile['deliver'] or 'no destination'}).")
+                    _scheduler_state["last_cycle_start"] = \
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    _scheduler_state["last_profile"] = profile["id"]
+                    # Marked before the run, not after: a sweep that crashes
+                    # must not become due again immediately and loop.
+                    mark_run(profile["id"])
+                    _run_one_system_background(profile["system"],
+                                               profile_id=profile["id"])
+                    # AND re-mark at completion. A multi-minute sweep on a
+                    # short interval could otherwise be due again the instant
+                    # it finished (next_run = start + interval, already in the
+                    # past), producing back-to-back scheduled sweeps nobody
+                    # asked for. Stamping the FINISH time makes the interval
+                    # count from when the sweep ended.
+                    try:
+                        mark_run(profile["id"])
+                    except Exception:
+                        pass
+                    # One profile per pass, then re-evaluate. A long sweep
+                    # would otherwise let several profiles pile up behind it.
+                else:
+                    upcoming = [p["next_run"] for p in profile_status()
+                                if p.get("next_run")]
+                    _scheduler_state["next_run_at"] = (
+                        min(upcoming).replace("T", " ") if upcoming else None)
         except Exception as exc:
             # The scheduler must never die: a bad schedule entry would
             # otherwise stop all automatic monitoring until someone noticed.
@@ -1052,10 +2194,29 @@ def _scheduler_loop():
 def start_scheduler():
     thread = threading.Thread(target=_scheduler_loop, daemon=True)
     thread.start()
-    log.info(f"Auto-scheduler started: every {SCHEDULE_INTERVAL_MINUTES} minutes.")
+    log.info("Scheduler started -- runs only what the Profiles page schedules.")
 
 
-if os.path.isdir(REPORTS_DIR):
-    app.mount("/reports", StaticFiles(directory=REPORTS_DIR), name="reports")
+# reports/ holds GUI screenshots and Excel sheets containing production
+# usernames, job names and lock owners. Mounting it as StaticFiles made every
+# one of those browsable to anything that could reach this port. It is served
+# through a route instead, with path containment enforced.
+
+@app.get("/reports/{path:path}")
+def serve_report_file(path: str):
+    if not os.path.isdir(REPORTS_DIR):
+        raise HTTPException(status_code=404, detail="No reports directory")
+
+    # Resolve and confirm the result is still inside REPORTS_DIR. Without
+    # this, "../../.env" resolves out of the tree and serves the credentials
+    # file -- the exact secrets this project is already trying to contain.
+    root = os.path.realpath(REPORTS_DIR)
+    target = os.path.realpath(os.path.join(root, path))
+    if not (target == root or target.startswith(root + os.sep)):
+        raise HTTPException(status_code=403, detail="Path outside reports directory")
+    if not os.path.isfile(target):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    return FileResponse(target)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

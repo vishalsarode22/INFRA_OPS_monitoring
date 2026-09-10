@@ -149,32 +149,121 @@ def _build_check_text(metric: MetricResult) -> str:
 
 def fill_metrobrands_template(template_path: str, output_path: str,
                                gui_results: list[MetricResult],
-                               report_date: str = None) -> str:
+                               report_date: str = None,
+                               result=None) -> str:
     """
-    Copies the template, fills System Monitoring sheet rows based on
-    gui_results (matched by MetricResult.tcode), saves to output_path.
+    Copies the template and fills the System Monitoring sheet.
+
+    What changed and why: the sheet used to carry the template's placeholder
+    header ("System - TST / Test Monitering") on every system's report, and
+    the Checks column fell back to dumping every extra_data key -- which is
+    where "Evidence Id: EV-..." and SMLG's "Instance Count: 0" came from.
+    Every row now goes through reporting.check_narratives, which reads the
+    parsed figures AND the OCR text of the captured screen and produces a
+    specific observation, a status, a count and a recommendation. Columns
+    D-H, previously empty, carry those. A Summary sheet is added.
     """
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from reporting.check_narratives import (narrate_all, summary_counts,
+                                            deterministic_analysis)
+
     shutil.copy(template_path, output_path)
     wb = openpyxl.load_workbook(output_path)
     ws = wb["System Monitoring"]
 
     if report_date is None:
         report_date = datetime.now().strftime("%d.%m.%Y")
-    ws["C2"] = report_date
 
-    by_tcode = {m.tcode: m for m in gui_results if m.tcode}
+    narratives = narrate_all(gui_results)
+    by_tcode = {n.tcode: n for n in narratives}
+    counts = summary_counts(narratives)
+
+    # ---- header: the system this report is actually about ----------------
+    sysname = getattr(result, "system", None) or next(
+        (m.extra_data.get("system") for m in gui_results if m.extra_data.get("system")), "")
+    client = getattr(result, "client", None) or next(
+        (m.extra_data.get("client") for m in gui_results if m.extra_data.get("client")), "")
+    overall = getattr(getattr(result, "overall_status", None), "value", "") if result else ""
+    ws["A1"] = f"System - {sysname}" + (f"  (client {client})" if client else "")
+    ws["A2"] = "InfraBeatOps SAP Basis Monitoring"
+    ws["C2"] = report_date
+    ws["D2"] = f"Overall: {overall}" if overall else ""
+    ws["E2"] = (f"{counts['captured']}/{counts['total']} checks captured · "
+                f"{counts['attention']} need attention · {counts['failed']} failed")
+
+    # ---- column headers (row 3) ------------------------------------------
+    headers = {"C": "Checks (observation)", "D": "Status", "E": "Count / Value",
+               "F": "Recommendation", "G": "Captured at", "H": "Evidence ID"}
+    bold = Font(bold=True)
+    for col, text in headers.items():
+        ws[f"{col}3"] = text
+        ws[f"{col}3"].font = bold
+    widths = {"C": 70, "D": 13, "E": 20, "F": 60, "G": 19, "H": 44}
+    for col, w in widths.items():
+        ws.column_dimensions[col].width = max(ws.column_dimensions[col].width or 0, w)
+
+    fills = {"OK": "C8E6C9", "ATTENTION": "FFE0B2", "FAILED": "FFCDD2",
+             "NOT COLLECTED": "ECEFF1"}
+    wrap = Alignment(wrap_text=True, vertical="top")
 
     for row, tcode in TCODE_ROW_MAP.items():
-        metric = by_tcode.get(tcode)
-        if metric is None:
+        n = by_tcode.get(tcode)
+        if n is None:
             ws[f"C{row}"] = "Not collected this cycle"
-            continue
+            ws[f"D{row}"] = "NOT COLLECTED"
+        else:
+            ws[f"C{row}"] = n.observation
+            ws[f"D{row}"] = n.status
+            ws[f"E{row}"] = n.value
+            ws[f"F{row}"] = n.recommendation
+            ws[f"G{row}"] = n.captured_at.replace("T", " ")
+            ws[f"H{row}"] = n.evidence_id
+        st = ws[f"D{row}"].value or "NOT COLLECTED"
+        ws[f"D{row}"].fill = PatternFill("solid", fgColor=fills.get(st, "FFFFFF"))
+        for col in "CDEFGH":
+            ws[f"{col}{row}"].alignment = wrap
 
-        if metric.display_value == "failed":
-            ws[f"C{row}"] = f"Collection failed: {metric.detail}"
-            continue
-
-        ws[f"C{row}"] = _build_check_text(metric)
+    # ---- Summary sheet ------------------------------------------------------
+    if "Summary" in wb.sheetnames:
+        del wb["Summary"]
+    sm = wb.create_sheet("Summary", 0)
+    sm.column_dimensions["A"].width = 26
+    sm.column_dimensions["B"].width = 110
+    r = 1
+    def put(k, v, b=False):
+        nonlocal r
+        sm.cell(row=r, column=1, value=k).font = Font(bold=True)
+        c = sm.cell(row=r, column=2, value=v)
+        c.alignment = wrap
+        if b:
+            c.font = Font(bold=True)
+        r += 1
+    put("System", f"{sysname}" + (f" (client {client})" if client else ""), True)
+    put("Report date", report_date)
+    put("Overall status", overall or "n/a", True)
+    put("Checks", f"{counts['captured']} captured, {counts['ok']} OK, "
+                  f"{counts['attention']} need attention, {counts['failed']} failed")
+    r += 1
+    ai = getattr(result, "ai_analysis", None) if result else None
+    da = deterministic_analysis(result, narratives) if result else None
+    put("Analysis", "AI analysis" if ai else "Rules-based analysis (model unavailable this cycle)", True)
+    if ai:
+        put("Severity", getattr(ai, "severity", ""))
+        put("Likely root cause", getattr(ai, "likely_root_cause", ""))
+        for i, a in enumerate(getattr(ai, "recommended_actions", []) or [], 1):
+            put(f"Action {i}", a)
+        put("Confidence", str(getattr(ai, "confidence", "")))
+    if da:
+        put("Headline", da["headline"])
+        for i, f_ in enumerate(da["findings"], 1):
+            put(f"Finding {i}", f_)
+        for i, a in enumerate(da["actions"], 1):
+            put(f"Recommended {i}", a)
+    r += 1
+    put("Checks needing attention", "", True)
+    for n in narratives:
+        if n.status in ("ATTENTION", "FAILED"):
+            put(f"{n.tcode} — {n.task}", f"{n.observation}  →  {n.recommendation}")
 
     wb.save(output_path)
     log.info(f"MetroBrands Excel template filled: {output_path}")

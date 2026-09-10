@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · AI RCA</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds4">
+<style>
+  .note{background:var(--info-bg);border:1px solid var(--info-br);border-radius:var(--radius);
+       padding:13px 15px;font-size:13px;line-height:1.65;margin-bottom:16px}
+  .chain{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .key{font-family:var(--mono);font-size:11.5px;padding:5px 11px;border-radius:14px;
+       border:1px solid var(--border);background:var(--card)}
+  .key.live{border-color:var(--green);color:var(--green)}
+  .key.dead{opacity:.5;text-decoration:line-through}
+  .rca{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:13px;
+       background:var(--card);overflow:hidden}
+  .rca.CRITICAL{border-left:3px solid var(--red)}
+  .rca.WARNING{border-left:3px solid var(--amber)}
+  .rh{display:flex;align-items:center;gap:10px;padding:12px 15px;
+       border-bottom:1px solid var(--border)}
+  .rh h4{font-size:13.5px;font-weight:800;flex:1}
+  .rh .meta{font-family:var(--mono);font-size:11px;color:var(--muted-dim)}
+  .rb{padding:14px 15px}
+  .rb h5{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:14px 0 6px}
+  .rb h5:first-child{margin-top:0}
+  .rb ul,.rb ol{margin-left:17px;font-size:12.5px;line-height:1.7}
+  .ev li{color:var(--muted);font-family:var(--mono);font-size:11.5px}
+  .hyp{background:rgba(120,120,120,.10);border:1px solid var(--border);
+       border-radius:var(--radius);padding:13px 15px;font-size:13px;line-height:1.65}
+  .hyp .tag{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.05em;
+       color:var(--muted-dim);display:block;margin-bottom:8px}
+  .det{border-left:2px solid var(--green);padding-left:11px}
+  .why-empty{padding:26px;text-align:center;color:var(--muted);line-height:1.7;font-size:13px}
+  .why-empty b{color:var(--fg)}
+  .ondemand{padding:15px 17px;margin-bottom:18px}
+  .od-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .od-head h3{font-size:14px;font-weight:800}
+  .od-sub{font-size:12px;color:var(--muted);margin-top:3px;max-width:560px;line-height:1.55}
+  .od-head select,.od-head button{margin-left:auto;align-self:center}
+  .od-head button.primary{background:var(--brand-live);color:#fff;border-color:transparent}
+  .od-head button[disabled]{opacity:.55;cursor:default}
+  .fnd{display:grid;grid-template-columns:190px 90px 90px 1fr;gap:9px;padding:7px 0;
+       border-bottom:1px solid var(--border);font-size:12px;align-items:center}
+  .fnd:last-child{border-bottom:none}
+  .fnd .m{font-family:var(--mono);font-size:11.5px}
+  .fnd .d{color:var(--muted-dim);font-size:11.5px}
+  .od-meta{font-family:var(--mono);font-size:11px;color:var(--muted-dim);margin-top:10px}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>AI RCA</h2>
+      <div class="sub">Model narrative over deterministic findings</div></div>
+    <div class="top-actions">
+      <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
+      <button class="btn" onclick="load()">Refresh</button>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="note">
+      The model rewrites the summary paragraph and nothing else. It cannot add a
+      finding, change a severity, name a different culprit or invent a remediation
+      step — those come from <a href="/correlation-page">the rules</a>. Where the
+      narrative disagrees with the findings above it, the findings are correct.
+    </div>
+    <div id="chain" class="chain"></div>
+
+    <div class="card ondemand">
+      <div class="od-head">
+        <div>
+          <h3>Analyse a system now</h3>
+          <div class="od-sub">Live RFC read, then one model call. Nothing runs on a
+            timer — four systems on a five-minute cycle would be about a thousand
+            calls a day to say "nothing is wrong".</div>
+        </div>
+        <select id="od-sys" class="btn"></select>
+        <button class="btn primary" id="od-run">Analyse now</button>
+      </div>
+      <div id="od-out"></div>
+    </div>
+
+    <h3 style="font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:22px 0 10px">Stored analyses · from incidents</h3>
+    <div id="list"><div class="card"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading analyses…</span></div></div></div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=ds4"></script>
+<script>
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px"><h2>Shared assets did not load</h2></div>';
+}
+</script>
+<script>
+IB.mountShell("rca");
+IB.mountSchedulerControl("sched-ctl");
+
+function chain(provider) {
+  const box = document.getElementById("chain");
+  if (!provider || provider.error) {
+    box.innerHTML = `<span class="key dead">provider unavailable${
+      provider && provider.error ? ": " + IB.esc(provider.error) : ""}</span>`;
+    return;
+  }
+  if (!provider.configured) {
+    box.innerHTML = `<span class="key">${IB.esc(provider.provider || "single provider")}</span>`;
+    return;
+  }
+  const exhausted = new Set(provider.exhausted || []);
+  box.innerHTML =
+    `<span style="font-size:11px;color:var(--muted-dim);align-self:center;
+      text-transform:uppercase;letter-spacing:.05em">Key chain</span>` +
+    provider.configured.map(label =>
+      `<span class="key ${exhausted.has(label) ? "dead" : "live"}"
+        title="${exhausted.has(label) ? "Quota exhausted — retired for this run"
+                                      : "Available"}">${IB.esc(label)}</span>`).join("");
+}
+
+function analysisCard(i) {
+  const ai = i.ai_analysis || {};
+  const severity = String(i.severity || "UNKNOWN").toUpperCase();
+
+  const list = (items, cls) => (items && items.length)
+    ? `<ul class="${cls || ""}">${items.map(x => `<li>${IB.esc(x)}</li>`).join("")}</ul>` : "";
+
+  return `
+    <div class="rca ${severity}">
+      <div class="rh">
+        <span class="chip c-${severity === 'CRITICAL' ? 'crit' : 'warn'}">${IB.esc(severity)}</span>
+        <h4>${IB.esc(i.title || i.rule_id)}</h4>
+        <span class="meta">${IB.esc(i.system)}/${IB.esc(i.client || "")}</span>
+        <span class="meta">${IB.esc(i.ai_analysis_at || i.last_seen || "")}</span>
+      </div>
+      <div class="rb">
+        <h5>Deterministic finding · from the rule</h5>
+        <div class="det">
+          <div style="font-size:12.5px;line-height:1.6">${IB.esc(i.description || "—")}</div>
+          <div style="font-family:var(--mono);font-size:11.5px;color:var(--muted-dim);margin-top:5px">
+            ${IB.esc(i.rule_id)}${i.confidence ? ` · confidence ${IB.esc(String(i.confidence))}` : ""}
+          </div>
+        </div>
+
+        ${(i.evidence || []).length ? `<h5>Evidence</h5>${list(i.evidence, "ev")}` : ""}
+
+        <h5>AI narrative</h5>
+        <div class="hyp">
+          <span class="tag">HYPOTHESIS · CYCLE-LEVEL · NOT A FINDING</span>
+          ${IB.esc(ai.likely_root_cause || ai.summary || "(no narrative returned)")}
+        </div>
+
+        ${(ai.limitations || []).length
+          ? `<h5>Stated limitations</h5>${list(ai.limitations)}` : ""}
+        ${(ai.contradicting_evidence || []).length
+          ? `<h5>Contradicting evidence</h5>${list(ai.contradicting_evidence, "ev")}` : ""}
+      </div>
+    </div>`;
+}
+
+async function load() {
+  const box = document.getElementById("list");
+  try {
+    const d = await (await fetch("/api/rca")).json();
+    chain(d.provider);
+
+    if (!d.analyses || !d.analyses.length) {
+      box.innerHTML = `<div class="card"><div class="why-empty">
+        <b>No AI analyses yet.</b><br>
+        An analysis is attached to an incident, so one has to exist first.
+        No correlation rule has matched — see
+        <a href="/incidents-page">Incidents</a> and
+        <a href="/correlation-page">Correlation</a>.<br><br>
+        If the key chain above shows every key retired, the model could not be
+        reached. That does not affect findings, severities or remediation —
+        only this narrative paragraph is missing.
+      </div></div>`;
+      return;
+    }
+    box.innerHTML = d.analyses.map(analysisCard).join("");
+  } catch (e) {
+    box.innerHTML = `<div class="card"><div class="empty">
+      Could not load analyses: ${IB.esc(String(e))}</div></div>`;
+  }
+}
+
+async function fillSystems() {
+  try {
+    const d = await (await fetch("/api/systems")).json();
+    const names = (d.systems || d || []).map(s => s.name || s).filter(Boolean);
+    document.getElementById("od-sys").innerHTML =
+      names.map(n => `<option value="${IB.esc(n)}">${IB.esc(n)}</option>`).join("");
+  } catch (e) {
+    document.getElementById("od-sys").innerHTML = "<option>—</option>";
+  }
+}
+
+function findingRow(f) {
+  const cls = f.status === "CRITICAL" ? "crit" : f.status === "WARNING" ? "warn" : "unk";
+  return `<div class="fnd">
+    <span class="m">${IB.esc(f.name)}</span>
+    <span class="m">${IB.esc(f.value)}</span>
+    <span class="chip c-${cls}">${IB.esc(f.status)}</span>
+    <span class="d">${IB.esc(f.detail || "")}${f.source ? " · " + IB.esc(f.source) : ""}</span>
+  </div>`;
+}
+
+async function analyseNow() {
+  const system = document.getElementById("od-sys").value;
+  const button = document.getElementById("od-run");
+  const out = document.getElementById("od-out");
+  if (!system) return;
+
+  button.disabled = true;
+  button.textContent = "Reading " + system + "…";
+  out.innerHTML = `<div class="empty" style="padding:18px">Live RFC read, then one model call…</div>`;
+
+  try {
+    const r = await IB.post("/api/rca/analyze/" + encodeURIComponent(system));
+    const d = await r.json();
+
+    if (d.analysed === false) {
+      // Not connected: no model call was made and no tokens were spent.
+      out.innerHTML = `<div class="hyp" style="margin-top:14px">
+        <b>${IB.esc(system)} did not answer over RFC.</b><br>
+        ${IB.esc(d.detail || "")}<br><br>
+        No analysis was requested — asking a model to explain an absence of data
+        produces confident prose about a system it never saw. No tokens spent.
+      </div>`;
+      return;
+    }
+
+    const findings = (d.findings || []).length
+      ? `<h5 style="font-size:9.5px;font-weight:700;letter-spacing:.05em;
+           text-transform:uppercase;color:var(--muted-dim);margin:16px 0 4px">
+           Deterministic findings · computed before the model was called</h5>
+         ${d.findings.map(findingRow).join("")}`
+      : `<div class="empty" style="padding:14px">No metric outside threshold.
+           ${IB.esc(String(d.metric_count))} read.</div>`;
+
+    const a = d.analysis || {};
+    const li = arr => (arr && arr.length)
+      ? "<ul style='margin:4px 0 0 18px;line-height:1.7'>"
+        + arr.map(x => `<li>${IB.esc(x)}</li>`).join("") + "</ul>"
+      : "<span style='color:var(--muted-dim)'>none provided</span>";
+
+    const narrative = d.narrative_error
+      ? `<div class="hyp" style="margin-top:14px">
+           <span class="tag">MODEL CALL FAILED</span>
+           ${IB.esc(d.narrative_error)}<br><br>
+           The findings above are unaffected — they were computed before the call.
+         </div>`
+      : (d.narrative || (a && a.root_cause) ? `<div class="hyp" style="margin-top:14px">
+           <span class="tag">${IB.esc((a.finding_status || "HYPOTHESIS"))} · ${
+             IB.esc(a.root_cause_category || "ANALYSIS")} · ${
+             IB.esc(a.confidence || "")}${a.confidence_score != null
+               ? " (" + a.confidence_score + ")" : ""}</span>
+           <div style="margin-top:8px;font-weight:600">${IB.esc(a.root_cause || d.narrative)}</div>
+           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px">
+             <div><h5 style="margin:0 0 4px">Supporting evidence</h5>${li(a.supporting_evidence)}</div>
+             <div><h5 style="margin:0 0 4px">Recommended actions</h5>${li(a.recommended_actions)}</div>
+           </div>
+           ${(a.contradicting_evidence && a.contradicting_evidence.length)
+             ? `<div style="margin-top:12px"><h5 style="margin:0 0 4px">Contradicting evidence</h5>${li(a.contradicting_evidence)}</div>` : ""}
+           ${(a.limitations && a.limitations.length)
+             ? `<div style="margin-top:12px"><h5 style="margin:0 0 4px">Limitations</h5>${li(a.limitations)}</div>` : ""}
+         </div>` : "");
+
+    const who = IB.renderAttribution(d.attribution);
+    out.innerHTML = findings + narrative + (who ? `<h4 style="margin:18px 0 6px;font-size:13.5px">Who and what — named from the live read</h4>` + who : "") +
+      `<div class="od-meta">${IB.esc(d.system)} · ${IB.esc(d.overall_status)} ·
+        ${IB.esc(String(d.metric_count))} metrics · read ${IB.esc(d.read_at || "—")}</div>`;
+
+    chain(d.provider);
+  } catch (e) {
+    out.innerHTML = `<div class="empty" style="padding:18px">
+      Request failed: ${IB.esc(String(e))}</div>`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Analyse now";
+  }
+}
+
+document.getElementById("od-run").addEventListener("click", analyseNow);
+fillSystems();
+load();
+</script>
+</body>
+</html>

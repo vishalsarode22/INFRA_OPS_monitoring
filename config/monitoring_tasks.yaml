@@ -1,43 +1,63 @@
+# T-code capture tasks.
+#
+# whatsapp: true  -> this screenshot is sent to WhatsApp.
+# Every task is still CAPTURED for the sweep, report and evidence
+# store; the flag only controls delivery. Keeping capture and
+# delivery separate means muting a phone notification never
+# silently removes a screen from the audit record.
+#
+# Selected: SMLG, SM51, SM12, ST03N, ST06, SMQ1, SMQ2, SM66
+
 tasks:
-  - tcode: AL08
-    action: al08
-  - tcode: DB01
-    action: db01
-  - tcode: DB02
-    action: db02
-  - tcode: DB12
-    action: db12
-  - tcode: SCOT
-    action: scot
-  - tcode: SM12
-    action: sm12
-  - tcode: SM13
-    action: sm13
-  - tcode: SM21
-    action: sm21
-  - tcode: SM37
-    action: sm37_active
-  - tcode: SM37_CANCELLED
-    action: sm37_cancelled
-  - tcode: SM51
-    action: sm51
-  - tcode: SM58
-    action: sm58
-  - tcode: SM50 
-    action: sm50
-  - tcode: SM66
-    action: sm66
-  - tcode: SMLG
-    action: smlg
-  - tcode: SMQ1
-    action: smq1
-  - tcode: SMQ2
-    action: smq2
-  - tcode: SOST
-    action: sost
-  - tcode: SP01
-    action: sp01
-  - tcode: ST03N
-    action: st03n
-  - tcode: ST22
-    action: st22_today
+- tcode: AL08
+  action: al08
+- tcode: DB01
+  action: db01
+- tcode: DB02
+  action: db02
+- tcode: DB12
+  action: db12
+- tcode: SCOT
+  action: scot
+- tcode: SM12
+  action: sm12
+  whatsapp: true
+- tcode: SM13
+  action: sm13
+- tcode: SM21
+  action: sm21
+- tcode: SM37
+  action: sm37_active
+- tcode: SM37_CANCELLED
+  action: sm37_cancelled
+- tcode: SM51
+  action: sm51
+  whatsapp: true
+- tcode: SM58
+  action: sm58
+- tcode: SM50
+  action: sm50
+- tcode: SM66
+  action: sm66
+  whatsapp: true
+- tcode: SMLG
+  action: smlg
+  whatsapp: true
+- tcode: SMQ1
+  action: smq1
+  whatsapp: true
+- tcode: SMQ2
+  action: smq2
+  whatsapp: true
+- tcode: SOST
+  action: sost
+- tcode: SP01
+  action: sp01
+- tcode: ST03N
+  action: st03n
+  whatsapp: true
+- tcode: ST22
+  action: st22_today
+- tcode: ST06
+  action: st06
+  whatsapp: true

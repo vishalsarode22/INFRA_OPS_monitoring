@@ -1,11 +1,37 @@
-2026-08-31 07:32:49,430 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: garbage | no rows
-2026-08-31 07:32:49,430 | ERROR    | collectors.sap_process_collector | Skipping parse -- collector reported error: boom
-2026-08-31 07:33:05,955 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
-2026-08-31 07:33:05,955 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
-2026-08-31 08:28:30,111 | ERROR    | collectors.sap_process_collector | sapcontrol produced no usable output. Tried: su -> bash: sapcontrol: command not found | /usr/sap/hostctrl/exe/sapcontrol -> bash: sapcontrol: command not found | /usr/sap/TST/D02/exe/sapcontrol -> bash: sapcontrol: command not found | /usr/sap/TST/DVEBMGS02/exe/sapcontrol -> bash: sapcontrol: command not found
-2026-08-31 08:28:39,454 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
-2026-08-31 08:28:39,454 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
-2026-08-31 10:19:49,576 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
-2026-08-31 10:19:49,577 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
-2026-08-31 10:26:13,771 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
-2026-08-31 10:26:13,771 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
+2026-09-08 10:42:47,429 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: SAP connection found but no sessions attached. Try fully closing SAP Logon/SAP GUI and logging in fresh.
+2026-09-08 10:42:49,482 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: SAP connection found but no sessions attached. Try fully closing SAP Logon/SAP GUI and logging in fresh.
+2026-09-08 10:42:51,513 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: SAP connection found but no sessions attached. Try fully closing SAP Logon/SAP GUI and logging in fresh.
+2026-09-08 10:42:53,564 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: SAP connection found but no sessions attached. Try fully closing SAP Logon/SAP GUI and logging in fresh.
+2026-09-08 10:42:55,607 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: SAP connection found but no sessions attached. Try fully closing SAP Logon/SAP GUI and logging in fresh.
+2026-09-08 22:18:19,132 | ERROR    | main | Pipeline for PRD appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-09 10:04:51,431 | ERROR    | main | Pipeline for PRD appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-09 10:10:34,295 | ERROR    | main | Pipeline for PRD appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-09 10:11:14,222 | ERROR    | main | All 2 attempts exhausted for PRD -- skipping this system for this cycle. Last error: Pipeline for PRD did not complete within 300s (hung).
+2026-09-09 15:38:44,005 | ERROR    | dashboard.app | Single-system run failed for CENTOR_QAS: cannot import name 'SapSession' from 'collectors.rfc_collector' (C:\infrabeatops\collectors\rfc_collector.py)
+2026-09-09 15:38:53,282 | ERROR    | dashboard.app | Single-system run failed for PRD: cannot import name 'SapSession' from 'collectors.rfc_collector' (C:\infrabeatops\collectors\rfc_collector.py)
+2026-09-09 17:23:34,632 | ERROR    | main | Pipeline for PRD appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-09 18:02:28,526 | ERROR    | main | Pipeline for PRD appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-09 22:01:07,952 | ERROR    | main | Pipeline for PRD appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-10 12:25:47,557 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 12:25:47,574 | ERROR    | collectors.sap_gui_collector | Could not acquire scripting session: RuntimeError
+2026-09-10 12:29:31,246 | ERROR    | main | Pipeline for PRD appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-10 12:34:51,476 | ERROR    | main | Pipeline for PRD appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-10 12:35:16,223 | ERROR    | main | All 2 attempts exhausted for PRD -- skipping this system for this cycle. Last error: Pipeline for PRD did not complete within 300s (hung).
+2026-09-10 14:20:02,427 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: (-2147352567, 'Exception occurred.', (614, 'saplogon', 'The enumerator of the collection cannot find an element with the specified index.', 'C:\\Program Files (x86)\\SAP\\FrontEnd\\SAPgui\\saplogon.HLP', 393215, 0), None)
+2026-09-10 14:20:06,525 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:20:11,462 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:20:16,805 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:20:20,026 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:20:24,548 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:20:29,230 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: SAP connection found but no sessions attached. Try fully closing SAP Logon/SAP GUI and logging in fresh.
+2026-09-10 14:33:02,330 | ERROR    | main | Pipeline for PRD appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-10 14:38:14,975 | ERROR    | main | Pipeline for PRD appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-10 14:38:21,129 | ERROR    | main | All 2 attempts exhausted for PRD -- skipping this system for this cycle. Last error: Pipeline for PRD did not complete within 300s (hung).
+2026-09-10 14:49:32,579 | ERROR    | main | Pipeline for CARFOUR QAS appears stuck -- no progress within 300s. Force-killing SAP processes to unblock it and moving on (this attempt counts as failed).
+2026-09-10 14:51:19,672 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:51:23,770 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:51:25,825 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:51:29,883 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:51:31,920 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:51:35,964 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.
+2026-09-10 14:51:38,010 | ERROR    | sap_gui.scripting_connection | Failed to get scripting session: No SAP connections found in scripting engine.

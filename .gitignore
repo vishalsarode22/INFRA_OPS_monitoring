@@ -13,3 +13,14 @@ reports/
 *.xlsm
 ~$*
 config/systems.yaml
+
+# --- added 2026-09-10 ---
+dashboard/snapshots/
+config/profile_state.json
+config/schedules.json
+*.bak
+probe_out.txt
+smlg_rfc*.txt
+alert_*.html
+Name
+CHANGES.diff

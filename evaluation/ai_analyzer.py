@@ -24,10 +24,26 @@ def get_provider() -> AIProvider:
         provider = configured.strip().lower()
     else:
         use_mock = os.getenv("USE_MOCK_AI", "true").strip().lower() == "true"
-        provider = "mock" if use_mock else "gemini"
+        if use_mock:
+            provider = "mock"
+        elif os.getenv("AI_PROVIDER_CHAIN"):
+            # A chain is configured, so use it rather than the single-key
+            # path -- otherwise the extra keys sit unused until someone
+            # notices AI_PROVIDER was never set.
+            provider = "failover"
+        else:
+            provider = "gemini"
 
     if provider == "gemini":
         return GeminiProvider()
+    if provider == "grok":
+        from evaluation.providers.grok import GrokProvider
+        return GrokProvider()
+    if provider in ("failover", "chain", "multi"):
+        from evaluation.providers.failover import FailoverProvider
+        chain = FailoverProvider()
+        log.info(f"AI provider chain: {chain.status()['configured']}")
+        return chain
     if provider == "mock":
         return MockAIProvider()
     raise ValueError(f"Unsupported AI_PROVIDER: {provider}")
@@ -132,6 +148,7 @@ def analyze(
     incident=None,
     intelligence=None,
     gui_results=None,
+    attribution=None,
 ) -> AIAnalysis:
     """Analyze the most important available monitoring evidence.
 
@@ -152,6 +169,12 @@ and GUI evidence are analyzed.
 
         ai_intelligence = build_ai_intelligence_context(intelligence)
         context["operational_intelligence"] = ai_intelligence.as_dict()
+
+    if attribution:
+        # Named things behind the counters: who dumped, which job failed and
+        # why, which report holds a work process, who drives response time.
+        # Computed deterministically; the model explains, it does not invent.
+        context["attribution"] = attribution
 
     context["ai_contract"] = {
         "authoritative_severity": authoritative,

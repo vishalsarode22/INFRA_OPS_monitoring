@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>InfraBeatOps · Live Wall</title>
-<link rel="stylesheet" href="/static/shell.css?v=bf941ec8">
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds4">
 <style>
   /* Sized for a wall monitor: fewer, larger cards; readable across a room. */
   .wall{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(430px,1fr))}
@@ -37,31 +39,40 @@
   .wp-types b{color:var(--text)}
   .longest{margin-top:9px;font-size:11px;color:var(--amber);font-family:var(--mono)}
 
+  /* Workload from /SDF/SMON_HEADER. Dialog queue leads CPU and memory: it
+     rises while users are already waiting and the OS tiles still look fine. */
+  .smon{padding:11px 16px;border-top:1px solid var(--border)}
+  .smon-head{display:flex;justify-content:space-between;font-size:10px;font-weight:700;
+        letter-spacing:.05em;text-transform:uppercase;color:var(--muted-dim);margin-bottom:8px}
+  .smon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px 12px}
+  .smon-grid div{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .smon-grid .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;
+        color:var(--muted-dim)}
+  .smon-grid .v{font-family:var(--mono);font-size:12.5px;font-weight:700}
+  .smon-srv{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);
+        display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 12px}
+  .smon-srv .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;
+        color:var(--muted-dim);display:block}
+  .smon-srv .v{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
   /* T-code checklist. Compact grid so 14 counters fit without scrolling,
      sorted worst-first so the eye lands on a problem immediately. */
   .checks{padding:11px 16px;border-top:1px solid var(--border)}
   .checks-head{display:flex;justify-content:space-between;font-size:10px;font-weight:700;
         letter-spacing:.05em;text-transform:uppercase;color:var(--muted-dim);margin-bottom:8px}
-  .kc-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;
+  .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:1px;
         background:var(--border);border:1px solid var(--border);border-radius:6px;overflow:hidden}
-  .kc{background:var(--card);padding:10px 12px;min-width:0}
-  .kc-k{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
-        color:var(--muted-dim);margin-bottom:4px;white-space:nowrap;overflow:hidden;
-        text-overflow:ellipsis}
-  .kc-v{font-family:var(--mono);font-size:20px;font-weight:800;line-height:1.1}
-  .kc-d{font-size:9.5px;color:var(--muted-dim);margin-top:4px;overflow:hidden;
+  /* The metric name leads; the transaction code is provenance, not the
+     headline. The previous layout reserved 38px for the T-code and let the
+     label ellipsis away to "Lo..." -- which told a viewer nothing about what
+     375 was counting. */
+  .chk{background:var(--card);padding:7px 9px;display:flex;align-items:center;
+        justify-content:space-between;gap:9px;min-width:0}
+  .chk .txt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+  .chk .lb{font-size:11px;color:var(--muted);overflow:hidden;
         text-overflow:ellipsis;white-space:nowrap}
-  .kc.s-normal .kc-v{color:var(--green)}
-  .kc.s-warning{background:var(--amber-bg)} .kc.s-warning .kc-v{color:var(--amber)}
-  .kc.s-critical{background:var(--red-bg)}  .kc.s-critical .kc-v{color:var(--red)}
-  .kc.s-unknown .kc-v{color:var(--muted-dim);font-size:13px;font-style:italic}
-  .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:1px;
-        background:var(--border);border:1px solid var(--border);border-radius:6px;overflow:hidden}
-  .chk{background:var(--card);padding:7px 9px;display:flex;align-items:center;gap:7px;min-width:0}
-  .chk .tc{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--muted-dim);
-        min-width:38px}
-  .chk .lb{font-size:10.5px;color:var(--muted);flex:1;overflow:hidden;
-        text-overflow:ellipsis;white-space:nowrap}
+  .chk .tc{font-family:var(--mono);font-size:9px;font-weight:700;
+        letter-spacing:.04em;color:var(--muted-dim)}
   .chk .vl{font-family:var(--mono);font-size:12px;font-weight:800;white-space:nowrap}
   .chk.s-critical{background:var(--red-bg)}
   .chk.s-warning{background:var(--amber-bg)}
@@ -85,16 +96,17 @@
   <div class="topbar">
     <div>
       <h2>Live operations wall</h2>
-      <div class="sub">Direct RFC reads · refreshed every <span id="every">10</span>s</div>
+      <div class="sub">Direct RFC reads · <span id="every">manual</span> — click Read live to refresh</div>
     </div>
     <div class="top-actions">
       <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
       <span class="chip c-live"><span class="pulse"></span> <span id="livecount">–</span> live</span>
-      <select class="input" id="rate">
-        <option value="5000">5s</option>
-        <option value="10000" selected>10s</option>
-        <option value="30000">30s</option>
-        <option value="0">paused</option>
+      <button class="btn btn-primary" id="readlive">↻ Read live</button>
+      <select class="input" id="rate" title="Auto-refresh interval (manual = only when Read live is clicked)">
+        <option value="0" selected>manual</option>
+        <option value="10000">every 10s</option>
+        <option value="30000">every 30s</option>
+        <option value="60000">every 60s</option>
       </select>
       <span id="run-ctl"></span>
       <button class="btn" id="theme">◑ Light</button>
@@ -103,7 +115,7 @@
 
   <div class="content">
     <div id="banner"></div>
-    <div class="wall" id="wall"><div class="empty">Reading live RFC…</div></div>
+    <div class="wall" id="wall"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Reading live RFC…</span></div></div>
     <div style="margin-top:14px;font-size:11px;color:var(--muted-dim)">
       Last read <span id="gen" class="mono">–</span>. Values marked
       <span class="src src-rfc">RFC LIVE</span> come straight from the application
@@ -114,7 +126,7 @@
   </div>
 </main>
 
-<script src="/static/shell.js?v=69f382d5"></script>
+<script src="/static/shell.js?v=ds4"></script>
 <script>
 /* Every page here depends on shell.js for the sidebar, theme and helpers.
    If it fails to load the page renders bare with only a console error, which
@@ -125,10 +137,10 @@ if (typeof IB === "undefined") {
     '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
     '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
     '<p style="color:#666;line-height:1.6">This page needs ' +
-    '<code>/static/shell.js?v=69f382d5</code> and <code>/static/shell.css?v=bf941ec8</code>. ' +
+    '<code>/static/shell.js?v=ds4</code> and <code>/static/shell.css?v=ds4</code>. ' +
     'They are missing or the static mount is not serving them.</p>' +
     '<p style="color:#666;line-height:1.6">Check that ' +
-    '<code>dashboard/static/shell.js?v=69f382d5</code> exists, then restart the server. ' +
+    '<code>dashboard/static/shell.js?v=ds4</code> exists, then restart the server. ' +
     'If you are seeing this inside a preview pane rather than at ' +
     '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
     'behind a preview.</p></div>';
@@ -181,63 +193,83 @@ function overall(s) {
   return "normal";
 }
 
-/* Key counts, not the full T-code grid.
-
-   The wall is read from across a room, so 14 truncated labels ("User …",
-   "Failed…") carry less than five readable numbers. Anything CRITICAL or
-   WARNING is always shown regardless of this list -- a problem must never be
-   hidden by a display preference. The full table is on the detail page. */
-const KEY_CHECKS = [
-  ["sap.al08.user_logons",    "Sessions"],
-  ["sap.sm12.lock_count",     "Locks"],
-  ["sap.st22.dumps",          "Dumps"],
-  ["sap.sm37.cancelled_jobs", "Cancelled jobs"],
-  ["sap.sm13.failed_updates", "Failed updates"],
-];
-
 function checks(list, source, err) {
   if (err) {
-    return `<div class="checks"><div class="checks-head"><span>Checks</span>
-            <span>error</span></div><div class="no-data">${IB.esc(err)}</div></div>`;
+    return `<div class="checks"><div class="checks-head"><span>T-code checks</span>
+            <span>error</span></div>
+            <div class="no-data">${IB.esc(err)}</div></div>`;
   }
   if (!list || !list.length) {
-    return `<div class="checks"><div class="checks-head"><span>Checks</span>
+    return `<div class="checks"><div class="checks-head"><span>T-code checks</span>
             <span>no data</span></div>
-            <div class="no-data">No counters returned — system unreachable, or
-            Z_GET_OBSERVABILITY_DATA is not installed.</div></div>`;
+            <div class="no-data">No counters returned — the system is not reachable,
+            or Z_GET_OBSERVABILITY_DATA is not installed and the fallback queries
+            found nothing.</div></div>`;
   }
-
-  const by = Object.fromEntries(list.map(c => [c.metric, c]));
-  const bad = list.filter(c => c.status === "CRITICAL" || c.status === "WARNING");
-
-  const key = KEY_CHECKS
-    .filter(([m]) => by[m])
-    .map(([m, label]) => {
-      const c = by[m];
-      return `<div class="kc s-${c.status.toLowerCase()}"
-                   title="${IB.esc(c.metric)}${c.detail ? " — " + IB.esc(c.detail) : ""}">
-          <div class="kc-k">${IB.esc(label)}</div>
-          <div class="kc-v">${IB.esc(c.value.replace(/ count$/, ""))}</div>
-          ${c.detail ? `<div class="kc-d">${IB.esc(c.detail)}</div>` : ""}
-        </div>`;
-    }).join("");
-
-  // Anything breaching a threshold that is not already in the key list.
-  const extra = bad
-    .filter(c => !KEY_CHECKS.some(([m]) => m === c.metric))
-    .map(c => `<div class="kc s-${c.status.toLowerCase()}">
-        <div class="kc-k">${IB.esc(c.tcode)}</div>
-        <div class="kc-v">${IB.esc(c.value.replace(/ count$/, ""))}</div>
-        ${c.detail ? `<div class="kc-d">${IB.esc(c.detail)}</div>` : ""}
-      </div>`).join("");
-
+  const bad = list.filter(c => c.status === "CRITICAL" || c.status === "WARNING").length;
   return `<div class="checks">
       <div class="checks-head">
-        <span>Key counts · ${IB.esc(source || "RFC")}</span>
-        <span class="mono">${bad.length ? bad.length + " need attention"
-                                        : "all within threshold"} · ${list.length} checks</span>
+        <span>T-code checks · ${IB.esc(source || "RFC")}</span>
+        <span class="mono">${bad ? bad + " need attention" : "all within threshold"}
+              · ${list.length} checks</span>
       </div>
-      <div class="kc-row">${key}${extra}</div>
+      <div class="check-grid">
+        ${list.map(c => `<div class="chk s-${c.status.toLowerCase()}"
+             title="${IB.esc(c.metric)}${c.detail ? " — " + IB.esc(c.detail) : ""}">
+            <span class="txt">
+              <span class="lb">${IB.esc(c.label)}</span>
+              <span class="tc">${IB.esc(c.tcode)}</span>
+            </span>
+            <span class="vl">${IB.esc(c.value)}</span>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+
+function smonPanel(sm) {
+  if (!sm || sm.cpu === undefined && sm.dialog_queue === undefined) return "";
+  if (!Object.keys(sm).length) return "";
+  const cell = (k, v, suffix) =>
+    (v === null || v === undefined) ? "" :
+    `<div><span class="k">${k}</span><span class="v">${IB.esc(String(v))}${suffix || ""}</span></div>`;
+  const cells = [
+    cell("Dialog queue", sm.dialog_queue),
+    cell("Update queue", sm.update_queue),
+    cell("Sessions", sm.sessions),
+    cell("Users", sm.users),
+    cell("Free RAM", sm.free_mem_mb, " MB"),
+    cell("Free incl. cache", sm.free_mem_mb_inc_fs, " MB"),
+    cell("RAM excl. cache", sm.memory_excl_cache, "%"),
+    cell("CPU idle", sm.cpu_idle_raw, "%"),
+    cell("Instances", sm.instance_count),
+    cell("Dialog avg 60s", sm.dialog_avg_60s),
+    cell("DB round-trip", sm.db_rtt_ms, " ms"),
+    cell("CPUs", sm.cpus),
+  ].join("");
+  if (!cells) return "";
+  // Per-instance breakdown. Aggregate totals hide the case where one app
+  // server is saturated and the other is idle -- which averages to "fine".
+  let perServer = "";
+  if (sm.per_server && sm.per_server.length > 1) {
+    perServer = `<div class="smon-srv">` + sm.per_server.map(p =>
+      `<div><span class="k">${IB.esc(p.server)}</span><span class="v">` +
+      [p.cpu === null ? "cpu –" : `cpu ${p.cpu}%`,
+       p.free_mem_mb === null ? "" : `free ${p.free_mem_mb} MB`,
+       p.sessions === null ? "" : `${p.sessions} sess`]
+        .filter(Boolean).join(" · ") + `</span></div>`).join("") + `</div>`;
+  }
+
+  const head = sm.instance_count > 1
+    ? `${sm.instance_count} instances · ${IB.esc(sm.server || "")}`
+    : IB.esc(sm.server || "");
+
+  return `<div class="smon">
+      <div class="smon-head">
+        <span>Workload · SMON</span>
+        <span class="mono">${head}${sm.sample_time ? " · " + IB.esc(sm.sample_time) : ""}</span>
+      </div>
+      <div class="smon-grid">${cells}</div>
+      ${perServer}
     </div>`;
 }
 
@@ -250,11 +282,17 @@ function workProcesses(wp) {
   const pct = wp.utilization_pct;
   const types = Object.entries(wp.by_type || {}).map(([k, v]) =>
     `<span>${IB.esc(k)} <b>${v.in_use}/${v.total}</b></span>`).join("");
+  // A blank WP_USER used to render as the literal word "system" next to the
+  // program name, which read as a username. Show whichever fields exist.
+  const lrParts = [];
+  if (wp.longest_running) {
+    lrParts.push(`WP ${IB.esc(wp.longest_running.wp)}`);
+    lrParts.push(`${Math.round(wp.longest_running.seconds / 60)}m`);
+    if (wp.longest_running.user) lrParts.push(IB.esc(wp.longest_running.user));
+    if (wp.longest_running.report) lrParts.push(IB.esc(wp.longest_running.report));
+  }
   const lr = wp.longest_running
-    ? `<div class="longest">Longest running: WP ${IB.esc(wp.longest_running.wp)} ·
-       ${Math.round(wp.longest_running.seconds / 60)}m ·
-       ${IB.esc(wp.longest_running.user || "system")}
-       ${IB.esc(wp.longest_running.report || "")}</div>` : "";
+    ? `<div class="longest">Longest running: ${lrParts.join(" · ")}</div>` : "";
 
   return `<div class="wp">
       <div class="wp-head">
@@ -267,66 +305,79 @@ function workProcesses(wp) {
     </div>`;
 }
 
-function instances(list, responseTime, groups) {
-  if ((!list || !list.length) && (!groups || !groups.length)) return "";
+function instances(list) {
+  if (!list || !list.length) return "";
 
-  // Two different measurements, never conflated:
-  //   RFC round-trip -- measured here, dispatcher latency only
-  //   SMLG RESP_TIME -- message server's per-group figure, from RZLLITAB
-  const rtt = responseTime && responseTime.rtt;
-  const rttGrade = rtt === null || rtt === undefined ? "unknown"
-                 : rtt >= 1000 ? "critical" : rtt >= 300 ? "warning" : "normal";
-  const rttLine = (rtt === null || rtt === undefined)
-    ? '<span class="no-data">not measured</span>'
-    : `<b class="v-${rttGrade}">${rtt} ms</b> <span class="src src-rfc">RFC LIVE</span>`;
+  // SERVICES came from TH_SERVER_LIST and was empty on every system seen so
+  // far, so the column carried no information. Replaced with the per-instance
+  // response time -- which is what SMLG's own instance view shows and what
+  // the table is actually opened to find out.
+  //
+  // The separate logon-group table is gone with it. Five groups all reading
+  // "not measured" told the reader nothing except that groups exist; the
+  // per-instance figure is the same data in the form people use.
 
-  const instRows = (list || []).map(i => `<tr>
-      <td class="mono">${IB.esc(i.name)}</td>
-      <td class="mono">${IB.esc(i.host)}</td>
-      <td class="mono" style="color:var(--muted-dim)">${IB.esc(i.services || "—")}</td>
-      <td><span class="chip c-live">${IB.esc(i.state)}</span></td>
-    </tr>`).join("");
-
-  // RESP_TIME is 0 until the message server distributes logons through the
-  // group. Saying "not measured" is honest; showing 0 ms would read as an
-  // impossibly fast system.
-  const groupRows = (groups || []).map(g => {
-    const ms = g.response_ms;
-    const grade = ms === null ? "unknown"
-                : ms >= 2000 ? "critical" : ms >= 1000 ? "warning" : "normal";
-    return `<tr>
-      <td class="mono">${IB.esc(g.group)}</td>
-      <td class="mono" style="color:var(--muted-dim)">${IB.esc(g.kind)}</td>
-      <td class="mono">${IB.esc(g.instance)}</td>
-      <td class="mono"><b class="v-${grade}">${ms === null
-          ? '<span class="no-data">not measured</span>' : ms + " ms"}</b></td>
-      <td class="mono">${g.users === null ? "—" : g.users}</td>
-    </tr>`;
-  }).join("");
+  const cell = (i) => {
+    if (i.response_ms === null || i.response_ms === undefined) {
+      // STAT was readable and empty: the instance is idle, which is a
+      // measurement, not a gap. Say that instead of "not measured".
+      if (i.response_note) {
+        return `<span style="color:var(--muted)" title="${IB.esc(i.response_note)}">idle</span>` +
+               `<div style="font-size:9.5px;color:var(--muted-dim)">no dialog steps in window</div>`;
+      }
+      // Never render an unmeasured instance as 0 ms -- an instance nothing has
+      // measured is not a fast instance. The tooltip names what would make it
+      // measurable, so "not measured" is a next step rather than a dead end.
+      return '<span style="color:var(--muted-dim)" title="No RFC source has ' +
+             'a response time for this instance. RZLLITAB only measures users ' +
+             'who connect via a logon group; ST03 workload needs stat/level ' +
+             'enabled in RZ11; the STAT read found no dialog steps.">not measured</span>';
+    }
+    const ms = i.response_ms;
+    // A sparse-sample or daily-aggregate STAT figure is informational, not a
+    // verdict: render it muted with the reason, never red.
+    const lowConf = !!i.response_low_confidence;
+    const colour = lowConf ? "var(--muted)"
+                 : ms >= 1000 ? "var(--red)" : ms >= 400 ? "var(--amber)" : "var(--green)";
+    // A raw "470596 ms" is unreadable and invites the reader to assume a unit
+    // bug. Past a second, show seconds; past a minute, minutes and seconds.
+    // The exact millisecond figure stays in the tooltip.
+    const human = ms >= 60000
+      ? `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`
+      : ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
+    const stat = i.response_statistic || "median";
+    const note = lowConf && i.response_confidence_note ? i.response_confidence_note : "";
+    return `<span style="color:${colour}" title="${IB.esc(String(Math.round(ms)))} ms · ` +
+           `${IB.esc(stat)} per dialog step · ${IB.esc(i.response_source || "")}` +
+           `${note ? " · " + IB.esc(note) : ""}">` +
+           `${IB.esc(human)}</span>` +
+           `<div style="font-size:9.5px;color:var(--muted-dim)">${IB.esc(stat)}` +
+           (i.response_source ? ` · ${IB.esc(i.response_source)}` : "") +
+           (note ? `<br><span style="color:var(--amber)">${IB.esc(note)}</span>` : "") +
+           `</div>`;
+  };
 
   return `<div class="inst">
-      ${instRows ? `<table>
-        <tr><th>Instance</th><th>Host</th><th>Services</th><th>State</th></tr>
-        ${instRows}</table>` : ""}
-
-      ${groupRows ? `<div style="margin-top:12px">
-        <div class="checks-head" style="margin-bottom:6px">
-          <span>Logon groups · SMLG</span>
-          <span class="src src-rfc">RZLLITAB</span>
-        </div>
-        <table>
-          <tr><th>Group</th><th>Type</th><th>Instance</th>
-              <th>Response</th><th>Users</th></tr>
-          ${groupRows}
-        </table></div>` : ""}
-
-      <div style="margin-top:9px;font-size:11px;color:var(--muted-dim)">
-        RFC round-trip: ${rttLine}
-      </div>
+      <table>
+        <tr><th>Instance</th><th>Host</th><th>Response</th><th>Users</th><th>State</th></tr>
+        ${list.map(i => `<tr>
+          <td class="mono">${IB.esc(i.name)}</td>
+          <td class="mono">${IB.esc(i.host || "—")}</td>
+          <td class="mono">${cell(i)}</td>
+          <td class="mono">${i.users === null || i.users === undefined
+              ? "—" : IB.esc(String(i.users))}</td>
+          <td><span class="chip c-live">${IB.esc(i.state)}</span></td>
+        </tr>`).join("")}
+      </table>
     </div>`;
 }
 
 function card(s) {
+  // Defensive defaults. A warming-up or partial payload may be missing whole
+  // sub-objects; one unguarded s.dispatcher.label used to throw here, which
+  // took down the entire .map(card) and left the wall stuck on the loader.
+  const disp = s.dispatcher || { label: "…", status: "UNKNOWN", source: "" };
+  const icm = s.icm || { label: "…", status: "UNKNOWN", source: "" };
   const st = overall(s);
   const wp = s.work_processes || {};
   const wpPct = wp.available ? wp.utilization_pct : null;
@@ -352,23 +403,52 @@ function card(s) {
 
     <div class="tiles">
       ${tile("CPU", IB.val(s.cpu, "%", 0), gradeCpu(s.cpu), srcNote(s, "cpu"))}
-      ${tile("Memory", IB.val(s.memory, "%", 0), gradeCpu(s.memory), srcNote(s, "memory"))}
-      ${tile("WP in use", wp.available ? `${wp.in_use}/${wp.total}` : IB.val(null),
-             gradeWp(wpPct), wpPct !== null ? wpPct + "% used" : "")}
-      ${tile("Load 1m", IB.val(s.load_1m, "", 2),
-             s.load_1m === null ? "unknown" : (s.load_1m >= 8 ? "critical" : s.load_1m >= 4 ? "warning" : "normal"),
-             srcNote(s, "load_1m"))}
-      ${tile("Dispatcher", IB.esc(s.dispatcher.label), s.dispatcher.status.toLowerCase(),
-             s.dispatcher.source ? IB.esc(s.dispatcher.source) : "")}
-      ${tile("ICM", IB.esc(s.icm.label), s.icm.status.toLowerCase(),
-             s.icm.source ? IB.esc(s.icm.source) : "")}
-      ${tile("Sessions", IB.val(s.users, "", 0), s.users === null ? "unknown" : "normal")}
-      ${tile("Server time", IB.val(s.server_time), s.server_time ? "normal" : "unknown")}
+      ${/* Memory: show the percentage when one can be derived, labelled with
+            its basis so a cache-inclusive 99% is never mistaken for pressure.
+            Where no percentage exists but a free figure was read, show the
+            free figure rather than "No data". */""}
+      ${(() => {
+        const basis = (s.smon && s.smon.memory_basis) || null;
+        const freeStr = s.ccms && s.ccms.mem_free_display;
+        if (s.memory !== null && s.memory !== undefined) {
+          const label = s.memory_is_sap_internal ? "SAP memory" : "Memory";
+          return tile(label, IB.val(s.memory, "%", 0), gradeCpu(s.memory),
+                      basis ? basis : srcNote(s, "memory"));
+        }
+        if (freeStr) {
+          // No denominator, but a real free figure. Show it, grade neutral --
+          // free memory without a total cannot be graded, only reported.
+          return tile("Memory free", IB.esc(freeStr), "normal",
+                      "RFC · CCMS RZ20 · no total published");
+        }
+        return tile("Memory", IB.val(null), "unknown",
+                    s.ccms && s.ccms.memory_note ? IB.esc(s.ccms.memory_note)
+                                                 : srcNote(s, "memory"));
+      })()}
+      ${tile("Dispatcher", IB.esc(disp.label), (disp.status || "unknown").toLowerCase(),
+             disp.source ? IB.esc(disp.source) : "")}
+      ${tile("ICM", IB.esc(icm.label), (icm.status || "unknown").toLowerCase(),
+             icm.source ? IB.esc(icm.source) : "")}
+      ${/* Uptime, not wall clock. Shows how long since this instance last
+            (re)started -- the operational number. Falls back to the SAP
+            system clock only where the kernel start time is unreadable. */""}
+      ${s.uptime_text
+        ? tile("Uptime", IB.esc(s.uptime_text),
+               (s.uptime_seconds !== undefined && s.uptime_seconds < 1800 && !s.uptime_bounded)
+                 ? "warning" : "normal",
+               (s.last_downtime_text
+                  ? "last down: " + IB.esc(s.last_downtime_text)
+                    + (s.last_down_from ? " (" + IB.esc(s.last_down_from) + ")" : "")
+                  : (s.uptime_since ? "since " + IB.esc(s.uptime_since) : ""))
+               + (s.uptime_source ? " · " + IB.esc(s.uptime_source) : ""))
+        : tile("Server time", IB.val(s.server_time), s.server_time ? "normal" : "unknown",
+               s.server_time_source ? IB.esc(s.server_time_source) : "")}
     </div>
 
-    ${checks(s.checks, s.check_source, s.check_error)}
     ${workProcesses(wp)}
-    ${instances(s.instances, {...(s.response_time || {}), rtt: s.rfc_round_trip_ms}, s.logon_groups)}
+    ${instances(s.instances)}
+    ${checks(s.checks, s.check_source, s.check_error)}
+    ${smonPanel(s.smon)}
     ${err}
 
     <div class="foot">
@@ -391,7 +471,7 @@ async function monitorOne(name) {
   const btn = document.getElementById("run-" + name);
   if (btn) { btn.disabled = true; btn.textContent = "Monitoring…"; }
   try {
-    const r = await fetch("/api/run-now/" + encodeURIComponent(name), { method: "POST" });
+    const r = await IB.post("/api/run-now/" + encodeURIComponent(name));
     if (r.status === 409) {
       const d = await r.json();
       if (btn) { btn.disabled = false; btn.textContent = "Busy — try again"; }
@@ -418,11 +498,30 @@ async function pollRun(name) {
   load();
 }
 
+// One card's render failure must never blank the whole wall. If card() throws
+// on an unexpected payload, show that system as a broken tile and keep every
+// other system on screen -- the opposite of the all-or-nothing .map that left
+// the wall stuck on the loader.
+function safeCard(s) {
+  try {
+    return card(s);
+  } catch (e) {
+    const name = (s && s.system) ? IB.esc(s.system) : "unknown";
+    return `<div class="sys s-unknown unknown-fill">
+      <div class="sh"><div><h3>${name}</h3>
+      <div class="sid">render error</div></div></div>
+      <div class="err">This card could not be drawn: ${IB.esc(e.message)}.
+      The other systems are unaffected.</div></div>`;
+  }
+}
+
 async function load() {
   try {
     const d = await IB.get("/api/live");
+    IB.heartbeat.beat({ live: d.live_count, total: d.total,
+      critical: (d.systems || []).some(x => (x.checks || []).some(c => c.status === "CRITICAL")) });
     document.getElementById("wall").innerHTML =
-      d.systems.length ? d.systems.map(card).join("")
+      d.systems.length ? d.systems.map(safeCard).join("")
                        : '<div class="empty">No systems configured.</div>';
     document.getElementById("livecount").textContent = `${d.live_count}/${d.total}`;
     document.getElementById("gen").textContent = d.generated_at;
@@ -439,15 +538,76 @@ async function load() {
 }
 
 function schedule() {
-  if (timer) clearInterval(timer);
+  if (timer) timer.stop && timer.stop();
   const ms = Number(document.getElementById("rate").value);
-  document.getElementById("every").textContent = ms ? ms / 1000 : "—";
-  if (ms) timer = setInterval(load, ms);
+  const everyEl = document.getElementById("every");
+  if (everyEl) everyEl.textContent = ms ? ms / 1000 : "manual";
+  if (ms) timer = IB.poll(load, ms);
 }
 document.getElementById("rate").onchange = schedule;
 
-load();
-schedule();
+// Read live: trigger an on-demand read of every system, then poll /api/live
+// while it runs so cards fill in as each system lands. This is the manual
+// replacement for the old always-on timer -- nothing reads SAP until this
+// is clicked.
+const readBtn = document.getElementById("readlive");
+let readPoll = null;
+
+async function readLive() {
+  readBtn.disabled = true;
+  readBtn.textContent = "↻ Reading…";
+  try {
+    const r = await IB.post("/api/live/refresh", { label: "Reading all systems…" });
+    const body = await r.json().catch(() => ({}));
+    if (body.started === false && body.reason === "already_running") {
+      // A read is already in flight (e.g. double click) -- just watch it.
+    }
+    // Poll the wall data AND the job status until the pass completes.
+    if (readPoll) readPoll.stop && readPoll.stop();
+    readPoll = IB.poll(async () => {
+      await load();
+      let st = {};
+      try { st = await IB.get("/api/live/refresh/status"); } catch (e) {}
+      if (st && st.total) {
+        readBtn.textContent = st.in_progress
+          ? `↻ Reading ${st.done}/${st.total}…` : "↻ Read live";
+      }
+      if (st && !st.in_progress) {
+        if (readPoll) { readPoll.stop && readPoll.stop(); readPoll = null; }
+        readBtn.disabled = false;
+        readBtn.textContent = "↻ Read live";
+      }
+    }, 1500);
+  } catch (e) {
+    readBtn.disabled = false;
+    readBtn.textContent = "↻ Read live";
+    document.getElementById("banner").innerHTML =
+      `<div class="banner banner-err">Could not start read — ${IB.esc(e.message)}</div>`;
+  }
+}
+readBtn.onclick = readLive;
+
+// On first open: show whatever is already cached (instant, may be empty),
+// then kick one read automatically so the operator sees data without a
+// second click. Auto-refresh stays off unless they pick an interval.
+//
+// Any exception in this boot sequence used to leave the page stuck on the
+// "Reading live RFC…" placeholder with no clue why. Paint it on screen.
+function bootError(where, e) {
+  const msg = (e && e.stack) ? e.stack : String(e);
+  document.getElementById("wall").innerHTML =
+    `<div class="banner banner-err"><strong>Page failed to start (${IB.esc(where)}):</strong>
+     <pre style="white-space:pre-wrap;margin:6px 0 0">${IB.esc(msg)}</pre></div>`;
+  console.error("wall boot error in", where, e);
+}
+window.addEventListener("error", ev => bootError("window", ev.error || ev.message));
+window.addEventListener("unhandledrejection", ev => bootError("promise", ev.reason));
+
+(async () => {
+  try { await load(); } catch (e) { bootError("load", e); return; }
+  try { await readLive(); } catch (e) { bootError("readLive", e); }
+  try { schedule(); } catch (e) { bootError("schedule", e); }
+})();
 </script>
 </body>
 </html>

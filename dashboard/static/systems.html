@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>InfraBeatOps · Systems</title>
-<link rel="stylesheet" href="/static/shell.css?v=bf941ec8">
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds4">
 <style>
   .paths span{margin-right:4px}
   .cfg{font-family:var(--mono);font-size:11.5px;color:var(--muted-dim)}
@@ -27,7 +29,7 @@
       <div class="sub">Registry, collection paths and current state</div></div>
     <div class="top-actions">
       <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
-      <input class="input" id="q" placeholder="Filter…">
+      <input class="input" id="q" placeholder="🔍 Filter systems by name / SID / host" title="Type to filter the list. Leave empty to show all systems." style="min-width:280px">
       <span id="run-ctl"></span>
       <button class="btn" id="theme">◑ Light</button>
     </div>
@@ -175,7 +177,7 @@
   </div>
 </main>
 
-<script src="/static/shell.js?v=69f382d5"></script>
+<script src="/static/shell.js?v=ds4"></script>
 <script>
 /* Every page here depends on shell.js for the sidebar, theme and helpers.
    If it fails to load the page renders bare with only a console error, which
@@ -186,10 +188,10 @@ if (typeof IB === "undefined") {
     '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
     '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
     '<p style="color:#666;line-height:1.6">This page needs ' +
-    '<code>/static/shell.js?v=69f382d5</code> and <code>/static/shell.css?v=bf941ec8</code>. ' +
+    '<code>/static/shell.js?v=ds4</code> and <code>/static/shell.css?v=ds4</code>. ' +
     'They are missing or the static mount is not serving them.</p>' +
     '<p style="color:#666;line-height:1.6">Check that ' +
-    '<code>dashboard/static/shell.js?v=69f382d5</code> exists, then restart the server. ' +
+    '<code>dashboard/static/shell.js?v=ds4</code> exists, then restart the server. ' +
     'If you are seeing this inside a preview pane rather than at ' +
     '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
     'behind a preview.</p></div>';
@@ -229,6 +231,21 @@ function render() {
   const tbl = document.getElementById("tbl");
   tbl.innerHTML = tbl.rows[0].outerHTML + rows.map(row).join("");
   document.getElementById("count").textContent = `${rows.length} of ${DATA.length}`;
+
+  // Make a live filter impossible to mistake for missing systems.
+  let fnote = document.getElementById("filter-note");
+  if (!fnote) {
+    fnote = document.createElement("div");
+    fnote.id = "filter-note";
+    fnote.style.cssText = "margin:6px 0 10px;font-size:12.5px;color:var(--amber)";
+    tbl.parentNode.insertBefore(fnote, tbl);
+  }
+  fnote.innerHTML = (q && rows.length < DATA.length)
+    ? `Filter "<b>${IB.esc(q)}</b>" is hiding ${DATA.length - rows.length} system(s). `
+      + `<a href="#" id="clear-filter">Clear filter</a> to see all ${DATA.length}.`
+    : "";
+  const cf = document.getElementById("clear-filter");
+  if (cf) cf.onclick = (e) => { e.preventDefault(); document.getElementById("q").value = ""; render(); };
 
   // A system configured for a path that produced nothing is worth naming:
   // it means a collector failed, not that the system is quiet.
@@ -371,8 +388,7 @@ document.getElementById("f-save").onclick = async () => {
   const btn = document.getElementById("f-save");
   btn.disabled = true; btn.textContent = "Saving…";
   try {
-    const r = await fetch("/api/systems", {
-      method: "POST", headers: {"Content-Type": "application/json"},
+    const r = await IB.post("/api/systems", { headers: {"Content-Type": "application/json"},
       body: JSON.stringify(body),
     });
     const d = await r.json();

@@ -21,6 +21,7 @@ Two entry points:
                                             dashboard's multi-system scheduler
 """
 
+import os
 import sys
 import time
 import threading
@@ -423,9 +424,47 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
     result.metrics = evaluate_all(result.metrics, thresholds)
     result.compute_overall_status()
     result.events = EventEngine(result.system, result.client).process_metrics(result.metrics)
+    # Per-item detail for the correlation evidence: which job failed, run by
+    # whom, for how long -- and which accounts locked, and why. A count tells
+    # nobody what to do; "DBA:DATABACKUP ended at its start time, so it never
+    # ran" does.
+    _detail = {}
+    try:
+        from collectors.rfc_live import read_live as _read_live
+        _live = _read_live(name, system_config, use_cache=True) or {}
+        _detail = {"job_detail": _live.get("job_detail") or {},
+                   "locked_user_detail": _live.get("locked_user_detail") or {}}
+    except Exception as _exc:
+        # Detail is an enrichment. Losing it must not cost the incident.
+        log.warning(f"{name}: could not read job/user detail: {_exc}")
     result.incidents = CorrelationEngine(result.system, result.client).correlate(
-        result.metrics, result.events
+        result.metrics, result.events, detail=_detail
     )
+
+    # Tell whoever scheduled a failed or long-running job, from the SAME
+    # mailbox the Basis alerts use. Off unless NOTIFY_JOB_OWNERS is true;
+    # system accounts are never mailed; one mail per job per day.
+    try:
+        from notifications.job_owner import notify_job_owners
+        _owner = notify_job_owners(name, _detail.get("job_detail") or {},
+                                   get_smtp_config(system_config))
+        if _owner.get("sent"):
+            log.info(f"{name}: notified {_owner['sent']} job owner(s).")
+    except Exception as _exc:
+        # A notification problem must never fail a sweep: the metrics, the
+        # snapshot and the report are the product.
+        log.warning(f"{name}: job owner notification failed: {_exc}")
+
+    # Tell the team that owns a memory-dump spike -- ABAP, Basis or
+    # functional, decided by SAP_MEMORY_DUMP_ATTRIBUTION. Same guards as job
+    # owners: opt-in, Basis always copied, once per culprit per day.
+    try:
+        from notifications.dump_owner import notify_dump_owner
+        _dump = notify_dump_owner(name, result.incidents, get_smtp_config(system_config))
+        if _dump.get("sent"):
+            log.info(f"{name}: notified {_dump['sent']} dump owner team(s).")
+    except Exception as _exc:
+        log.warning(f"{name}: dump owner notification failed: {_exc}")
 
     # Operational intelligence is evaluated only after the complete metric and
     # incident picture exists. The runtime is per-system, so repeated scheduler
@@ -455,6 +494,7 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
         template_path=TEMPLATE_PATH,
         output_path=str(system_template_path(name, result.cycle_timestamp)),
         gui_results=gui_results,
+        result=result,
     )
 
     # Per-system alerting: a PRD alert should not land in a sandbox inbox
@@ -463,6 +503,19 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
     send_final_report(result, smtp_config, pdf_path, metrobrands_path)
 
     log.info(f"===== Pipeline COMPLETE for system {name} (gui_available={gui_available}) =====")
+
+    # Close SAP Logon / SAP GUI after a SUCCESSFUL run too. It was only ever
+    # killed on failure or at the start of the next run, so a good sweep
+    # left the GUI sitting on the last T-code (ST06 on the operator's
+    # screen) until the next cycle -- holding a session and a licence, and
+    # confusing whoever sits at the desktop. Best-effort; a close failing
+    # must not turn a completed sweep into a failed one.
+    if gui_available and os.environ.get("IBO_GUI_CLOSE_AFTER_SWEEP", "1").strip() not in ("0", "false", "no"):
+        try:
+            kill_sap_processes()
+            log.info(f"{name}: SAP GUI closed after successful sweep.")
+        except Exception as close_err:  # noqa: BLE001
+            log.warning(f"{name}: could not close SAP GUI after sweep: {close_err}")
     return True
 
 

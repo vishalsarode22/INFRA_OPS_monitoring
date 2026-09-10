@@ -15,3 +15,7 @@ paramiko
 # RFC collector. Requires the SAP NetWeaver RFC SDK on the host;
 # the collector degrades quietly if this is absent.
 pyrfc
+
+# ASE / Sybase collector. Needs an ODBC driver on the host: the SAP ASE
+# client's driver or FreeTDS (tds version 5.0). Degrades quietly if absent.
+pyodbc

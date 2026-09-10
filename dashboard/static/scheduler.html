@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>InfraBeatOps · Scheduler</title>
-<link rel="stylesheet" href="/static/shell.css?v=bf941ec8">
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds4">
 <style>
   .srow{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
         margin-bottom:13px;overflow:hidden}
@@ -50,17 +52,17 @@
       in progress — and resets on restart, unlike these schedules which persist.
     </div>
 
-    <div id="list"><div class="empty">Loading…</div></div>
+    <div id="list"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading schedule…</span></div></div>
   </div>
 </main>
 
-<script src="/static/shell.js?v=69f382d5"></script>
+<script src="/static/shell.js?v=ds4"></script>
 <script>
 if (typeof IB === "undefined") {
   document.body.innerHTML =
     '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
     '<h2>Shared assets did not load</h2><p style="color:#666">This page needs ' +
-    '<code>/static/shell.js?v=69f382d5</code>. If you are seeing this in a preview pane rather ' +
+    '<code>/static/shell.js?v=ds4</code>. If you are seeing this in a preview pane rather ' +
     'than at <code>127.0.0.1:8000</code>, that is expected.</p></div>';
 }
 </script>
@@ -163,8 +165,7 @@ function wire(s) {
     const btn = $("save");
     btn.disabled = true; btn.textContent = "Saving…";
     try {
-      const r = await fetch("/api/schedules/" + encodeURIComponent(s.system), {
-        method: "POST", headers: {"Content-Type": "application/json"},
+      const r = await IB.post("/api/schedules/" + encodeURIComponent(s.system), { headers: {"Content-Type": "application/json"},
         body: JSON.stringify(body),
       });
       const d = await r.json();

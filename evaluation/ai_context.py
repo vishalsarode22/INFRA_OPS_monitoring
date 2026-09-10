@@ -707,6 +707,8 @@ def build_rca_prompt(context: dict) -> str:
         "historical_matches": [],
         "active_events": [],
     }
+    if context.get("attribution"):
+        compact["attribution"] = context["attribution"]
 
     # ---------------------------------------------------------------
     # Metrics
@@ -1014,6 +1016,10 @@ The LLM is responsible for:
 - identifying supporting evidence
 - identifying contradicting evidence or limitations
 - recommending investigation steps
+- WHEN a "dumps" block is present under "attribution": naming the users,
+  hosts and programs behind the dump count and grouping them, so the answer
+  says WHO and WHAT is dumping, not merely how many. Where the program names
+  are absent, say so and point to ST22 for them rather than inventing them.
 
 The LLM is NOT responsible for:
 
@@ -1286,6 +1292,30 @@ IMPORTANT OUTPUT RULES
 
 6. Keep the root-cause description explicitly hypothetical when
    finding_status is HYPOTHESIS.
+
+ATTRIBUTION (when "attribution" is present in EVIDENCE)
+--------------------------------------------------------
+The attribution block names the concrete things behind each counter.
+Use it. A reader wants to know WHICH and WHO, not that "dumps occurred".
+
+- Dumps: name the users (attribution.dumps.by_user), the hosts, and the
+  programs and teams when by_program is present. If by_program is empty,
+  say plainly that program names were not readable over RFC and route
+  the investigation to ST22; do not guess a program.
+- Cancelled jobs: for EACH job name it, its owner, and the WHY given
+  (never started vs. died mid-run). Say who to contact (owner / email).
+- Long-running jobs and work processes: name the job or report, the user,
+  how long, and the WHY (waiting on X = blocked; doing Y = working but
+  heavy). Route custom (Z*/Y*) reports to the ABAP team, standard to Basis.
+- Response time: name the top users and reports (by response, DB time,
+  memory) as the drivers, per instance. If low_sample is true, say the
+  window is too thin to blame anyone.
+- Locks: name the owner of the oldest lock and any duplicate-object
+  contention.
+- Put these names in supporting_evidence and recommended_actions. The
+  user is execution CONTEXT (rule 4) -- name them as "where to look",
+  not as blame, unless the evidence shows repeated single-user cause.
+- Never list a name that is not in the attribution block.
 
 EVIDENCE
 --------

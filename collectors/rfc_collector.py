@@ -36,14 +36,12 @@ DESIGN RULES CARRIED OVER FROM THE RFC BRANCH
 
 from __future__ import annotations
 
+import os as _os
 import threading
 import time
 from datetime import datetime
 
 from core.models import MetricResult, Status
-from utils.logger import get_logger
-
-log = get_logger(__name__, "application")
 
 try:
     from pyrfc import Connection
@@ -103,6 +101,22 @@ def clear_cooldown(system: str | None = None) -> None:
         _cooldowns.clear() if system is None else _cooldowns.pop(system, None)
 
 
+def park(system: str, error_text: str) -> None:
+    """
+    Public entry point to the failure cooldown.
+
+    _park() used to be reachable only from collect_rfc_metrics(), i.e. from
+    the scheduled sweep. The live refresher called cooldown_remaining() but
+    nothing on that path ever WROTE a cooldown, so an unreachable host was
+    re-dialled on every single refresh pass. On Windows a TCP connect to a
+    host that does not answer sits for roughly 21 seconds before failing,
+    and the refresher waits for every system before sleeping -- so two dead
+    systems stretched an 8-second cycle to well over 20 and made every
+    healthy system's reading that stale.
+    """
+    _park(system, error_text)
+
+
 # --------------------------------------------------------------------------
 # Connection
 # --------------------------------------------------------------------------
@@ -143,7 +157,54 @@ def build_rfc_params(cfg: dict) -> dict | None:
     route = _format_saprouter(rfc.get("saprouter"))
     if route:
         params["saprouter"] = route
+
+    # Bound the connect attempt. Without these the NetWeaver RFC library
+    # inherits the OS TCP timeout -- about 21s on Windows -- so a host that
+    # is powered off or firewalled holds a worker for that whole time. Both
+    # are standard SAP connection parameters, passed straight through by
+    # pyrfc, and both are overridable per system in systems.yaml.
+    params["CPIC_MAX_CONV"] = "50"
+    for key, env, default in (
+        ("NWRFC_CONNECT_TIMEOUT", "IBO_RFC_CONNECT_TIMEOUT", "8"),
+        ("NWRFC_COMM_TIMEOUT", "IBO_RFC_COMM_TIMEOUT", "30"),
+    ):
+        value = str(rfc.get(key.lower()) or _os.environ.get(env) or default).strip()
+        if value and value != "0":
+            params[key] = value
     return params
+
+
+def _tcp_reachable(host: str, params: dict, cfg: dict) -> tuple[bool, str]:
+    """
+    Can we open a TCP socket to the app server's dispatcher/gateway port?
+
+    A cheap gate in front of the RFC logon so an unreachable host fails in
+    under a second instead of on the OS TCP timeout. The port is the SAP
+    dispatcher port for the instance: 33NN where NN is the system number.
+    Derived from sysnr when present, else from an explicit rfc.port, else the
+    common 3300.
+    """
+    import socket
+
+    rfc = cfg.get("rfc") or {}
+    port = None
+    sysnr = str(params.get("sysnr") or rfc.get("sysnr") or "").strip()
+    if sysnr.isdigit():
+        port = 3300 + int(sysnr)
+    if port is None:
+        try:
+            port = int(str(rfc.get("port") or "3300").strip())
+        except ValueError:
+            port = 3300
+
+    timeout = float(_os.environ.get("IBO_RFC_TCP_PROBE_TIMEOUT", "2") or 2)
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True, ""
+    except OSError as exc:
+        return False, (f"host {host}:{port} not reachable "
+                       f"({exc.__class__.__name__}) -- network/Basis check, "
+                       f"not a code issue")
 
 
 class SapSession:
@@ -164,6 +225,27 @@ class SapSession:
         if not params:
             self.error = "no RFC configuration (ashost, username or password missing)"
             return self
+
+        # FAST REACHABILITY PRE-CHECK.
+        #
+        # NWRFC_CONNECT_TIMEOUT is honoured by the RFC library only once it
+        # has a socket; it does NOT bound the initial TCP connect. So a host
+        # that is powered off or firewalled (SARLOHA PRD, CEQ) still made
+        # Connection() sit on the OS TCP timeout -- ~21s on Windows -- and
+        # since the refresher waits for every system, two dead hosts set the
+        # pace for all of them. A plain socket connect with a short timeout
+        # turns that 21s hang into a sub-second failure, and only then do we
+        # reach for the (much heavier) RFC logon.
+        #
+        # Skipped when a SAProuter is in play: the route target is not the
+        # ashost, so a direct probe would test the wrong endpoint.
+        host = params.get("ashost")
+        if host and not params.get("saprouter"):
+            reachable, why = _tcp_reachable(host, params, self.cfg)
+            if not reachable:
+                self.error = why
+                return self
+
         try:
             self.conn = Connection(**params)
             self.ok = True
@@ -189,13 +271,84 @@ class SapSession:
         except Exception:
             return None
 
+    # RFC_READ_TABLE takes its WHERE clause as OPTIONS, a table of lines of
+    # 72 characters. Anything longer is TRUNCATED BY SAP, and a clause cut
+    # mid-expression raises SAPSQL_PARSE_ERROR / CX_SY_DYNAMIC_OSQL_SEMANTICS
+    # in SAPLSDTX -- a short dump, on the monitored system, on every call.
+    #
+    # This was found the hard way: a WHERE of
+    #   ( STATUS = 'A' AND ENDDATE = '...' ) OR ( STATUS = 'R' AND ... )
+    # is 87 characters, and produced one dump every ten seconds on a system
+    # the wall was polling.
+    OPTIONS_LINE_LENGTH = 72
+
+    @staticmethod
+    def _split_where(where: str) -> list[dict]:
+        """
+        Break a WHERE clause into <=72-character lines.
+
+        SAP concatenates the lines back together, so the split must fall on a
+        SPACE. Splitting mid-token would join two lines into one broken
+        identifier and produce the same parse error this exists to prevent.
+
+        A single token longer than the limit cannot be split safely -- that is
+        returned whole and will fail, loudly, rather than being silently cut
+        into something that parses into a different query.
+        """
+        where = " ".join(str(where or "").split())
+        if not where:
+            return []
+
+        lines, current = [], ""
+        for token in where.split(" "):
+            if not current:
+                current = token
+            elif len(current) + 1 + len(token) <= SapSession.OPTIONS_LINE_LENGTH:
+                current = f"{current} {token}"
+            else:
+                lines.append(current)
+                current = token
+        if current:
+            lines.append(current)
+
+        # A line must never END on a dangling operator. How SAP rejoins the
+        # lines -- with a space or without -- is not something to rely on, and
+        # "... AND" + "FIELD = 'x'" concatenated without a space becomes
+        # ANDFIELD and parses as nothing. Trailing operators are pushed onto
+        # the next line instead.
+        fixed: list[str] = []
+        carry = ""
+        for line in lines:
+            line = (carry + " " + line).strip() if carry else line
+            carry = ""
+            parts = line.split(" ")
+            while parts and parts[-1].upper() in ("AND", "OR", "NOT", "(", "="):
+                carry = (parts.pop() + " " + carry).strip()
+            if parts:
+                fixed.append(" ".join(parts))
+            elif carry:
+                # Whole line was operators; keep it rather than drop a clause.
+                fixed.append(carry)
+                carry = ""
+        if carry:
+            fixed.append(carry)
+
+        if any(len(line) > SapSession.OPTIONS_LINE_LENGTH for line in fixed):
+            # Caller's clause cannot be expressed safely. Better to say so
+            # than to send something SAP will truncate into a short dump.
+            log.warning("WHERE clause cannot be split within "
+                        f"{SapSession.OPTIONS_LINE_LENGTH} chars without "
+                        f"breaking a token: {where[:120]}")
+
+        return [{"TEXT": line} for line in fixed]
+
     def read_table(self, table: str, fields: list[str], where: str = "", rows: int = 500):
         res = self.call(
             "RFC_READ_TABLE",
             QUERY_TABLE=table,
             DELIMITER="|",
             FIELDS=[{"FIELDNAME": f} for f in fields],
-            OPTIONS=[{"TEXT": where}] if where else [],
+            OPTIONS=self._split_where(where),
             ROWCOUNT=rows,
         )
         return None if res is None else [r["WA"].split("|") for r in res.get("DATA", [])]
@@ -252,18 +405,6 @@ _ZERO_IS_MISSING = {"cpu", "memory", "memory.total_gb"}
 _NEGATIVE_IS_MISSING = {"cpu", "memory", "memory.total_gb", "load_1m"}
 
 # TAB512 detail tables -> metric key.
-# Delimited EV_*_LIST exports. The Option-A function module (no custom DDIC
-# types) returns detail lists as comma/pipe-separated strings rather than
-# TABLES parameters. Nothing read them, which is why the Detail column was
-# empty even though the names were being collected and returned.
-_FM_LISTS = {
-    "EV_ACTIVE_USERS_LIST":   ("sap.al08.user_logons",    ","),
-    "EV_LOCK_USERS_LIST":     ("sap.sm12.lock_count",     ","),
-    "EV_CANCELLED_JOBS_LIST": ("sap.sm37.cancelled_jobs", ","),
-    "EV_RUNNING_JOBS_LIST":   ("sap.sm37.active_jobs",    ","),
-    "EV_SHORT_DUMP_LIST":     ("sap.st22.dumps",          "|"),
-}
-
 _FM_TABLES = {
     "ET_SHORT_DUMPS": "sap.st22.dumps",
     "ET_LOCK_USERS": "sap.sm12.lock_count",
@@ -335,23 +476,8 @@ def _from_function_module(session: SapSession) -> list[MetricResult]:
     if not result:
         return []
 
-    # TABLES parameters first (corrected FM), then the delimited strings
-    # (Option-A FM). Whichever the installed module returns, the names reach
-    # the Detail column.
     details = {key: _detail_rows(result.get(param), key)
                for param, key in _FM_TABLES.items()}
-
-    for param, (key, delimiter) in _FM_LISTS.items():
-        if details.get(key):
-            continue
-        raw = str(result.get(param, "") or "").strip()
-        if not raw:
-            continue
-        entries = [e.strip() for e in raw.split(delimiter) if e.strip()]
-        if key == "sap.st22.dumps":
-            # "HHMMSS-USER" per entry.
-            entries = [e.replace("-", " ") for e in entries]
-        details[key] = ", ".join(entries[:12])
 
     metrics: list[MetricResult] = []
     for export, (name, tcode, unit, category) in _FM_METRICS.items():
@@ -420,59 +546,6 @@ def _from_function_module(session: SapSession) -> list[MetricResult]:
         ))
 
     return metrics
-
-
-# Metrics the function module counts but does not name. Detail is fetched
-# separately, and ONLY when the count is non-zero -- an operator seeing "3
-# failed updates" needs to know whose, but querying VBHDR on every cycle for
-# a system with zero failures is pure overhead.
-_DETAIL_QUERIES = {
-    "sap.sm13.failed_updates": ("VBHDR",     ["VBUSR", "VBKEY"],  "{today}", 20),
-    "sap.sm58.stuck_entries":  ("ARFCSSTATE",["ARFCIPID", "ARFCDEST"], None,  20),
-    "sap.we02.failed_idocs":   ("EDIDC",     ["DOCNUM", "RCVPRN"], "{today}", 20),
-    "sap.su01.locked_users":   ("USR02",     ["BNAME"],            None,      20),
-}
-
-_DETAIL_WHERE = {
-    "sap.sm13.failed_updates": "VBDATE = '{today}' AND VBSTATE <> '00'",
-    "sap.sm58.stuck_entries":  "ARFCSTATE = 'SYSFAIL' OR ARFCSTATE = 'CPICERR'",
-    "sap.we02.failed_idocs":   "UPDDAT = '{today}' AND STATUS = '51'",
-    "sap.su01.locked_users":   "UFLAG <> '0'",
-}
-
-
-def _enrich_details(session: SapSession, metrics: list) -> None:
-    """
-    Fills the Detail column for counted-but-unnamed metrics, in place.
-
-    A bare count tells an operator something is wrong but not where to look.
-    "2 locked users" is a number; "MONITORING, BATCHUSER" is an action.
-    """
-    today = datetime.now().strftime("%Y%m%d")
-
-    for metric in metrics:
-        if metric.detail or not metric.value:
-            continue
-        spec = _DETAIL_QUERIES.get(metric.name)
-        if not spec:
-            continue
-
-        table, fields, _, rows = spec
-        where = _DETAIL_WHERE.get(metric.name, "").replace("{today}", today)
-        try:
-            data = session.read_table(table, fields, where, rows)
-        except Exception:
-            continue
-        if not data:
-            continue
-
-        entries = []
-        for row in data[:12]:
-            parts = [p.strip() for p in row if p and p.strip()]
-            if parts:
-                entries.append(" ".join(parts[:2]))
-        if entries:
-            metric.detail = ", ".join(entries)
 
 
 def _from_standard_modules(session: SapSession) -> list[MetricResult]:
@@ -557,11 +630,6 @@ def collect_rfc_metrics(system: str, cfg: dict) -> tuple[list[MetricResult], str
         metrics = _from_function_module(session)
         if not metrics:
             metrics = _from_standard_modules(session)
-        # Names for the counts the FM does not itemise.
-        try:
-            _enrich_details(session, metrics)
-        except Exception as exc:
-            log.debug(f"{system}: detail enrichment skipped: {exc}")
         if not metrics:
             return [], "connected, but no metrics could be read"
         return metrics, None

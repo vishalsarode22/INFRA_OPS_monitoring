@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>InfraBeatOps · System detail</title>
-<link rel="stylesheet" href="/static/shell.css?v=bf941ec8">
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds4">
 <style>
   .tabs{display:flex;gap:5px;border-bottom:1px solid var(--border);margin-bottom:16px}
   .tab{padding:9px 15px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted);
@@ -13,6 +15,9 @@
   .tab.on{color:var(--brand-live);border-bottom-color:var(--brand-live)}
   .pane{display:none} .pane.on{display:block}
   .mtable td:first-child{font-family:var(--mono);font-size:11.5px}
+  .xtra{font-family:var(--mono);font-size:10.5px;color:var(--muted-dim);white-space:pre-wrap;
+        margin:4px 0 0;max-height:160px;overflow:auto}
+  details.xd summary{cursor:pointer;color:var(--muted);font-size:11px}
 </style>
 </head>
 <body>
@@ -31,17 +36,17 @@
   <div class="content">
     <div class="tabs">
       <div class="tab on" data-p="live">Live (RFC)</div>
-      <div class="tab" data-p="metrics">All metrics</div>
+      <div class="tab" data-p="metrics">Last sweep</div>
       <div class="tab" data-p="report">Health report</div>
     </div>
 
     <div class="pane on" id="p-live"><div class="empty">Reading…</div></div>
-    <div class="pane" id="p-metrics"><div class="empty">Loading…</div></div>
-    <div class="pane" id="p-report"><div class="empty">Loading…</div></div>
+    <div class="pane" id="p-metrics"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Reading live RFC…</span></div></div>
+    <div class="pane" id="p-report"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Reading live RFC…</span></div></div>
   </div>
 </main>
 
-<script src="/static/shell.js?v=69f382d5"></script>
+<script src="/static/shell.js?v=ds4"></script>
 <script>
 /* Every page here depends on shell.js for the sidebar, theme and helpers.
    If it fails to load the page renders bare with only a console error, which
@@ -52,10 +57,10 @@ if (typeof IB === "undefined") {
     '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
     '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
     '<p style="color:#666;line-height:1.6">This page needs ' +
-    '<code>/static/shell.js?v=69f382d5</code> and <code>/static/shell.css?v=bf941ec8</code>. ' +
+    '<code>/static/shell.js?v=ds4</code> and <code>/static/shell.css?v=ds4</code>. ' +
     'They are missing or the static mount is not serving them.</p>' +
     '<p style="color:#666;line-height:1.6">Check that ' +
-    '<code>dashboard/static/shell.js?v=69f382d5</code> exists, then restart the server. ' +
+    '<code>dashboard/static/shell.js?v=ds4</code> exists, then restart the server. ' +
     'If you are seeing this inside a preview pane rather than at ' +
     '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
     'behind a preview.</p></div>';
@@ -67,6 +72,7 @@ IB.themeToggle(document.getElementById("theme"));
 const NAME = new URLSearchParams(location.search).get("name") || "";
 document.getElementById("title").textContent = NAME;
 document.getElementById("crumb").textContent = NAME;
+let _aiHtml = "";  // last live-AI narrative, preserved across the 10s refresh
 
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
@@ -80,10 +86,64 @@ function kpi(l, v, cls, sub) {
           ${sub?`<div class="sub">${sub}</div>`:""}</div>`;
 }
 
+/* Status -> number colour, so a KPI tile agrees with the chip in the table. */
+function numCls(status) {
+  return {CRITICAL:"n-red", WARNING:"n-amber", NORMAL:"n-green"}[status] || "n-info";
+}
+
+/* Age badge for the perf block: it refreshes on a slower clock than the
+   rest of the live read, and the page must say so rather than imply 10s. */
+function ageBadge(sec) {
+  if (sec === null || sec === undefined) return "";
+  const s = Math.round(sec);
+  return `<span class="src src-rfc">RFC LIVE · ${s < 5 ? "just read" : s + "s ago"}</span>`;
+}
+
+/* One KPI per headline perf metric. Missing metric -> "—", never 0. */
+function perfTiles(perf) {
+  const by = {};
+  for (const m of (perf.metrics || [])) by[m.metric] = m;
+  const t = (name, label, unit) => {
+    const m = by[name];
+    if (!m) return kpi(label, IB.val(null), "n-info");
+    const sub = (m.detail || "").split(";")[0].slice(0, 48);
+    return kpi(label, IB.esc(m.display_value), numCls(m.status), IB.esc(sub));
+  };
+  return `<div class="grid g4" style="margin-bottom:16px">
+    ${t("sap.st03.dialog_resp_ms", "Dialog response")}
+    ${t("sap.st03.db_time_pct", "DB share of response")}
+    ${t("sap.sm66.max_instance_saturation_pct", "Busiest instance")}
+    ${t("sap.sm12.oldest_lock_minutes", "Oldest lock")}
+  </div>`;
+}
+
+/* Every RFC metric, every field. Rows with extra_data get an expander so the
+   per-instance / top-user / lock-owner detail is one click away. */
+function allRfcTable(rows) {
+  if (!rows || !rows.length) return '<div class="card-b"><div class="empty">No RFC metrics returned.</div></div>';
+  return `<table class="mtable">
+    <tr><th>Metric</th><th>T-code</th><th>Value</th><th>Status</th><th>Detail</th><th>Collector</th></tr>
+    ${rows.map(m => {
+      const hasExtra = m.extra && Object.keys(m.extra).length;
+      const thr = (m.threshold_warning !== null && m.threshold_warning !== undefined)
+        ? ` <span style="color:var(--muted-dim)">(warn ${m.threshold_warning}${m.unit||""} · crit ${m.threshold_critical}${m.unit||""})</span>` : "";
+      return `<tr>
+        <td>${IB.esc(m.metric)}<div style="font-family:system-ui;color:var(--muted-dim);font-size:11px">${IB.esc(m.label)}</div></td>
+        <td class="mono">${IB.esc(m.tcode)}</td>
+        <td class="mono">${IB.esc(m.display_value)}${thr}</td>
+        <td><span class="chip ${IB.statusClass(m.status)}">${IB.esc(m.status)}</span></td>
+        <td style="color:var(--muted-dim);font-size:11.5px">${IB.esc(m.detail||"")}
+          ${hasExtra ? `<details class="xd"><summary>data</summary><pre class="xtra">${IB.esc(JSON.stringify(m.extra, null, 1))}</pre></details>` : ""}</td>
+        <td class="mono" style="font-size:10.5px;color:var(--muted-dim)">${IB.esc(m.collector||"")}<br>${IB.esc(m.read_at||"")}</td>
+      </tr>`; }).join("")}
+  </table>`;
+}
+
 async function loadLive() {
   const el = document.getElementById("p-live");
   try {
     const s = await IB.get("/api/live/" + encodeURIComponent(NAME));
+    IB.heartbeat.beat({ live: s.connected ? 1 : 0, total: 1, critical: (s.checks || []).some(c => c.status === "CRITICAL") });
     document.getElementById("livechip").innerHTML = s.connected
       ? '<span class="chip c-live"><span class="pulse"></span> RFC live</span>'
       : '<span class="chip c-unknown">not reachable</span>';
@@ -99,9 +159,22 @@ async function loadLive() {
       <div class="grid g4" style="margin-bottom:16px">
         ${kpi("CPU", IB.val(s.cpu,"%",0), s.cpu>=80?"n-red":"n-green")}
         ${kpi("Memory", IB.val(s.memory,"%",0), s.memory>=85?"n-red":"n-green")}
-        ${kpi("Load 1m", IB.val(s.load_1m,"",2), "n-info")}
+        ${(s.load_1m === null || s.load_1m === undefined) && s.load_5m !== null && s.load_5m !== undefined
+            ? kpi("Load 5m", IB.val(s.load_5m,"",2), "n-info", "CCMS RZ20")
+            : kpi("Load 1m", IB.val(s.load_1m,"",2), "n-info")}
         ${kpi("Sessions", IB.val(s.users,"",0), "n-info")}
       </div>
+      ${perfTiles(s.perf || {})}
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-h"><h3>AI analysis · live RFC</h3>
+          <span class="src src-none">Gemini · one call over the current read</span>
+          <button class="btn primary" id="ai-run" style="margin-left:auto">✨ Analyse live</button></div>
+        <div class="card-b" id="ai-out"><div class="empty" style="padding:10px">
+          Runs findings on the live reading, then one model call for the narrative.
+          Nothing runs on a timer.</div></div>
+      </div>
+      ${(s.perf && s.perf.error && !(s.perf.metrics||[]).length)
+        ? `<div class="banner banner-warn">Performance read: ${IB.esc(String(s.perf.error).split("\n")[0])}</div>` : ""}
       <div class="card" style="margin-bottom:16px">
         <div class="card-h"><h3>T-code checks</h3>
           <span class="src src-rfc">${IB.esc(s.check_source || "RFC")} LIVE</span>
@@ -119,6 +192,13 @@ async function loadLive() {
             ${s.check_error ? IB.esc(s.check_error)
               : "No counters returned — system unreachable, or the Z function module is not installed."}
           </div></div>`}
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-h"><h3>All RFC data</h3>
+          ${ageBadge(s.perf && s.perf.age_seconds)}
+          <span class="src src-none">${(s.rfc_metrics||[]).length} metrics</span></div>
+        ${allRfcTable(s.rfc_metrics)}
       </div>
 
       <div class="grid g2">
@@ -169,14 +249,20 @@ async function loadLive() {
   } catch (e) {
     el.innerHTML = `<div class="banner banner-err">${IB.esc(e.message)}</div>`;
   }
+  // The 10s refresh rebuilds the pane, which would wipe a narrative the user
+  // is still reading. Put it back.
+  if (_aiHtml) {
+    const out = document.getElementById("ai-out");
+    if (out) out.innerHTML = _aiHtml;
+  }
 }
 
 async function loadMetrics() {
   const el = document.getElementById("p-metrics");
   try {
     const d = await IB.get("/api/status/" + encodeURIComponent(NAME));
-    if (!d.available) { el.innerHTML = '<div class="card"><div class="empty">No sweep has completed for this system.</div></div>'; return; }
-    el.innerHTML = `<div class="card"><div class="card-h"><h3>Metrics from last sweep</h3>
+    if (!d.available) { el.innerHTML = '<div class="card"><div class="empty">No sweep has completed for this system. Live RFC data is on the Live tab.</div></div>'; return; }
+    el.innerHTML = `<div class="card"><div class="card-h"><h3>Last scheduled sweep — all collectors (RFC + SSH + SAP GUI)</h3>
       <span class="src src-none">${IB.esc(d.cycle_timestamp||"")}</span></div>
       <table class="mtable"><tr><th>Metric</th><th>Value</th><th>Status</th><th>Detail</th></tr>
       ${(d.metrics||[]).map(m=>`<tr><td>${IB.esc(m.name)}</td>
@@ -206,8 +292,81 @@ async function loadReport() {
   }
 }
 
-loadLive(); loadMetrics(); loadReport();
-setInterval(loadLive, 10000);
+function findingRow(f){
+  return `<tr><td class="mono">${IB.esc(f.name)}</td>
+    <td class="mono">${IB.esc(f.value)}</td>
+    <td><span class="chip ${IB.statusClass(f.status)}">${IB.esc(f.status)}</span></td>
+    <td style="color:var(--muted-dim);font-size:11.5px">${IB.esc(f.detail||"")}</td></tr>`;
+}
+
+async function analyseLive() {
+  const btn = document.getElementById("ai-run");
+  const out = document.getElementById("ai-out");
+  if (!btn || !out) return;
+  btn.disabled = true; const label = btn.textContent;
+  btn.textContent = "Reading " + NAME + "…";
+  out.innerHTML = '<div class="empty" style="padding:12px">Live RFC read, then one model call…</div>';
+  try {
+    const r = await IB.post("/api/rca/analyze/" + encodeURIComponent(NAME));
+    const d = await r.json();
+
+    if (d.analysed === false) {
+      out.innerHTML = `<div class="banner banner-warn">${IB.esc(NAME)} did not answer over RFC — ${
+        IB.esc(d.detail||"")}. No model call made, no tokens spent.</div>`;
+      return;
+    }
+    const findings = (d.findings||[]).length
+      ? `<table><tr><th>Metric</th><th>Value</th><th>Status</th><th>Detail</th></tr>
+         ${d.findings.map(findingRow).join("")}</table>
+         <div style="font-size:10.5px;color:var(--muted-dim);margin:6px 0 12px">
+           Deterministic findings — computed before the model was called.</div>`
+      : `<div class="empty" style="padding:10px">No metric outside threshold (${
+           IB.esc(String(d.metric_count))} read).</div>`;
+
+    const a = d.analysis || {};
+    const li = arr => (arr && arr.length)
+      ? `<ul style="margin:4px 0 0 18px;line-height:1.7">${arr.map(x=>`<li>${IB.esc(x)}</li>`).join("")}</ul>`
+      : `<span style="color:var(--muted-dim)">none</span>`;
+    const narrative = d.narrative_error
+      ? `<div class="banner banner-err">Model call failed: ${IB.esc(d.narrative_error)}.
+           The findings above are unaffected.</div>`
+      : ((a.root_cause || d.narrative)
+          ? `<div class="banner" style="background:var(--info-bg);border:1px solid var(--info-br);color:var(--text)">
+               <div style="font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+                 color:var(--muted-dim);margin-bottom:5px">${IB.esc(a.finding_status||"HYPOTHESIS")} ·
+                 ${IB.esc(a.root_cause_category||"analysis")}${a.confidence?" · "+IB.esc(a.confidence):""}</div>
+               <div style="font-weight:600;margin-bottom:10px">${IB.esc(a.root_cause||d.narrative)}</div>
+               <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                 <div><b style="font-size:11px">Supporting evidence</b>${li(a.supporting_evidence)}</div>
+                 <div><b style="font-size:11px">Recommended actions</b>${li(a.recommended_actions)}</div>
+               </div>
+               ${(a.limitations&&a.limitations.length)?`<div style="margin-top:10px"><b style="font-size:11px">Limitations</b>${li(a.limitations)}</div>`:""}
+             </div>`
+          : `<div class="empty" style="padding:10px">No narrative returned.</div>`);
+
+    // A single provider has .provider/.name; a key chain (FailoverProvider)
+    // has .configured/.exhausted/.available instead -- show which key
+    // actually answered, and how many are retired, rather than nothing.
+    const prov = d.provider && (d.provider.provider || d.provider.name ||
+      (d.provider.configured ? `${(d.provider.available||[]).length}/${d.provider.configured.length} keys live` : null));
+    const who = IB.renderAttribution(d.attribution);
+    _aiHtml = findings + narrative + (who ? `<div style="font-weight:700;font-size:12.5px;margin:14px 0 4px">Who and what</div>` + who : "") +
+      `<div style="font-size:10.5px;color:var(--muted-dim);margin-top:8px">
+         ${IB.esc(d.overall_status||"")} · ${IB.esc(String(d.metric_count||0))} metrics ·
+         read ${IB.esc(d.read_at||"—")}${prov ? " · " + IB.esc(prov) : ""}</div>`;
+    out.innerHTML = _aiHtml;
+  } catch (e) {
+    out.innerHTML = `<div class="banner banner-err">${IB.esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+document.addEventListener("click", e => {
+  if (e.target && e.target.id === "ai-run") analyseLive();
+});
+
+loadMetrics(); loadReport();
+IB.poll(loadLive, 10000);   // paused while tab hidden
 </script>
 </body>
 </html>

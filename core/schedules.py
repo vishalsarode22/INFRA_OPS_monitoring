@@ -163,7 +163,19 @@ def next_run_at(cfg: dict, last_run: datetime | None, now: datetime | None = Non
             return now
         delta = (timedelta(minutes=cfg["every"]) if cfg["mode"] == "minutes"
                  else timedelta(hours=cfg["every"]))
-        return last_run + delta
+        scheduled = last_run + delta
+        # CATCH-UP GUARD. If a profile has been idle far longer than its
+        # interval -- the server was off, monitoring was paused for a day,
+        # a manual run held the slot -- `last_run + delta` is deep in the
+        # past, so the profile is "due" and fires the instant monitoring is
+        # free. That is how an unrequested PRD sweep followed an unrelated
+        # manual run. When the scheduled time is more than one whole interval
+        # behind now, treat the interval as restarting from now instead of
+        # replaying every missed slot: the next run is one interval ahead,
+        # not immediately.
+        if scheduled < now - delta:
+            return now + delta
+        return scheduled
 
     hh, mm = (int(x) for x in cfg["at"].split(":"))
     candidate = now.replace(hour=hh, minute=mm, second=0, microsecond=0)

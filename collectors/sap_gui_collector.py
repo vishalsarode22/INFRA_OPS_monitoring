@@ -129,11 +129,24 @@ def collect_tcode_evidence(
                     capture()
 
                 ocr_patterns = all_ocr_patterns.get(tcode, {})
-                if ocr_patterns and screenshots:
-                    ocr_text = run_ocr(screenshots[-1])
-                    ocr_data = extract_patterns(ocr_text, ocr_patterns)
-                    for key, value in ocr_data.items():
-                        extracted_data.setdefault(key, value)
+                # OCR EVERY captured screen, not only the ones with patterns:
+                # the recognised text is what the report uses to describe
+                # what was captured (rows seen, statuses, counts) once the
+                # screenshots themselves are no longer embedded. Kept short
+                # and only for the final screenshot.
+                if screenshots:
+                    try:
+                        ocr_text = run_ocr(screenshots[-1])
+                    except Exception:  # noqa: BLE001 -- OCR is best-effort
+                        ocr_text = ""
+                    if ocr_text:
+                        compact = " ".join(ocr_text.split())
+                        extracted_data.setdefault("ocr_excerpt", compact[:1200])
+                        extracted_data.setdefault("ocr_lines", len(ocr_text.splitlines()))
+                    if ocr_patterns:
+                        ocr_data = extract_patterns(ocr_text, ocr_patterns)
+                        for key, value in ocr_data.items():
+                            extracted_data.setdefault(key, value)
 
                 # ---------------------------------------------------------------
                 # Structured T-code analysis

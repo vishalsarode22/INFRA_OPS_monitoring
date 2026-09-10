@@ -1,42 +1,344 @@
-2026-08-31 07:32:49,428 | INFO     | collectors.sap_process_collector | Parsed 4 SAP process statuses.
-2026-08-31 07:32:49,429 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
-2026-08-31 07:32:49,429 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses (script format).
-2026-08-31 07:32:49,430 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: garbage | no rows
-2026-08-31 07:32:49,430 | ERROR    | collectors.sap_process_collector | Skipping parse -- collector reported error: boom
-2026-08-31 07:33:05,954 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
-2026-08-31 07:33:05,955 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
-2026-08-31 07:33:05,955 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
-2026-08-31 07:33:05,955 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses (script format).
-2026-08-31 07:33:05,955 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
-2026-08-31 08:28:30,108 | INFO     | collectors.sap_process_collector | SAP process list collected via: su
-2026-08-31 08:28:30,110 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
-2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from "su - tstadm -c 'sapcontrol -nr 02 -function GetProcessList'": bash: sapcontrol: command not found
-2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from '/usr/sap/hostctrl/exe/sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
-2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from '/usr/sap/TST/D02/exe/sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
-2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from '/usr/sap/TST/DVEBMGS02/exe/sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
-2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from '/usr/sap/TST/ASCS02/exe/sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
-2026-08-31 08:28:30,110 | DEBUG    | collectors.sap_process_collector | stderr from '/usr/sap/TST/J02/exe/sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
-2026-08-31 08:28:30,111 | DEBUG    | collectors.sap_process_collector | stderr from 'sapcontrol -nr 02 -function GetProcessList': bash: sapcontrol: command not found
-2026-08-31 08:28:30,111 | ERROR    | collectors.sap_process_collector | sapcontrol produced no usable output. Tried: su -> bash: sapcontrol: command not found | /usr/sap/hostctrl/exe/sapcontrol -> bash: sapcontrol: command not found | /usr/sap/TST/D02/exe/sapcontrol -> bash: sapcontrol: command not found | /usr/sap/TST/DVEBMGS02/exe/sapcontrol -> bash: sapcontrol: command not found
-2026-08-31 08:28:39,454 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
-2026-08-31 08:28:39,454 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
-2026-08-31 08:28:39,454 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
-2026-08-31 08:28:39,454 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses (script format).
-2026-08-31 08:28:39,454 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
-2026-08-31 10:19:49,576 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
-2026-08-31 10:19:49,576 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
-2026-08-31 10:19:49,576 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
-2026-08-31 10:19:49,577 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses (script format).
-2026-08-31 10:19:49,577 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
-2026-08-31 10:26:13,770 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
-2026-08-31 10:26:13,770 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses.
-2026-08-31 10:26:13,771 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: some unrelated output | no rows here
-2026-08-31 10:26:13,771 | INFO     | collectors.sap_process_collector | Parsed 2 SAP process statuses (script format).
-2026-08-31 10:26:13,771 | ERROR    | collectors.sap_process_collector | sapcontrol returned output but no process rows could be parsed. First lines: disp+work, Dispatcher, MAGENTA, ?
-2026-09-01 14:42:36,304 | INFO     | collectors.linux_collector | Linux metrics collected successfully.
-2026-09-01 14:42:36,307 | INFO     | collectors.linux_collector | Parsed 7 Linux metrics.
-2026-09-01 14:42:36,968 | INFO     | collectors.sap_process_collector | SAP process list collected via: su
-2026-09-01 14:42:36,970 | INFO     | collectors.sap_process_collector | Parsed 4 SAP process statuses.
-2026-09-01 14:42:38,364 | INFO     | core.orchestrator | [TST] RFC collector: 14 metrics added, 3 already covered by another collector.
-2026-09-01 14:42:38,365 | INFO     | core.orchestrator | Monitoring cycle complete for TST/000: overall=WARNING, metrics=25, errors=0
-2026-09-01 14:42:38,371 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-07 17:36:44,671 | WARNING  | core.event_engine | New WARNING event EVT-DAF381F7EB: TST/sap.sm12.lock_count=20 count
+2026-09-07 17:36:44,676 | WARNING  | core.event_engine | New WARNING event EVT-6C79A681CA: TST/sap.st03n.dialog_response_time=700 ms
+2026-09-07 17:36:44,677 | WARNING  | core.event_engine | New WARNING event EVT-086DDFC53C: TST/sap.st22.dump_count=2 count
+2026-09-07 17:36:44,785 | WARNING  | core.event_engine | New CRITICAL event EVT-1FAD3FAE19: PRD/cpu=95 %
+2026-09-07 17:36:44,786 | WARNING  | core.event_engine | New CRITICAL event EVT-961C5C674E: PRD/memory=92 %
+2026-09-07 17:36:44,786 | WARNING  | core.event_engine | New CRITICAL event EVT-F0A6C3B127: PRD/load_1m=9 count
+2026-09-07 17:36:44,879 | WARNING  | core.event_engine | New CRITICAL event EVT-02535000CB: QAS/sap_process_disp+work=1 state
+2026-09-07 17:36:44,969 | WARNING  | core.event_engine | New WARNING event EVT-7697A45C23: DEV/sap.sm12.lock_count=20 count
+2026-09-07 17:36:44,970 | WARNING  | core.event_engine | New WARNING event EVT-20F4BB7B5B: DEV/sap.st03n.dialog_response_time=700 ms
+2026-09-07 17:36:44,970 | WARNING  | core.event_engine | New WARNING event EVT-A4E8476F24: DEV/sap.st22.dump_count=1 count
+2026-09-07 17:36:45,054 | INFO     | core.event_engine | Resolved event EVT-7697A45C23: DEV/sap.sm12.lock_count
+2026-09-07 17:36:45,055 | INFO     | core.event_engine | Resolved event EVT-20F4BB7B5B: DEV/sap.st03n.dialog_response_time
+2026-09-07 17:36:45,055 | INFO     | core.event_engine | Resolved event EVT-A4E8476F24: DEV/sap.st22.dump_count
+2026-09-07 17:40:17,694 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-07 17:40:17,733 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-07 17:40:22,073 | INFO     | core.orchestrator | [PRD] RFC perf collector: 9 metrics added.
+2026-09-07 17:40:22,075 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=26, errors=0
+2026-09-07 17:40:22,114 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-07 17:40:22,115 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-07 17:40:22,116 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-07 17:40:22,117 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-07 17:40:22,117 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-07 17:40:22,120 | WARNING  | core.event_engine | New WARNING event EVT-07268551D5: PRD/sap.st22.dumps=2 count
+2026-09-07 17:40:22,124 | WARNING  | core.event_engine | New WARNING event EVT-1AC8A797BC: PRD/sap.sm21.errors=6 count
+2026-09-08 09:42:02,332 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-08 09:42:02,402 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-08 09:42:12,750 | INFO     | core.orchestrator | [PRD] RFC perf collector: 9 metrics added.
+2026-09-08 09:42:12,754 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=26, errors=0
+2026-09-08 09:42:12,842 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-08 09:42:12,854 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-08 09:42:12,865 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-08 09:42:12,871 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-08 09:42:12,872 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-08 09:42:12,892 | INFO     | core.event_engine | Resolved event EVT-07268551D5: PRD/sap.st22.dumps
+2026-09-08 09:42:12,902 | INFO     | core.event_engine | Resolved event EVT-1AC8A797BC: PRD/sap.sm21.errors
+2026-09-08 10:42:57,625 | INFO     | core.orchestrator | No SSH access configured for SARLOHA QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-08 10:42:57,858 | INFO     | core.orchestrator | [SARLOHA QAS] RFC collector: 6 metrics added.
+2026-09-08 10:42:58,622 | INFO     | core.orchestrator | [SARLOHA QAS] RFC perf collector: 11 metrics added.
+2026-09-08 10:42:58,623 | INFO     | core.orchestrator | Monitoring cycle complete for SARLOHA QAS/500: overall=CRITICAL, metrics=17, errors=0
+2026-09-08 10:42:58,644 | WARNING  | core.event_engine | New CRITICAL event EVT-B4A4B9D3E2: SARLOHA QAS/sap.st03.dialog_resp_ms=187558 ms
+2026-09-08 10:42:58,645 | WARNING  | core.event_engine | New CRITICAL event EVT-7857CBF4F4: SARLOHA QAS/sap.st03.max_instance_resp_ms=187558 ms
+2026-09-08 11:22:39,959 | INFO     | core.orchestrator | No SSH access configured for SARLOHA QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-08 11:22:40,159 | INFO     | core.orchestrator | [SARLOHA QAS] RFC collector: 6 metrics added.
+2026-09-08 11:22:41,030 | INFO     | core.orchestrator | [SARLOHA QAS] RFC perf collector: 11 metrics added.
+2026-09-08 11:22:41,031 | INFO     | core.orchestrator | Monitoring cycle complete for SARLOHA QAS/500: overall=CRITICAL, metrics=17, errors=0
+2026-09-08 11:24:35,855 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.backend_sessions' (key='sap.al08.backend_sessions') -- leaving UNKNOWN.
+2026-09-08 11:24:35,856 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.user_logons' (key='sap.al08.user_logons') -- leaving UNKNOWN.
+2026-09-08 11:24:35,857 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm37.active_jobs' (key='sap.sm37.active_jobs') -- leaving UNKNOWN.
+2026-09-08 11:24:35,858 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-08 11:24:35,858 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-08 11:24:35,859 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-08 11:24:35,860 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-08 11:24:35,861 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sp01.spool_count' (key='sap.sp01.spool_count') -- leaving UNKNOWN.
+2026-09-08 11:24:35,879 | WARNING  | core.event_engine | New WARNING event EVT-02D1183A49: SARLOHA QAS/sap.st03.top_report_db_ms=110089 ms
+2026-09-08 11:41:50,118 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-08 11:41:50,178 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-08 11:41:51,302 | INFO     | core.orchestrator | [PRD] RFC perf collector: 9 metrics added.
+2026-09-08 11:41:51,303 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=26, errors=0
+2026-09-08 16:49:09,928 | INFO     | core.orchestrator | No SSH access configured for SARLOHA QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-08 16:49:10,240 | INFO     | core.orchestrator | [SARLOHA QAS] RFC collector: 6 metrics added.
+2026-09-08 16:49:21,698 | INFO     | core.orchestrator | [SARLOHA QAS] RFC perf collector: 9 metrics added.
+2026-09-08 16:49:21,869 | INFO     | core.orchestrator | Monitoring cycle complete for SARLOHA QAS/500: overall=NORMAL, metrics=15, errors=0
+2026-09-08 16:49:22,813 | INFO     | core.event_engine | Resolved event EVT-B4A4B9D3E2: SARLOHA QAS/sap.st03.dialog_resp_ms
+2026-09-08 16:49:22,988 | INFO     | core.event_engine | Resolved event EVT-7857CBF4F4: SARLOHA QAS/sap.st03.max_instance_resp_ms
+2026-09-08 16:52:05,654 | INFO     | core.orchestrator | No SSH access configured for SARLOHA QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-08 16:52:05,903 | INFO     | core.orchestrator | [SARLOHA QAS] RFC collector: 6 metrics added.
+2026-09-08 16:53:39,170 | INFO     | core.orchestrator | [SARLOHA QAS] RFC perf collector: 6 metrics added.
+2026-09-08 16:53:39,248 | INFO     | core.orchestrator | Monitoring cycle complete for SARLOHA QAS/500: overall=NORMAL, metrics=12, errors=0
+2026-09-08 22:14:41,888 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-08 22:15:02,983 | WARNING  | core.orchestrator | [PRD] RFC collector: 1 (rc=1): key=RFC_COMMUNICATION_FAILURE, message=
+LOCATION    CPIC (TCP/IP) on local host with Unicode
+ERROR       partner '10.1.0.193:3300' not reached
+TIME        Tue Sep  8 22:15:02 2026
+RELEASE     753
+COMPONENT   NI (network interface)
+VERSION     40
+RC          -10
+MODULE      D:/depot/bas/753_REL/src/base/ni/nixxi.cpp
+LINE        3449
+DETAIL      NiPConnect2: 10.1.0.193:3300
+SYSTEM CALL connect
+ERRNO       10060
+ERRNO TEXT  WSAETIMEDOUT: Connection timed out
+COUNTER     2
+ [MSG: class=, type=, number=, v1-4:=;;;]
+2026-09-08 22:15:02,984 | WARNING  | core.orchestrator | [PRD] RFC perf collector: 1 (rc=1): key=RFC_COMMUNICATION_FAILURE, message=
+LOCATION    CPIC (TCP/IP) on local host with Unicode
+ERROR       partner '10.1.0.193:3300' not reached
+TIME        Tue Sep  8 22:15:02 2026
+RELEASE     753
+COMPONENT   NI (network interface)
+VERSION     40
+RC          -10
+MODULE      D:/depot/bas/753_REL/src/base/ni/nixxi.cpp
+LINE        3449
+DETAIL      NiPConnect2: 10.1.0.193:3300
+SYSTEM CALL connect
+ERRNO       10060
+ERRNO TEXT  WSAETIMEDOUT: Connection timed out
+COUNTER     2
+ [MSG: class=, type=, number=, v1-4:=;;;] (retrying in 300s)
+2026-09-08 22:15:02,985 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=UNKNOWN, metrics=0, errors=2
+2026-09-08 22:19:25,598 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-08 22:19:25,600 | WARNING  | core.orchestrator | [PRD] RFC collector: 1 (rc=1): key=RFC_COMMUNICATION_FAILURE, message=
+LOCATION    CPIC (TCP/IP) on local host with Unicode
+ERROR       partner '10.1.0.193:3300' not reached
+TIME        Tue Sep  8 22:15:02 2026
+RELEASE     753
+COMPONENT   NI (network interface)
+VERSION     40
+RC          -10
+MODULE      D:/depot/bas/753_REL/src/base/ni/nixxi.cpp
+LINE        3449
+DETAIL      NiPConnect2: 10.1.0.193:3300
+SYSTEM CALL connect
+ERRNO       10060
+ERRNO TEXT  WSAETIMEDOUT: Connection timed out
+COUNTER     2
+ [MSG: class=, type=, number=, v1-4:=;;;] (retrying in 37s)
+2026-09-08 22:19:25,611 | WARNING  | core.orchestrator | [PRD] RFC perf collector: 1 (rc=1): key=RFC_COMMUNICATION_FAILURE, message=
+LOCATION    CPIC (TCP/IP) on local host with Unicode
+ERROR       partner '10.1.0.193:3300' not reached
+TIME        Tue Sep  8 22:15:02 2026
+RELEASE     753
+COMPONENT   NI (network interface)
+VERSION     40
+RC          -10
+MODULE      D:/depot/bas/753_REL/src/base/ni/nixxi.cpp
+LINE        3449
+DETAIL      NiPConnect2: 10.1.0.193:3300
+SYSTEM CALL connect
+ERRNO       10060
+ERRNO TEXT  WSAETIMEDOUT: Connection timed out
+COUNTER     2
+ [MSG: class=, type=, number=, v1-4:=;;;] (retrying in 37s)
+2026-09-08 22:19:25,625 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=UNKNOWN, metrics=0, errors=2
+2026-09-09 10:01:54,349 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 10:01:54,407 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-09 10:01:56,152 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-09 10:01:56,155 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=23, errors=0
+2026-09-09 10:01:56,220 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-09 10:01:56,243 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-09 10:01:56,244 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-09 10:01:56,245 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-09 10:01:56,246 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-09 10:07:30,408 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 10:07:30,688 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-09 10:07:37,057 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-09 10:07:37,066 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=23, errors=0
+2026-09-09 10:07:37,154 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-09 10:07:37,155 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-09 10:07:37,156 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-09 10:07:37,157 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-09 10:07:37,158 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-09 11:58:04,881 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 11:58:04,955 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-09 11:58:06,003 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-09 11:58:06,004 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=23, errors=0
+2026-09-09 11:58:06,039 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-09 11:58:06,042 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-09 11:58:06,043 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-09 11:58:06,043 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-09 11:58:06,044 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-09 15:58:16,496 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 15:58:16,615 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-09 15:58:17,768 | INFO     | core.orchestrator | [PRD] RFC perf collector: 9 metrics added.
+2026-09-09 15:58:17,770 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=26, errors=0
+2026-09-09 15:58:17,811 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-09 15:58:17,814 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-09 15:58:17,815 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-09 15:58:17,816 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-09 15:58:17,816 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-09 16:10:43,367 | INFO     | core.orchestrator | No SSH access configured for SARLOHA PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 16:10:43,796 | INFO     | core.orchestrator | [SARLOHA PRD] RFC collector: 6 metrics added.
+2026-09-09 16:10:50,720 | INFO     | core.orchestrator | [SARLOHA PRD] RFC perf collector: 11 metrics added.
+2026-09-09 16:10:50,786 | INFO     | core.orchestrator | Monitoring cycle complete for SARLOHA PRD/500: overall=CRITICAL, metrics=17, errors=0
+2026-09-09 16:10:50,819 | WARNING  | core.event_engine | New CRITICAL event EVT-9051621A53: SARLOHA PRD/sap.st22.dumps=98 count
+2026-09-09 16:10:50,821 | WARNING  | core.event_engine | New WARNING event EVT-17C4249DC2: SARLOHA PRD/sap.sm37.cancelled_jobs=3 count
+2026-09-09 16:10:50,821 | WARNING  | core.event_engine | New CRITICAL event EVT-B128F7FC78: SARLOHA PRD/sap.sm58.stuck_entries=143 count
+2026-09-09 16:10:50,822 | WARNING  | core.event_engine | New CRITICAL event EVT-C77D60B1E8: SARLOHA PRD/sap.st03.dialog_resp_ms=46266 ms
+2026-09-09 16:10:50,823 | WARNING  | core.event_engine | New CRITICAL event EVT-2F03F0C52D: SARLOHA PRD/sap.st03.top_report_db_ms=5648059379 ms
+2026-09-09 16:10:50,823 | WARNING  | core.event_engine | New WARNING event EVT-CAFAB9D5A4: SARLOHA PRD/sap.st03.top_user_memory_mb=1713 MB
+2026-09-09 16:10:50,825 | WARNING  | core.event_engine | New CRITICAL event EVT-9E17564FAD: SARLOHA PRD/sap.st03.max_instance_resp_ms=93221 ms
+2026-09-09 16:20:49,879 | INFO     | core.orchestrator | No SSH access configured for SARLOHA QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 16:20:50,722 | INFO     | core.orchestrator | [SARLOHA QAS] RFC collector: 6 metrics added.
+2026-09-09 16:20:56,629 | INFO     | core.orchestrator | [SARLOHA QAS] RFC perf collector: 9 metrics added.
+2026-09-09 16:20:56,630 | INFO     | core.orchestrator | Monitoring cycle complete for SARLOHA QAS/500: overall=NORMAL, metrics=15, errors=0
+2026-09-09 16:23:17,048 | INFO     | core.orchestrator | No SSH access configured for SARLOHA QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 16:23:17,374 | INFO     | core.orchestrator | [SARLOHA QAS] RFC collector: 6 metrics added.
+2026-09-09 16:23:21,454 | INFO     | core.orchestrator | [SARLOHA QAS] RFC perf collector: 9 metrics added.
+2026-09-09 16:23:21,457 | INFO     | core.orchestrator | Monitoring cycle complete for SARLOHA QAS/500: overall=WARNING, metrics=15, errors=0
+2026-09-09 16:53:53,962 | INFO     | core.orchestrator | No SSH access configured for SARLOHA QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 16:53:54,812 | INFO     | core.orchestrator | [SARLOHA QAS] RFC collector: 6 metrics added.
+2026-09-09 16:54:05,650 | INFO     | core.orchestrator | [SARLOHA QAS] RFC perf collector: 9 metrics added.
+2026-09-09 16:54:05,651 | INFO     | core.orchestrator | Monitoring cycle complete for SARLOHA QAS/500: overall=WARNING, metrics=15, errors=0
+2026-09-09 17:19:08,201 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 17:19:08,601 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-09 17:19:14,741 | INFO     | core.orchestrator | [PRD] RFC perf collector: 9 metrics added.
+2026-09-09 17:19:14,743 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=26, errors=0
+2026-09-09 17:21:39,507 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-09 17:21:39,508 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-09 17:21:39,509 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-09 17:21:39,509 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-09 17:21:39,510 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-09 17:21:39,513 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.backend_sessions' (key='sap.al08.backend_sessions') -- leaving UNKNOWN.
+2026-09-09 17:21:39,514 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.user_logons' (key='sap.al08.user_logons') -- leaving UNKNOWN.
+2026-09-09 17:21:39,515 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm37.active_jobs' (key='sap.sm37.active_jobs') -- leaving UNKNOWN.
+2026-09-09 17:21:39,516 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-09 17:21:39,517 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-09 17:21:39,518 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-09 17:21:39,518 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-09 17:21:39,519 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sp01.spool_count' (key='sap.sp01.spool_count') -- leaving UNKNOWN.
+2026-09-09 17:24:11,774 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 17:24:11,843 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-09 17:24:13,309 | INFO     | core.orchestrator | [PRD] RFC perf collector: 9 metrics added.
+2026-09-09 17:24:13,310 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=26, errors=0
+2026-09-09 17:58:37,887 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 17:58:38,211 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-09 17:58:42,598 | INFO     | core.orchestrator | [PRD] RFC perf collector: 11 metrics added.
+2026-09-09 17:58:42,601 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=28, errors=0
+2026-09-09 17:58:42,658 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-09 17:58:42,661 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-09 17:58:42,664 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-09 17:58:42,664 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-09 17:58:42,666 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-09 17:58:42,676 | WARNING  | core.event_engine | New WARNING event EVT-BC3E19A884: PRD/sap.st03.top_report_db_ms=124843 ms
+2026-09-09 18:03:12,138 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 18:03:12,200 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-09 18:03:14,086 | INFO     | core.orchestrator | [PRD] RFC perf collector: 11 metrics added.
+2026-09-09 18:03:14,087 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=28, errors=0
+2026-09-09 18:05:33,229 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-09 18:05:33,230 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-09 18:05:33,230 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-09 18:05:33,231 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-09 18:05:33,232 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-09 18:05:33,232 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.backend_sessions' (key='sap.al08.backend_sessions') -- leaving UNKNOWN.
+2026-09-09 18:05:33,232 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.user_logons' (key='sap.al08.user_logons') -- leaving UNKNOWN.
+2026-09-09 18:05:33,234 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm37.active_jobs' (key='sap.sm37.active_jobs') -- leaving UNKNOWN.
+2026-09-09 18:05:33,234 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-09 18:05:33,235 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-09 18:05:33,236 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-09 18:05:33,236 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-09 18:05:33,237 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sp01.spool_count' (key='sap.sp01.spool_count') -- leaving UNKNOWN.
+2026-09-09 18:05:33,240 | INFO     | core.event_engine | Resolved event EVT-BC3E19A884: PRD/sap.st03.top_report_db_ms
+2026-09-09 21:57:10,127 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 21:57:12,141 | WARNING  | core.orchestrator | [PRD] RFC collector: host 10.1.0.193:3300 not reachable (TimeoutError) -- network/Basis check, not a code issue
+2026-09-09 21:57:12,143 | WARNING  | core.orchestrator | [PRD] RFC perf collector: host 10.1.0.193:3300 not reachable (TimeoutError) -- network/Basis check, not a code issue (retrying in 120s)
+2026-09-09 21:57:12,145 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=UNKNOWN, metrics=0, errors=2
+2026-09-09 22:08:09,713 | INFO     | core.orchestrator | No SSH access configured for SARLOHA QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-09 22:08:11,722 | WARNING  | core.orchestrator | [SARLOHA QAS] RFC collector: host 172.22.1.127:3300 not reachable (TimeoutError) -- network/Basis check, not a code issue
+2026-09-09 22:08:11,725 | WARNING  | core.orchestrator | [SARLOHA QAS] RFC perf collector: host 172.22.1.127:3300 not reachable (TimeoutError) -- network/Basis check, not a code issue (retrying in 120s)
+2026-09-09 22:08:11,727 | INFO     | core.orchestrator | Monitoring cycle complete for SARLOHA QAS/500: overall=UNKNOWN, metrics=0, errors=2
+2026-09-10 10:27:34,330 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 10:27:35,071 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-10 10:27:41,437 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-10 10:27:41,453 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=23, errors=0
+2026-09-10 10:27:41,519 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-10 10:27:41,521 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-10 10:27:41,522 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-10 10:27:41,523 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-10 10:27:41,524 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:25:12,709 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 12:25:13,141 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-10 12:25:47,111 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-10 12:25:47,125 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=23, errors=0
+2026-09-10 12:25:47,743 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:25:47,745 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:25:47,750 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:25:47,753 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:25:47,760 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:31:01,131 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 12:31:01,294 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-10 12:31:24,055 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-10 12:31:24,185 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=23, errors=0
+2026-09-10 12:31:24,717 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:31:24,719 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:31:24,720 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:31:24,723 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:31:24,725 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-10 12:59:44,680 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 12:59:45,081 | WARNING  | core.orchestrator | [CARFOUR QAS] RFC collector: 2 (rc=2): key=RFC_LOGON_FAILURE, message=Name or password is incorrect (repeat logon) [MSG: class=, type=, number=, v1-4:=;;;]
+2026-09-10 12:59:45,083 | WARNING  | core.orchestrator | [CARFOUR QAS] RFC perf collector: 2 (rc=2): key=RFC_LOGON_FAILURE, message=Name or password is incorrect (repeat logon) [MSG: class=, type=, number=, v1-4:=;;;] (retrying in 899s)
+2026-09-10 12:59:45,085 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=UNKNOWN, metrics=0, errors=2
+2026-09-10 13:01:51,544 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm37.active_jobs' (key='sap.sm37.active_jobs') -- leaving UNKNOWN.
+2026-09-10 13:01:51,545 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-10 13:01:51,545 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-10 13:01:51,545 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-10 13:01:51,546 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sp01.spool_count' (key='sap.sp01.spool_count') -- leaving UNKNOWN.
+2026-09-10 14:18:57,124 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 14:18:58,556 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-10 14:19:27,040 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-10 14:19:27,042 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-10 14:24:11,854 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 14:24:13,303 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-10 14:24:30,965 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-10 14:24:30,966 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-10 14:26:54,142 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm37.active_jobs' (key='sap.sm37.active_jobs') -- leaving UNKNOWN.
+2026-09-10 14:26:54,142 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-10 14:26:54,142 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-10 14:26:54,142 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-10 14:26:54,143 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sp01.spool_count' (key='sap.sp01.spool_count') -- leaving UNKNOWN.
+2026-09-10 14:26:54,147 | WARNING  | core.event_engine | New WARNING event EVT-1DDAE9BE55: CARFOUR QAS/sap.sm58.stuck_entries=3 count
+2026-09-10 14:26:54,147 | WARNING  | core.event_engine | New CRITICAL event EVT-F0DF1977B4: CARFOUR QAS/sap.st03.dialog_resp_ms=10907 ms
+2026-09-10 14:26:54,148 | WARNING  | core.event_engine | New WARNING event EVT-C80DCCD895: CARFOUR QAS/sap.st03.top_report_db_ms=88550 ms
+2026-09-10 14:26:54,149 | WARNING  | core.event_engine | New CRITICAL event EVT-397CDE7127: CARFOUR QAS/sap.st03.max_instance_resp_ms=10907 ms
+2026-09-10 14:26:54,150 | WARNING  | core.event_engine | New CRITICAL event EVT-AC3BB2B5BB: CARFOUR QAS/sap.sm12.oldest_lock_minutes=83672 min
+2026-09-10 14:28:36,303 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 14:28:40,175 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-10 14:28:44,813 | INFO     | core.orchestrator | [PRD] RFC perf collector: 9 metrics added.
+2026-09-10 14:28:44,814 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=26, errors=0
+2026-09-10 14:28:44,838 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-10 14:28:44,838 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-10 14:28:44,839 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-10 14:28:44,839 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-10 14:28:44,841 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-10 14:33:34,062 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 14:33:34,346 | INFO     | core.orchestrator | [PRD] RFC collector: 17 metrics added.
+2026-09-10 14:33:44,591 | INFO     | core.orchestrator | [PRD] RFC perf collector: 9 metrics added.
+2026-09-10 14:33:44,609 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=26, errors=0
+2026-09-10 14:33:44,902 | DEBUG    | evaluation.threshold_engine | Metric 'cpu' has no numeric value -- leaving UNKNOWN.
+2026-09-10 14:33:44,906 | DEBUG    | evaluation.threshold_engine | Metric 'memory' has no numeric value -- leaving UNKNOWN.
+2026-09-10 14:33:44,907 | DEBUG    | evaluation.threshold_engine | Metric 'memory.total_gb' has no numeric value -- leaving UNKNOWN.
+2026-09-10 14:33:44,911 | DEBUG    | evaluation.threshold_engine | Metric 'load_1m' has no numeric value -- leaving UNKNOWN.
+2026-09-10 14:33:44,917 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-10 14:45:44,293 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 14:45:45,658 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-10 14:46:08,199 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 9 metrics added.
+2026-09-10 14:46:08,199 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=14, errors=0
+2026-09-10 14:46:08,234 | WARNING  | core.event_engine | New WARNING event EVT-CE652D6A26: CARFOUR QAS/sap.sm37.cancelled_jobs=1 count
+2026-09-10 14:46:08,235 | INFO     | core.event_engine | Resolved event EVT-F0DF1977B4: CARFOUR QAS/sap.st03.dialog_resp_ms
+2026-09-10 14:46:08,236 | INFO     | core.event_engine | Resolved event EVT-397CDE7127: CARFOUR QAS/sap.st03.max_instance_resp_ms
+2026-09-10 14:50:27,861 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 14:50:28,276 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-10 14:50:30,952 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-10 14:50:30,954 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-10 15:50:51,288 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-10 15:50:51,669 | WARNING  | core.orchestrator | [CARFOUR QAS] RFC collector: 2 (rc=2): key=RFC_LOGON_FAILURE, message=Name or password is incorrect (repeat logon) [MSG: class=, type=, number=, v1-4:=;;;]
+2026-09-10 15:50:51,672 | WARNING  | core.orchestrator | [CARFOUR QAS] RFC perf collector: 2 (rc=2): key=RFC_LOGON_FAILURE, message=Name or password is incorrect (repeat logon) [MSG: class=, type=, number=, v1-4:=;;;] (retrying in 900s)
+2026-09-10 15:50:51,676 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=UNKNOWN, metrics=0, errors=2
+2026-09-10 15:53:16,601 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm37.active_jobs' (key='sap.sm37.active_jobs') -- leaving UNKNOWN.
+2026-09-10 15:53:16,601 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-10 15:53:16,601 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-10 15:53:16,602 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-10 15:53:16,602 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sp01.spool_count' (key='sap.sp01.spool_count') -- leaving UNKNOWN.

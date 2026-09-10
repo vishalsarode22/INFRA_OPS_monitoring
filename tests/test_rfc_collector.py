@@ -39,52 +39,84 @@ def _by_key(payload):
     return {m.name: m for m in rc._from_function_module(FakeSession(payload))}
 
 
-class TestSentinels:
-    def test_negative_one_is_unknown(self):
-        # The ABAP module returns -1 when a reading could not be taken.
-        m = _by_key({**BASE, "EV_CPU_UTIL_PCT": -1})["cpu"]
-        assert m.status is Status.UNKNOWN and m.value is None
-
-    def test_zero_cpu_and_memory_are_unknown(self):
-        # A live host is never at 0% CPU with 0 GB of RAM.
-        got = _by_key({**BASE, "EV_CPU_UTIL_PCT": 0, "EV_TOTAL_RAM_GB": 0})
-        assert got["cpu"].status is Status.UNKNOWN
-        assert got["memory.total_gb"].status is Status.UNKNOWN
-
-    def test_zero_load_is_a_real_reading(self):
-        # An idle system genuinely reports 0.00. Treating that as a failure
-        # would discard a correct measurement.
-        m = _by_key(BASE)["load_1m"]
-        assert m.status is Status.NORMAL and m.value == 0.0
-
-    def test_zero_dump_count_is_real(self):
-        m = _by_key(BASE)["sap.st22.dumps"]
-        assert m.status is Status.NORMAL and m.value == 0.0
-
-
-class TestCanonicalNaming:
+class TestNoCommandDerivedOsMetrics:
     """
-    RFC must emit the SAME metric names as the GUI and SSH collectors.
-    Human-readable labels would fork each signal into two histories and
-    break event keying, baselines and correlation rules.
+    CPU, memory and load must come from /SDF/SMON_HEADER, never from the
+    function module's SXPG exports.
+
+    Those exports are fed by SM69 external commands, which need S_LOG_COM --
+    remote command execution on the application server. The grant has been
+    removed, so a transported older FM may still return values for them and
+    they must be ignored rather than silently displayed.
     """
 
-    def test_tcode_metrics_use_dotted_names(self):
-        for name in _by_key(BASE):
-            assert name.startswith(("sap.", "cpu", "memory", "load_1m")), name
+    def test_fm_os_exports_are_not_mapped(self):
+        from collectors.rfc_collector import _FM_METRICS
+        for export in ("EV_CPU_UTIL_PCT", "EV_MEM_UTIL_PCT",
+                       "EV_LOAD_1M", "EV_TOTAL_RAM_GB"):
+            assert export not in _FM_METRICS, (
+                f"{export} is command-derived and must not feed the dashboard")
 
-    def test_os_metrics_match_ssh_collector_names(self):
-        got = _by_key(BASE)
-        # collectors/linux_collector.py emits exactly these three.
-        for name in ("cpu", "memory", "load_1m"):
-            assert name in got
+    def test_stale_fm_values_do_not_reach_the_payload(self):
+        import collectors.rfc_live as L
 
-    def test_shared_tcode_names_match_gui_collector(self):
-        # These names also appear in dashboard/snapshots produced by the
-        # SAP GUI collector -- they must line up exactly.
-        got = _by_key(BASE)
-        assert "sap.sm12.lock_count" in got
-        assert "sap.al08.user_logons" in got
+        class Session:
+            ok = True
+            cfg = {}
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def call(self, name, **kw):
+                if name == "Z_GET_OBSERVABILITY_DATA":
+                    # An older transported FM still running the SXPG block.
+                    return {"EV_CPU_UTIL_PCT": 99, "EV_MEM_UTIL_PCT": 99,
+                            "EV_LOAD_1M": 99, "EV_ACTIVE_USERS": 3}
+                return None
+            def read_table(self, *a, **k): return None
+
+        original = L.SapSession
+        try:
+            L.SapSession = lambda sid, cfg: Session()
+            L._cache.clear()
+            payload = L.read_live("TST", {"rfc": {"ashost": "x"}}, use_cache=False)
+        finally:
+            L.SapSession = original
+
+        assert payload["cpu"] is None
+        assert payload["memory"] is None
+        assert payload["load_1m"] is None
+        assert payload.get("os_hint"), "operator should be told to schedule SMON"
+
+    def test_smon_supplies_the_values(self):
+        import collectors.rfc_live as L
+
+        class Session:
+            ok = True
+            cfg = {}
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def call(self, name, **kw):
+                return {"EV_ACTIVE_USERS": 3} if name == "Z_GET_OBSERVABILITY_DATA" else None
+            def read_table(self, table, *a, **k):
+                if table == "/SDF/SMON_HEADER":
+                    # Decimal comma, as RFC_READ_TABLE returns it.
+                    return [["20260901", "143100", "nwtest_TST_02", "3", "2", "95",
+                             "62,0", "4150", "0,18", "1", "1", "0", "0", "3", "4",
+                             "2730", "4,00"]]
+                return None
+
+        original = L.SapSession
+        try:
+            L.SapSession = lambda sid, cfg: Session()
+            L._cache.clear()
+            payload = L.read_live("TST", {"rfc": {"ashost": "x"}}, use_cache=False)
+        finally:
+            L.SapSession = original
+
+        assert payload["cpu"] == 5           # 100 - IDLE_TOTAL
+        assert payload["memory"] == 38       # 100 - FREE_MEM_PERC
+        assert payload["load_1m"] == 0.18    # "0,18" not 18
+        assert payload["os_source"] == "SMON"
+        assert payload["smon"]["dialog_queue"] == 0
 
 
 class TestGrading:

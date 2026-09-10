@@ -228,3 +228,46 @@ def send_final_report(result: MonitoringResult, smtp_config: dict,
             time.sleep(3)
 
     return False
+
+def send_diagnostic_alert(result, smtp_config: dict, incident=None,
+                          ai_analysis=None, max_retries: int = 2) -> bool:
+    """
+    Sends the full RCA alert to the Basis consultant.
+
+    Use instead of send_final_report when an incident was correlated or the
+    cycle is CRITICAL: it carries the culprit, the evidence behind that
+    attribution, the remediation steps, and everything that could NOT be read.
+    """
+    from notifications.diagnostic_alert import build_diagnostic_alert
+
+    subject, html_body = build_diagnostic_alert(result, incident, ai_analysis)
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = smtp_config["from_email"]
+    msg["To"] = ", ".join(smtp_config["to_emails"])
+    msg.attach(MIMEText(
+        f"System {result.system} is {result.overall_status}. "
+        "This alert requires an HTML-capable mail client.", "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            with smtplib.SMTP(smtp_config["host"], smtp_config["port"], timeout=60) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(smtp_config["username"], smtp_config["password"])
+                server.sendmail(smtp_config["from_email"], smtp_config["to_emails"],
+                                msg.as_string())
+            log.info(f"Diagnostic alert sent to {smtp_config['to_emails']}")
+            return True
+        except Exception as e:
+            log.warning(f"Diagnostic alert attempt {attempt}/{max_retries} failed: {e}")
+            if attempt == max_retries:
+                log.error(f"Failed to send diagnostic alert after {max_retries} attempts: {e}")
+                return False
+            import time
+            time.sleep(3)
+
+    return False
