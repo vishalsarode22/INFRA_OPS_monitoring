@@ -447,8 +447,16 @@ function card(s) {
 
     ${workProcesses(wp)}
     ${instances(s.instances)}
-    ${checks(s.checks, s.check_source, s.check_error)}
-    ${smonPanel(s.smon)}
+
+    <div style="text-align:center;margin:6px 0">
+      <button class="btn" style="font-size:11px;padding:3px 14px"
+              id="moreBtn-${IB.esc(s.system)}"
+              onclick="toggleMore('${IB.esc(s.system)}')">More</button>
+    </div>
+    <div id="morePanel-${IB.esc(s.system)}" style="display:none">
+      ${checks(s.checks, s.check_source, s.check_error)}
+      ${smonPanel(s.smon)}
+    </div>
     ${err}
 
     <div class="foot">
@@ -456,13 +464,59 @@ function card(s) {
       ${s.cache_age_seconds ? `<span>cache ${s.cache_age_seconds}s</span>` : ""}
       ${s.snapshot_age_minutes !== undefined && s.snapshot_age_minutes !== null
         ? `<span>last sweep ${s.snapshot_age_minutes}m ago</span>` : ""}
-      <button class="btn btn-primary" style="margin-left:auto;padding:4px 11px;font-size:11px"
+      <button class="btn" style="margin-left:auto;padding:4px 11px;font-size:11px"
+              onclick="refreshOne('${IB.esc(s.system)}')"
+              id="refresh-${IB.esc(s.system)}" title="Fresh RFC read for this system only">↻ Refresh</button>
+      <button class="btn btn-primary" style="padding:4px 11px;font-size:11px"
               onclick="monitorOne('${IB.esc(s.system)}')"
               id="run-${IB.esc(s.system)}">Monitor this system</button>
       <a href="/system?name=${encodeURIComponent(s.system)}"
          style="color:var(--brand-live);font-weight:700">Detail →</a>
     </div>
   </div>`;
+}
+
+/* Fresh RFC read for one system only. No SAP GUI, no sweep -- just an
+   on-demand read of RFC counters + TH_WPINFO for the one card the user is
+   looking at. Bypasses the wall-wide cooldown so a dead host does not block
+   a live one, and re-renders in place instead of forcing a full wall reload.
+   The whole call takes ~1s for a healthy system, ~10s for a dead one (TCP
+   probe timeout). */
+const _moreOpen = new Set();
+
+function toggleMore(name) {
+  const panel = document.getElementById("morePanel-" + name);
+  const btn = document.getElementById("moreBtn-" + name);
+  if (!panel) return;
+  const opening = panel.style.display === "none";
+  panel.style.display = opening ? "" : "none";
+  if (btn) btn.textContent = opening ? "Less" : "More";
+  if (opening) { _moreOpen.add(name); } else { _moreOpen.delete(name); }
+}
+
+function restoreMoreState() {
+  _moreOpen.forEach(function(name) {
+    const panel = document.getElementById("morePanel-" + name);
+    const btn = document.getElementById("moreBtn-" + name);
+    if (panel) panel.style.display = "";
+    if (btn) btn.textContent = "Less";
+  });
+}
+
+async function refreshOne(name) {
+  const btn = document.getElementById("refresh-" + name);
+  if (btn) { btn.disabled = true; btn.textContent = "↻ Reading…"; }
+  try {
+    const r = await fetch("/api/live/" + encodeURIComponent(name)
+                          + "?fresh=1&_t=" + Date.now());
+    if (r.ok) {
+      await load();   // re-render the whole wall from cache; the one system
+                      // that just refreshed will have new numbers, everyone
+                      // else keeps whatever they had.
+    }
+  } catch (e) { /* button gets re-enabled below */ }
+  const b2 = document.getElementById("refresh-" + name);
+  if (b2) { b2.disabled = false; b2.textContent = "↻ Refresh"; }
 }
 
 /* Monitor ONE system. A full sweep drives SAP GUI for every system and
@@ -523,6 +577,7 @@ async function load() {
     document.getElementById("wall").innerHTML =
       d.systems.length ? d.systems.map(safeCard).join("")
                        : '<div class="empty">No systems configured.</div>';
+    restoreMoreState();
     document.getElementById("livecount").textContent = `${d.live_count}/${d.total}`;
     document.getElementById("gen").textContent = d.generated_at;
 

@@ -89,7 +89,7 @@ LOCKS_PER_USER_MANY = 10            # "many locks" threshold per user
 # oldest-lock metric. /SDF/ is the Service Data Framework: SMON holds
 # /SDF/SMON_CALL for its entire run, Cloud ALM holds /SDF/CALM_HM_K hourly.
 # Confirmed live on PRD. They still count toward per-user totals.
-LOCK_AGE_IGNORE_PREFIXES = ("/SDF/",)
+LOCK_AGE_IGNORE_PREFIXES = ("/SDF/", "BGRFC")
 SQLM_ROWS = 5000                    # RFC_READ_TABLE cap for SQLMD
 SQLM_LOOKBACK_DAYS = 7              # SQLMD rows with DDATE in this window
 
@@ -443,7 +443,7 @@ def response_summary(recs: list[dict], system: str = "") -> dict | None:
                                    "db_calls": 0, "tcodes": set(), "users": set()})
     priv_steps = 0
     for r in dia:
-        resp = _num(r.get("RESPTI")) or 0
+        resp = (_num(r.get("RESPTI")) or 0) / 1000  # RESPTI is microseconds; convert to ms
         # DBREQTIME is the per-step DB request time on this release (confirmed
         # live); older shapes carry READDIRTI/READSEQTI/CHNGTI instead.
         if "DBREQTIME" in r:
@@ -852,7 +852,7 @@ def build_metrics(system: str, session: SapSession, client: str) -> list[MetricR
     recs, note = stat_records(session, inst, system)
     rs = response_summary(recs, system) if recs is not None else None
     window = f"{RESP_WINDOW_MINUTES}min"
-    if rs is None:
+    if rs is None or rs["steps"] < MIN_DIALOG_STEPS:
         rs = st03n_aggregate(session, inst)
         if rs:
             window, note = "today (ST03N daily aggregate)", ""

@@ -126,18 +126,22 @@ def run_full_pipeline(system: str, client: str):
     # Operational intelligence is evaluated only after the complete metric and
     # incident picture exists. The runtime is per-system, so repeated scheduler
     # cycles build baseline history without mixing systems.
-    try:
-        intelligence_runtime = get_intelligence_runtime(result.system)
-        intelligence = attach_operational_intelligence(result, intelligence_runtime)
-        analyses = run_ai_analysis(result, intelligence=intelligence)
-        result.ai_analysis = analyses[0] if analyses else None
-    except Exception as e:
-        # AI/intelligence is optional; deterministic monitoring and incident
-        # severity remain available when the provider fails.
-        log.error(
-            "Milestone 8.2: AI/intelligence analysis failed after final metric collection: %s",
-            type(e).__name__,
-        )
+    if not IBO_AI_ENABLED:
+        log.info(f"{name if 'name' in dir() else result.system}: AI analysis disabled (IBO_ENABLE_AI=0); skipping.")
+        result.ai_analysis = None
+    else:
+        try:
+            intelligence_runtime = get_intelligence_runtime(result.system)
+            intelligence = attach_operational_intelligence(result, intelligence_runtime)
+            analyses = run_ai_analysis(result, intelligence=intelligence)
+            result.ai_analysis = analyses[0] if analyses else None
+        except Exception as e:
+            # AI/intelligence is optional; deterministic monitoring and incident
+            # severity remain available when the provider fails.
+            log.error(
+                "Milestone 8.2: AI/intelligence analysis failed after final metric collection: %s",
+                type(e).__name__,
+            )
         result.errors.append(f"ai_analyzer: {type(e).__name__}")
 
     if result.overall_status.value == "CRITICAL":
@@ -165,8 +169,11 @@ def run_full_pipeline(system: str, client: str):
         gui_results=gui_results,
     )
 
-    smtp_config = get_smtp_config()
-    send_final_report(result, smtp_config, pdf_path, metrobrands_path)
+    if IBO_EMAIL_ENABLED:
+        smtp_config = get_smtp_config()
+        send_final_report(result, smtp_config, pdf_path, metrobrands_path)
+    else:
+        log.info("Final report email disabled (IBO_ENABLE_EMAIL=0); skipping.")
 
     log.info("===== SAP BASIS Monitoring Pipeline: COMPLETE =====")
     print(f"\nPDF (LaTeX): {pdf_path}")
@@ -201,6 +208,14 @@ PIPELINE_STALL_SECONDS = int(
 # drive the same SAP GUI at once.
 PIPELINE_JOIN_GRACE_SECONDS = int(
     os.environ.get("IBO_PIPELINE_JOIN_GRACE", 90) or 90)
+
+# Kill switches. Both default OFF right now: the Gemini keys are exhausted
+# for the day and Grok's API key is rejected outright (HTTP 400,
+# invalid-argument), so every AI call was guaranteed to fail after burning
+# ~7s across all 6 providers -- and every cycle, failed or not, was still
+# emailing a report. Set both to "1" in .env once the keys are fixed.
+IBO_AI_ENABLED = os.environ.get("IBO_ENABLE_AI", "0").strip() in ("1", "true", "yes")
+IBO_EMAIL_ENABLED = os.environ.get("IBO_ENABLE_EMAIL", "0").strip() in ("1", "true", "yes")
 
 
 def _run_with_watchdog(system_config: dict) -> tuple:
@@ -331,11 +346,14 @@ def run_pipeline_for_system(system_config: dict) -> bool:
             last_error = e
             log.error(f"Pipeline attempt {attempt}/{SYSTEM_MAX_ATTEMPTS} for {name} failed: {e}", exc_info=True)
 
-        try:
-            smtp_config = get_smtp_config()
-            send_failure_alert(name, str(last_error), attempt, SYSTEM_MAX_ATTEMPTS, smtp_config)
-        except Exception as alert_err:
-            log.error(f"Could not send failure alert for {name} (SMTP config issue?): {alert_err}")
+        if IBO_EMAIL_ENABLED:
+            try:
+                smtp_config = get_smtp_config()
+                send_failure_alert(name, str(last_error), attempt, SYSTEM_MAX_ATTEMPTS, smtp_config)
+            except Exception as alert_err:
+                log.error(f"Could not send failure alert for {name} (SMTP config issue?): {alert_err}")
+        else:
+            log.info(f"{name}: failure alert email disabled (IBO_ENABLE_EMAIL=0); skipping.")
 
         if attempt < SYSTEM_MAX_ATTEMPTS:
             log.info(f"Resetting SAP processes before retrying {name}...")
@@ -479,10 +497,13 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
         ]
         if failed_tcodes:
             log.warning(f"{name}: {len(failed_tcodes)} T-code(s) failed to capture: {failed_tcodes}")
-            try:
-                send_tcode_failure_alert(name, failed_tcodes, get_smtp_config(system_config))
-            except Exception as e:
-                log.error(f"Could not send T-code failure alert for {name}: {e}")
+            if IBO_EMAIL_ENABLED:
+                try:
+                    send_tcode_failure_alert(name, failed_tcodes, get_smtp_config(system_config))
+                except Exception as e:
+                    log.error(f"Could not send T-code failure alert for {name}: {e}")
+            else:
+                log.info(f"{name}: T-code failure alert email disabled (IBO_ENABLE_EMAIL=0); skipping.")
     else:
         log.info(f"Skipping T-code GUI evidence for {name} -- GUI access disabled or no active SAP session.")
 
@@ -538,14 +559,18 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
     # Operational intelligence is evaluated only after the complete metric and
     # incident picture exists. The runtime is per-system, so repeated scheduler
     # cycles build baseline history without mixing systems.
-    try:
-        intelligence_runtime = get_intelligence_runtime(result.system)
-        intelligence = attach_operational_intelligence(result, intelligence_runtime)
-        analyses = run_ai_analysis(result, intelligence=intelligence)
-        result.ai_analysis = analyses[0] if analyses else None
-    except Exception as e:
-        log.error(f"AI/intelligence analysis failed after final metric collection: {type(e).__name__}")
-        result.errors.append(f"ai_analyzer: {type(e).__name__}")
+    if not IBO_AI_ENABLED:
+        log.info(f"{name}: AI analysis disabled (IBO_ENABLE_AI=0); skipping.")
+        result.ai_analysis = None
+    else:
+        try:
+            intelligence_runtime = get_intelligence_runtime(result.system)
+            intelligence = attach_operational_intelligence(result, intelligence_runtime)
+            analyses = run_ai_analysis(result, intelligence=intelligence)
+            result.ai_analysis = analyses[0] if analyses else None
+        except Exception as e:
+            log.error(f"AI/intelligence analysis failed after final metric collection: {type(e).__name__}")
+            result.errors.append(f"ai_analyzer: {type(e).__name__}")
 
     if result.overall_status.value == "CRITICAL":
         try:
@@ -571,8 +596,11 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
     # Per-system alerting: a PRD alert should not land in a sandbox inbox
     # just because both use the same mail server.
     heartbeat.beat(f"{name}:final-email")
-    smtp_config = get_smtp_config(system_config)
-    send_final_report(result, smtp_config, pdf_path, metrobrands_path)
+    if IBO_EMAIL_ENABLED:
+        smtp_config = get_smtp_config(system_config)
+        send_final_report(result, smtp_config, pdf_path, metrobrands_path)
+    else:
+        log.info(f"{name}: final report email disabled (IBO_ENABLE_EMAIL=0); skipping.")
 
     log.info(f"===== Pipeline COMPLETE for system {name} (gui_available={gui_available}) =====")
 

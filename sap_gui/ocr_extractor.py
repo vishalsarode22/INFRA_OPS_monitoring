@@ -149,10 +149,31 @@ def extract_patterns(text: str, patterns: dict) -> dict:
     """
     patterns: {result_key: regex_with_one_capture_group}
     Returns {result_key: matched_value} for every pattern that matched.
+
+    Keys ending in "_list" are MULTI-match: every occurrence of group 1 is
+    collected (order kept, duplicates dropped) and joined with "; ", and a
+    companion "<key>_count" carries the number of distinct hits. This is
+    how per-row values -- lock owners, job names, syslog messages, instance
+    names -- come out of a screen that lists them one per line, which a
+    single re.search cannot express. Patterns run with MULTILINE so "^"
+    anchors to each OCR line, and IGNORECASE because OCR case is unreliable.
     """
     results = {}
+    flags = re.IGNORECASE | re.MULTILINE
     for key, pattern in patterns.items():
-        match = re.search(pattern, text, re.IGNORECASE)
+        if key.endswith("_list"):
+            seen, items, rows = set(), [], 0
+            for m in re.finditer(pattern, text, flags):
+                v = (m.group(1) if m.groups() else m.group(0)).strip()
+                if not v:
+                    continue
+                rows += 1                      # every matching ROW counts...
+                if v not in seen:              # ...but the list names each value once
+                    seen.add(v); items.append(v)
+            results[key] = "; ".join(items)
+            results[key[:-5] + "_count"] = rows
+            continue
+        match = re.search(pattern, text, flags)
         if match:
             results[key] = match.group(1).strip()
     return results

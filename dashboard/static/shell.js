@@ -628,14 +628,16 @@ IB.mountRunControl = function (containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
   _refreshRunControl(el);
-  setInterval(() => _refreshRunControl(el), 5000);
+  // IB.poll (not setInterval): a hidden tab stops polling, so background
+  // tabs no longer queue requests behind the single SAP GUI thread.
+  IB.poll(() => _refreshRunControl(el), 5000);
 };
 
 IB.mountSchedulerControl = function (containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
   _refreshScheduler(el);
-  setInterval(() => _refreshScheduler(el), 15000);
+  IB.poll(() => _refreshScheduler(el), 15000);
 };
 
 /* Shared "no data" styling, injected once so pages need not repeat it. */

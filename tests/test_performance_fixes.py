@@ -126,24 +126,69 @@ class GeminiQuota(unittest.TestCase):
 
 
 class Recompress(unittest.TestCase):
+    """
+    Recompression must shrink a SAP hardCopy PNG hard, and change no pixel.
+
+    This used to scavenge the reports tree for any file over 400KB and assume
+    it was an uncompressed original. The backfill script emptied that
+    population, so the search started returning ALREADY-compressed files, and
+    the test failed asking why a 464KB file did not shrink to 46KB. A test
+    whose fixture is whatever happens to be on disk reports the state of the
+    disk, not the state of the code, so it now builds its own input.
+    """
+
+    @staticmethod
+    def _hardcopy_like(path):
+        """An uncompressed PNG shaped like a SAP GUI screen: flat title band,
+        banded list rows, large areas of a single colour. compress_level=0
+        reproduces what SAP hardCopy writes."""
+        from PIL import Image, ImageDraw
+        img = Image.new("RGB", (1920, 1080), (255, 255, 255))
+        draw = ImageDraw.Draw(img)
+        draw.rectangle([0, 0, 1920, 60], fill=(20, 60, 120))
+        for y in range(80, 1080, 24):
+            draw.rectangle([40, y, 900, y + 12],
+                           fill=(30, 30, 30) if y % 48 else (200, 215, 235))
+        img.save(path, "PNG", compress_level=0)
+        return img.tobytes()
+
     def test_lossless_and_ocr_identical_pixels(self):
         from PIL import Image
         import sap_gui.screenshot as ss
-        import glob
-        src = [f for f in sorted(glob.glob('reports/**/screenshots/*.png', recursive=True))
-               if os.path.getsize(f) > 400_000]
-        if not src:
-            self.skipTest("no uncompressed screenshots available")
-        import shutil, tempfile
+        import tempfile
         tmp = os.path.join(tempfile.mkdtemp(), "shot.png")
-        shutil.copy(src[0], tmp)
-        before_px = list(Image.open(tmp).convert("RGB").getdata())
+        before_px = self._hardcopy_like(tmp)
         before = os.path.getsize(tmp)
+        self.assertGreater(before, 1_000_000, "fixture is not an uncompressed PNG")
+
         ss._recompress(tmp)
+
         after = os.path.getsize(tmp)
-        after_px = list(Image.open(tmp).convert("RGB").getdata())
+        with Image.open(tmp) as reopened:
+            after_px = reopened.convert("RGB").tobytes()
+        # Pixel identity is the point: OCR reads the file after this runs, and
+        # evidence that reads differently after compression is not evidence.
         self.assertEqual(before_px, after_px, "recompression changed pixels")
         self.assertLess(after, before / 10, "recompression saved less than 10x")
+
+    def test_already_compressed_file_is_left_alone_and_intact(self):
+        """Re-running the backfill over compressed evidence must be a no-op,
+        not a corruption. The 400KB scavenge hid this case entirely."""
+        from PIL import Image
+        import sap_gui.screenshot as ss
+        import tempfile
+        tmp = os.path.join(tempfile.mkdtemp(), "shot.png")
+        self._hardcopy_like(tmp)
+        ss._recompress(tmp)
+        once = os.path.getsize(tmp)
+        with Image.open(tmp) as img:
+            px = img.convert("RGB").tobytes()
+
+        ss._recompress(tmp)
+
+        with Image.open(tmp) as img:
+            self.assertEqual(px, img.convert("RGB").tobytes())
+        self.assertLessEqual(os.path.getsize(tmp), once)
 
     def test_missing_file_does_not_raise(self):
         import sap_gui.screenshot as ss

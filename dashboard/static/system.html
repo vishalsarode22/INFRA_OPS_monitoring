@@ -165,15 +165,7 @@ async function loadLive() {
         ${kpi("Sessions", IB.val(s.users,"",0), "n-info")}
       </div>
       ${perfTiles(s.perf || {})}
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-h"><h3>AI analysis · live RFC</h3>
-          <span class="src src-none">Gemini · one call over the current read</span>
-          <button class="btn primary" id="ai-run" style="margin-left:auto">✨ Analyse live</button></div>
-        <div class="card-b" id="ai-out"><div class="empty" style="padding:10px">
-          Runs findings on the live reading, then one model call for the narrative.
-          Nothing runs on a timer.</div></div>
-      </div>
-      ${(s.perf && s.perf.error && !(s.perf.metrics||[]).length)
+${(s.perf && s.perf.error && !(s.perf.metrics||[]).length)
         ? `<div class="banner banner-warn">Performance read: ${IB.esc(String(s.perf.error).split("\n")[0])}</div>` : ""}
       <div class="card" style="margin-bottom:16px">
         <div class="card-h"><h3>T-code checks</h3>
@@ -277,7 +269,7 @@ async function loadReport() {
   const el = document.getElementById("p-report");
   try {
     const r = await IB.get("/api/report/" + encodeURIComponent(NAME));
-    el.innerHTML = `<div class="banner" style="background:var(--info-bg);border:1px solid var(--info-br);color:var(--text)">
+    el.innerHTML = rcaPanel() + `<div class="banner" style="background:var(--info-bg);border:1px solid var(--info-br);color:var(--text)">
         ${IB.esc(r.summary)}</div>
       ${r.findings.map(f=>`<div class="card" style="margin-bottom:11px">
         <div class="card-h"><span class="chip ${IB.statusClass(f.severity)}">${IB.esc(f.severity)}</span>
@@ -288,7 +280,81 @@ async function loadReport() {
         || '<div class="card"><div class="empty">No findings.</div></div>'}
       <div style="margin-top:10px"><a class="btn" href="/reports-page">Full report →</a></div>`;
   } catch (e) {
-    el.innerHTML = `<div class="card"><div class="empty">No report yet — a sweep must complete first.</div></div>`;
+    el.innerHTML = rcaPanel() + `<div class="card"><div class="empty">No report yet — a sweep must complete first.</div></div>`;
+  }
+  refreshRcaStatus();
+}
+
+/* ---- Performance monitoring (emergency RCA) --------------------------
+   One button, one status line. The RCA drives SAP GUI for several minutes
+   and pre-empts a running sweep, so the button says what it is about to do
+   before it does it, and the status line says where it got to. */
+function rcaPanel() {
+  return `<div class="card" style="margin-bottom:11px" id="rca-card">
+    <div class="card-h"><h3>Performance monitoring</h3>
+      <button class="btn btn-brand" id="rca-run" onclick="runRca()">Run performance RCA now</button></div>
+    <div class="card-b">
+      <div style="color:var(--muted);font-size:12.5px;margin-bottom:6px">
+        Captures SM50 (by memory, PRIV), ST03N load windows, STAD slow steps, SM12 lock contention and
+        ST04 database screens, runs OCR and model root-cause analysis, and emails the PDF to the Basis
+        consultant. Fires automatically when dialog response stays over threshold; press to run it now.</div>
+      <div id="rca-status" class="mono" style="font-size:11.5px;color:var(--muted-dim)">…</div>
+    </div></div>`;
+}
+
+async function runRca() {
+  const btn = document.getElementById("rca-run");
+  if (btn) { btn.disabled = true; btn.textContent = "Starting…"; }
+  try {
+    const r = await IB.post("/api/perf-rca/" + encodeURIComponent(NAME), { label: "Starting performance RCA…" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      alert(d.detail || ("RCA could not start (HTTP " + r.status + ")"));
+      if (btn) { btn.disabled = false; btn.textContent = "Run performance RCA now"; }
+      return;
+    }
+    setRcaStatus(d.note || "Started.");
+  } catch (e) {
+    // IB.post throws on 401/503; say so rather than silently resetting the button.
+    alert(e.message || "RCA request failed");
+    if (btn) { btn.disabled = false; btn.textContent = "Run performance RCA now"; }
+    return;
+  }
+  pollRca();
+}
+
+function setRcaStatus(text) {
+  const s = document.getElementById("rca-status");
+  if (s) s.textContent = text;
+}
+
+async function refreshRcaStatus() {
+  try {
+    const st = await IB.get("/api/perf-rca/" + encodeURIComponent(NAME) + "/status");
+    const t = st.trigger || {};
+    let line = t.enabled
+      ? `auto-trigger: ${t.metric} > ${t.threshold_ms} ms for ${t.sustain_polls} polls · last ${t.last_value_ms ?? "—"} ms · streak ${t.consecutive_over}`
+      : "auto-trigger disabled (IBO_ENABLE_RCA=0 or rca.yaml enabled: false)";
+    if (t.cooldown_remaining_s > 0) line += ` · cooldown ${Math.ceil(t.cooldown_remaining_s/60)} min`;
+    if (st.running) line = `RUNNING since ${st.started_at} — ` + line;
+    else if (st.last && st.last.finished_at) {
+      line = (st.last.ok
+        ? `last: ${st.last.severity} — ${st.last.headline || ""} (${st.last.screens} screens${st.last.emailed ? ", emailed" : ""}) at ${st.last.finished_at}`
+        : `last attempt failed: ${st.last.error || "?"} at ${st.last.finished_at}`) + " · " + line;
+    }
+    setRcaStatus(line);
+    const btn = document.getElementById("rca-run");
+    if (btn && !st.running) { btn.disabled = false; btn.textContent = "Run performance RCA now"; }
+    return st;
+  } catch (e) { setRcaStatus("status unavailable: " + (e.message || e)); return null; }
+}
+
+async function pollRca() {
+  const st = await refreshRcaStatus();
+  if (st && st.running) {
+    const btn = document.getElementById("rca-run");
+    if (btn) { btn.disabled = true; btn.textContent = "RCA running…"; }
+    setTimeout(pollRca, 4000);
   }
 }
 

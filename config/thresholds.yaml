@@ -22,13 +22,13 @@ load_1m:
 # SAP GUI / T-code monitoring thresholds
 # ============================================================
 
-# SMLG instance response time
-# Healthy  : < 1000 ms
-# Warning  : 1000 - 2500 ms
-# Critical : > 2500 ms
+# SMLG / SMON instance dialog response time (live, per instance)
+# Healthy  : < 1500 ms  (an idle instance reads 0 ms and is healthy)
+# Warning  : 1500 - 3000 ms
+# Critical : > 3000 ms
 sap.smlg.response_time:
-  warning: 1000
-  critical: 2500
+  warning: 1500
+  critical: 3000
 
 # ST22 ABAP runtime errors / short dumps per day
 # Healthy  : 0
@@ -139,9 +139,11 @@ sap.sm66.max_instance_saturation_pct:
   critical: 90
 
 # Average dialog response over the last 5 minutes, all instances (STAT records)
+# Aligned with sap.smlg.response_time so the same measurement grades the same
+# way whichever source it came from.
 sap.st03.dialog_resp_ms:
-  warning: 1000
-  critical: 2500
+  warning: 1500
+  critical: 3000
 
 # Worst single instance's average dialog response
 sap.st03.max_instance_resp_ms:

@@ -46,6 +46,7 @@ class CheckNarrative:
     captured_at: str = ""
     evidence_id: str = ""
     facts: dict[str, Any] = field(default_factory=dict)
+    screenshots: list[str] = field(default_factory=list)
 
 
 # Human task names per T-code (used where the template has none).
@@ -75,6 +76,58 @@ def _grab(pattern: str, text: str, flags=re.I):
     return m.group(1) if m else None
 
 
+# --------------------------------------------------------------------------
+# OCR legibility
+#
+# Tesseract on a SAP GUI screen with icon toolbars returns long runs of
+# glyph noise ("(c) gRFC Edit Goto ... @Ge@ishs(R) AALS e8"). Printing that
+# as an Observation in a client report is worse than printing nothing: it
+# looks like the tool is broken. These two helpers decide whether an OCR
+# excerpt is readable enough to quote, and only then is it quoted.
+# --------------------------------------------------------------------------
+
+_WORDLIKE = re.compile(r"^[A-Za-z][A-Za-z./-]{2,}$|^\d{1,7}$|^[A-Za-z]{1,4}\d{1,4}$")
+
+
+# Characters that essentially never appear in SAP screen text but are the
+# signature of Tesseract reading toolbar icons: box glyphs, currency and
+# quotation marks, guillemets, copyright/registered symbols.
+_GARBAGE_CHARS = set("«»©®£¥€“”‘’|\\^~`§¶†‡•…=[]{}<>*")
+
+
+def _is_legible(text: str, min_tokens: int = 6) -> bool:
+    """
+    True when an OCR excerpt reads like words rather than glyph noise.
+
+    Two signals, because neither alone is enough. Word density catches short
+    fragments ("& CAQ (1) 800 * vhrrncaqci INS [al"). Glyph density catches
+    the harder case where a toolbar row sits between real menu words and the
+    line scores well on words alone -- the SOST capture read as legible on
+    word density at 0.65 while containing five icon-noise tokens.
+    """
+    tokens = [t for t in re.split(r"\s+", str(text or "").strip()) if t]
+    if len(tokens) < min_tokens:
+        return False
+    wordlike = sum(1 for t in tokens if _WORDLIKE.match(t))
+    garbage = sum(1 for t in tokens if _GARBAGE_CHARS & set(t))
+    return (wordlike / len(tokens)) >= 0.60 and (garbage / len(tokens)) <= 0.08
+
+
+NO_READABLE_TEXT = ("Screen captured; the on-screen text could not be read "
+                    "reliably. See the attached screenshot.")
+
+
+def _plausible_instance(name: str) -> bool:
+    """
+    SAP instance names are <host>_<SID>_<NN> with an uppercase 3-char SID.
+    OCR routinely turns q into g and uppercase into lowercase, producing
+    lookalikes such as vhrrncagei_cao_00 for vhrrncaqci_CAQ_00. Printing a
+    wrong hostname in a client report is worse than printing none, so a name
+    that fails this check is dropped rather than guessed at.
+    """
+    return bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9]*_[A-Z0-9]{3}_\d{2}", str(name or "")))
+
+
 def narrate(metric) -> CheckNarrative:
     """Build the narrative for one GUI-capture MetricResult."""
     tcode = (getattr(metric, "tcode", "") or "").upper()
@@ -86,6 +139,10 @@ def narrate(metric) -> CheckNarrative:
                        evidence_id=str(data.get("evidence_id", "") or ""))
     facts = {k: v for k, v in data.items() if k not in _META_KEYS and v is not None}
     n.facts = facts
+    shots = list(getattr(metric, "screenshot_paths", None) or [])
+    if not shots and getattr(metric, "screenshot_path", None):
+        shots = [metric.screenshot_path]
+    n.screenshots = [s_ for s_ in shots if s_]
 
     display = getattr(metric, "display_value", "") or ""
     if display == "failed":
@@ -290,12 +347,14 @@ def _smlg(n, f, ocr):
             return
         inst, resp, users = m2.group(1), m2.group(2), m2.group(3)
         n.value = f"{resp} ms"
-        n.observation = f"Instance {inst}: response {resp} ms, {users} users (SMLG load view)."
+        where = f"Instance {inst}" if _plausible_instance(inst) else "Instance (name unreadable)"
+        n.observation = f"{where}: response {resp} ms, {users} users (SMLG load view)."
         return
     inst, resp, users, tm, qual, steps = m.groups()
     groups = re.findall(r"\b(PUBLIC|SPACE|[A-Z0-9_]{4,})\s+\w+_[A-Z0-9]{3}_\d{2}\s+\d+\.\d+", ocr)
     n.value = f"{resp} ms"
-    n.observation = (f"Instance {inst}: response {resp} ms, {users} users, quality {qual}, "
+    where = f"Instance {inst}" if _plausible_instance(inst) else "Instance (name unreadable)"
+    n.observation = (f"{where}: response {resp} ms, {users} users, quality {qual}, "
                      f"{steps} dialog steps (sample {tm}).")
     if groups:
         n.observation += f" Logon groups: {', '.join(sorted(set(groups)))}."
@@ -445,10 +504,10 @@ def _generic(n, f, ocr):
             parts.append(f"{k.replace('_', ' ').title()}: {v}")
     if parts:
         n.observation = "; ".join(parts[:6]) + "."
-    elif ocr:
+    elif ocr and _is_legible(ocr):
         n.observation = "Screen captured. Recognised text: " + ocr[:220].rstrip() + ("…" if len(ocr) > 220 else "")
     else:
-        n.observation = "Screen captured; no figures could be read from it."
+        n.observation = NO_READABLE_TEXT
 
 
 _HANDLERS = {
@@ -460,8 +519,50 @@ _HANDLERS = {
 }
 
 
+def _richness(n: CheckNarrative) -> tuple:
+    """
+    How much a narrative actually says, for choosing between duplicates.
+    A parsed figure beats a bare screen capture; a real sentence beats the
+    'could not be read' fallback.
+    """
+    unreadable = n.observation in ("", NO_READABLE_TEXT,
+                                   "Screen captured; no figures could be read from it.")
+    return (0 if unreadable else 1,
+            1 if n.value else 0,
+            1 if n.recommendation else 0,
+            len(n.observation))
+
+
 def narrate_all(gui_results) -> list[CheckNarrative]:
-    return [narrate(m) for m in (gui_results or []) if getattr(m, "tcode", None)]
+    """
+    One narrative per T-code, in capture order.
+
+    A T-code can produce more than one MetricResult in a cycle -- SMLG, for
+    instance, emits both a structured read and an OCR read, which is how a
+    client report ended up with two SMLG rows, one of them saying only
+    "Ocr Source: True". Reports show one row per check, so duplicates are
+    collapsed here: the narrative that says the most wins, and screenshots
+    from every capture of that T-code are kept so no evidence is lost.
+    """
+    best: dict[str, CheckNarrative] = {}
+    order: list[str] = []
+    for m in (gui_results or []):
+        if not getattr(m, "tcode", None):
+            continue
+        n = narrate(m)
+        prev = best.get(n.tcode)
+        if prev is None:
+            best[n.tcode] = n
+            order.append(n.tcode)
+            continue
+        keep, drop = ((n, prev) if _richness(n) > _richness(prev) else (prev, n))
+        for shot in drop.screenshots:
+            if shot not in keep.screenshots:
+                keep.screenshots.append(shot)
+        if not keep.evidence_id:
+            keep.evidence_id = drop.evidence_id
+        best[n.tcode] = keep
+    return [best[t] for t in order]
 
 
 def summary_counts(narratives: list[CheckNarrative]) -> dict:
@@ -480,28 +581,66 @@ def deterministic_analysis(result, narratives: list[CheckNarrative]) -> dict:
     and the structured evidence the model is given when it is available.
     Never invents: every line traces to a metric status or a capture fact.
     """
-    findings, actions = [], []
+    by_tcode = {n.tcode: n for n in narratives}
+
+    # Threshold findings come from the RFC metric stream; check findings come
+    # from the GUI captures. They are separate evidence and are counted
+    # separately -- conflating them is how a report said "3 need attention"
+    # in the header and "4 item(s) need attention" two sections later.
+    metric_findings, check_findings, actions, conflicts = [], [], [], []
+
     for m in getattr(result, "metrics", []) or []:
         st = getattr(getattr(m, "status", None), "value", str(getattr(m, "status", "")))
-        if st in ("CRITICAL", "WARNING"):
-            findings.append(f"[{st}] {m.name} = {m.display_value}"
-                            + (f" — {m.detail}" if getattr(m, 'detail', '') else ""))
+        if st not in ("CRITICAL", "WARNING"):
+            continue
+        line = (f"[{st}] {m.name} = {m.display_value}"
+                + (f" — {m.detail}" if getattr(m, "detail", "") else "")
+                + " (RFC metric)")
+        metric_findings.append(line)
+
+        # An RFC metric named sap.<tcode>.<field> covers the same ground as
+        # the GUI capture of that T-code. When the two disagree -- SM58 read
+        # 3 stuck entries over RFC while the captured screen showed none --
+        # saying so is the report's job. Printing both without comment leaves
+        # the reader to notice the contradiction, which is how trust is lost.
+        parts = str(getattr(m, "name", "")).split(".")
+        tcode = parts[1].upper() if len(parts) > 2 and parts[0] == "sap" else ""
+        n = by_tcode.get(tcode)
+        if n is not None and n.status == "OK":
+            conflicts.append(
+                f"[{tcode}] RFC metric {m.name} reads {m.display_value} while the "
+                f"captured screen read normal ({n.value or 'no figure'}). The two "
+                f"sources disagree; treat this check as unverified until one is "
+                f"confirmed at the system.")
+
     for n in narratives:
         if n.status == "ATTENTION":
-            findings.append(f"[{n.tcode}] {n.observation}")
+            check_findings.append(f"[{n.tcode}] {n.observation}")
             if n.recommendation:
                 actions.append(f"{n.tcode}: {n.recommendation}")
         elif n.status == "FAILED":
-            findings.append(f"[{n.tcode}] {n.observation}")
+            check_findings.append(f"[{n.tcode}] {n.observation}")
+
+    findings = metric_findings + conflicts + check_findings
     counts = summary_counts(narratives)
+    counts["metric_findings"] = len(metric_findings)
+    counts["conflicts"] = len(conflicts)
+
     if not findings:
         headline = (f"All {counts['captured']} captured checks are within normal ranges; "
                     f"no metric is critical or warning this cycle.")
         severity = "NORMAL"
     else:
-        crit = sum(1 for f_ in findings if f_.startswith("[CRITICAL]"))
+        crit = sum(1 for f_ in metric_findings if f_.startswith("[CRITICAL]"))
         severity = "CRITICAL" if crit else "WARNING"
-        headline = (f"{len(findings)} item(s) need attention out of {counts['total']} checks "
-                    f"({crit} critical).")
+        bits = [f"{counts['attention'] + counts['failed']} of {counts['total']} "
+                f"captured checks need attention"]
+        if metric_findings:
+            bits.append(f"{len(metric_findings)} RFC metric(s) over threshold "
+                        f"({crit} critical)")
+        if conflicts:
+            bits.append(f"{len(conflicts)} source conflict(s)")
+        headline = "; ".join(bits) + "."
     return {"severity": severity, "headline": headline,
-            "findings": findings, "actions": actions, "counts": counts}
+            "findings": findings, "actions": actions, "counts": counts,
+            "conflicts": conflicts}

@@ -181,6 +181,31 @@ def collect_tcode_evidence(
                     analysis = analyze_st03n(extracted_data)
                     extracted_data["analysis"] = analysis
 
+                elif tcode.upper() == "SMLG" and extracted_data.get("response_time_ms"):
+                    # Confirmed on this system: no RFC path exposes per-instance
+                    # SMLG response time (SMLG_GET_LOAD_INFO, Z_GET_LOGON_LOAD,
+                    # RZL_INTG_READALL_C, TH_LOAD_DISTRIBUTION and
+                    # TH_GET_LOAD_DISTRIBUTION all returned FU_NOT_FOUND). This
+                    # OCR reading of the SMLG screen is therefore the only
+                    # source for this number -- real, but as of the last sweep,
+                    # not live. The wall labels it accordingly.
+                    try:
+                        smlg_ms = float(str(extracted_data["response_time_ms"]).replace(",", "."))
+                        results.append(MetricResult(
+                            name="sap.smlg.response_time",
+                            value=smlg_ms,
+                            display_value=f"{smlg_ms:.0f} ms",
+                            status=Status.NORMAL,
+                            source="sap_gui_collector",
+                            tcode="SMLG",
+                            detail="OCR of the SMLG instance table; RFC has no "
+                                   "path to this figure on this system (all "
+                                   "5 candidate FMs return FU_NOT_FOUND).",
+                            extra_data={"ocr_source": True},
+                        ))
+                    except (TypeError, ValueError):
+                        pass
+
                 final_screenshots = screenshots
                 last_error = None
                 break

@@ -2,6 +2,9 @@
 
 SM12:
   lock_count: "Selected Lock Entries:\\s*(\\d+)"
+  # Enqueue Administration rows: "<HH:MM:SS> <client> <USER> <appl comp> <mode>"
+  lock_users_list: "^\\d{2}:\\d{2}:\\d{2}\\s+\\d{3}\\s+([A-Z][A-Z0-9_]+)"
+  lock_objects_list: "^([A-Z][A-Z0-9_]{6,})\\s+[a-z0-9]+_[A-Z0-9]+_\\d{2}\\s*$"
 
 
 
@@ -25,3 +28,33 @@ SM58:
 
 ST03N:
   avg_response_time: "Avg\\. dialog response time[^\\d]*([\\d,\\.]+)"
+
+SMLG:
+  # SMLG's instance table row: <name>|<state icon> <resp ms> <users> <HH:MM:SS>.
+  # Structure-matched, not name-matched -- OCR mangles lowercase 'q' in SAP
+  # hostnames unreliably, but the pipe + two-number + timestamp shape holds.
+  response_time_ms: "\\|\\s*\\D{0,4}(\\d{1,6})\\s+\\d+\\s+\\d{2}:\\d{2}:\\d{2}"
+SM37:
+  # Job Overview rows: "<JOBNAME>. <USER> <Status> <dd.mm.yyyy>"
+  active_job_names_list: "^\\W*([A-Z0-9_/]{4,})\\.?\\s+[A-Z0-9_]+\\s+(?:Active|Running)\\b"
+
+SM37_CANCELLED:
+  cancelled_job_names_list: "^\\W*([A-Z0-9_/]{4,})\\.?\\s+[A-Z0-9_]+\\s+Cancel"
+  cancelled_job_users_list: "^\\W*[A-Z0-9_/]{4,}\\.?\\s+([A-Z0-9_]+)\\s+Cancel"
+
+SM58:
+  # One row per tRFC entry starts with a date+time; "Nothing was selected." = 0.
+  trfc_entries_list: "(\\d{2}\\.\\d{2}\\.\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}[^\\n]{0,90})"
+  trfc_empty: "(Nothing was selected)"
+
+SM21:
+  # Every syslog row starts dd.mm.yyyy hh:mm:ss.
+  syslog_rows_list: "^(\\d{2}\\.\\d{2}\\.\\d{4}\\s+\\d{2}:\\d{2}:\\d{2})"
+  # The rows worth a human's attention: failures, invalid certs, dumps, cancels.
+  notable_messages_list: "(\\d{2}:\\d{2}:\\d{2}[^\\n]*?(?:failed|invalid|short dump|cancel|error|closed)[^\\n]*)"
+
+SM66:
+  # "<host>_<SID>_<nn> <wp> <type> <pid> Running ..."
+  active_instances_list: "^([a-z0-9]+_[A-Z0-9]+_\\d{2})\\s+\\d+\\s+(?:DIA|BTC|UPD|SPO|ENQ|UP2)\\b"
+  running_processes_list: "^[a-z0-9]+_[A-Z0-9]+_\\d{2}\\s+(\\d+)\\s+(?:DIA|BTC|UPD|SPO|ENQ|UP2)\\s+[\\d.]+\\s+Running"
+  running_users_list: "Running[^\\n]*\\s\\d{3}\\s+([A-Z][A-Z0-9_]{2,})\\s*$"

@@ -85,7 +85,18 @@ def test_field_order_follows_the_reply_not_the_request():
 # ---------------------------------------------------------------------------
 
 def _step(resp_ms, user="3249", instance="srlprdap1_DB1_00"):
-    return {"TASKTYPE": b"\x01", "RESPTI": resp_ms, "ACCOUNT": user,
+    """
+    One STAT record, built from a response time given in MILLISECONDS.
+
+    RESPTI as returned by SWNC_GET_STATRECS_FRAME is in MICROSECONDS, and
+    the collector divides by 1000. This helper used to write its ms argument
+    straight into RESPTI, which only matched reality while that division was
+    missing -- so these fixtures silently encoded the 1000x inflation bug and
+    started failing once it was fixed. The conversion belongs here, at the
+    fixture boundary, so every call site and assertion below stays readable
+    in ms.
+    """
+    return {"TASKTYPE": b"\x01", "RESPTI": resp_ms * 1000, "ACCOUNT": user,
             "REPORT": "SAPMSSY1", "TCODE": "", "_instance": instance,
             "DBREQTIME": 0, "DBPREQTIME": 0, "MAXBYTES": 0, "DSQLCNT": 0}
 

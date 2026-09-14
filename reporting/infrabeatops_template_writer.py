@@ -70,8 +70,6 @@ CHECK_METRICS: dict[str, list[str]] = {
     "MAIL-02":   ["sap.sost.errors", "sap.sost.send_requests"],
     "SPOOL-01":  ["sap.sp01.spool_count"],
     "DUMP-01":   ["sap.st22.dumps", "sap.st22.dump_count"],
-    "OS-01":     ["disk_/", "disk_/usr/sap", "disk_/sapmnt"],
-    "OS-02":     ["cpu", "memory", "load_1m"],
 }
 
 # Column letters on the Monitoring Checklist sheet (header row 2).

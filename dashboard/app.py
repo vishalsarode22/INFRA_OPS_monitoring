@@ -121,6 +121,13 @@ def _refresh_one_live(cfg: dict) -> None:
     with _live_cache_lock:
         _live_cache[name] = payload
         _live_cache_at[name] = time_module.monotonic()
+    # Performance RCA: every live poll is one observation for the trigger.
+    # Cheap (a dict lookup and a counter); the expensive part only runs
+    # when it decides to fire, and then in its own thread.
+    try:
+        _rca_observe(name, payload)
+    except Exception as exc:   # noqa: BLE001 -- the wall must never stall on this
+        log.debug(f"RCA trigger observe failed for {name}: {type(exc).__name__}: {exc}")
 
 
 def _live_refresh_loop():
@@ -358,6 +365,7 @@ def _get_live_impl(system_name: str):
         _kick_live_refresh(system_name, cfg)
         snap = load_snapshot(system_name)
         if snap is not None:
+            from collectors.rfc_live import attach_snapshot_extras
             payload = attach_snapshot_extras({}, snap)
             payload["warming"] = True
             payload["from_snapshot"] = True
@@ -2231,3 +2239,141 @@ def serve_report_file(path: str):
     return FileResponse(target)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+# ===========================================================================
+# Performance RCA -- threshold trigger and operator button
+#
+# Two entry points into one runner:
+#   _rca_observe()      called once per live poll per system by
+#                       _refresh_one_live(); fires when the trigger says so
+#   POST /api/rca/{s}   the "Performance monitoring" button
+#
+# The runner owns _run_state for its duration, exactly like a sweep, so a
+# scheduled sweep cannot start underneath it and the wall shows RUNNING.
+# Pre-emption of an in-flight sweep is cooperative -- see core.rca_trigger.
+# ===========================================================================
+
+from core.rca_trigger import RcaTrigger, TriggerConfig, preempt_running_sweep   # noqa: E402
+
+_rca_cfg: dict = {}
+_rca_trigger: RcaTrigger | None = None
+_rca_state = {"running": False, "system": None, "started_at": None, "last": {}}
+_rca_lock = threading.Lock()
+
+
+def _rca_load():
+    global _rca_cfg, _rca_trigger
+    from evaluation.rca_pipeline import load_rca_config, rca_enabled
+    _rca_cfg = load_rca_config()
+    tc = TriggerConfig.from_yaml(_rca_cfg)
+    tc.enabled = tc.enabled and rca_enabled(_rca_cfg)
+    _rca_trigger = RcaTrigger(tc)
+    log.info(f"Performance RCA {'enabled' if tc.enabled else 'disabled'}: "
+             f"{tc.metric} > {tc.threshold_ms:.0f} ms for {tc.sustain_polls} polls, "
+             f"cooldown {tc.cooldown_minutes:.0f} min, preempt={tc.preempt_running_sweep}")
+
+
+def _rca_observe(system_name: str, payload: dict) -> None:
+    if _rca_trigger is None:
+        _rca_load()
+    d = _rca_trigger.observe(system_name, payload)
+    if d.fire:
+        _rca_start(system_name, d.reason, manual=False)
+
+
+def _rca_start(system_name: str, reason: str, manual: bool) -> dict:
+    """Launch the RCA in a thread. Returns immediately with what happened."""
+    if _rca_trigger is None:
+        _rca_load()
+    with _rca_lock:
+        if _rca_state["running"]:
+            return {"started": False, "reason": f"RCA already running on {_rca_state['system']}"}
+        _rca_state.update({"running": True, "system": system_name,
+                           "started_at": datetime.now().isoformat(timespec="seconds")})
+    if manual:
+        _rca_trigger.mark_fired(system_name, reason)
+    t = threading.Thread(target=_run_rca_background, args=(system_name, reason), daemon=True)
+    t.start()
+    return {"started": True, "system": system_name, "reason": reason}
+
+
+def _run_rca_background(system_name: str, reason: str) -> None:
+    from evaluation.rca_pipeline import run_rca
+    outcome: dict = {"system": system_name, "reason": reason, "ok": False}
+    try:
+        cfg = next((c for c in get_systems() if c.get("name") == system_name), None)
+        if cfg is None:
+            outcome["error"] = f"Unknown system: {system_name}"
+            return
+
+        # ---- pre-empt whatever is holding SAP GUI -------------------------
+        if _rca_trigger.cfg.preempt_running_sweep:
+            ok, note = preempt_running_sweep(
+                _run_state,
+                request_cancel=lambda: _run_state.__setitem__("cancel_requested", True),
+                is_running=lambda: bool(_run_state["running"]),
+            )
+            outcome["preempt"] = note
+            if not ok:
+                outcome["error"] = note
+                log.error(f"RCA on {system_name} abandoned: {note}")
+                return
+        elif _run_state["running"]:
+            outcome["error"] = f"a sweep is running on {_run_state.get('current_system')} and preempt is off"
+            return
+
+        # ---- own the run state so nothing else starts a sweep -------------
+        with _run_lock:
+            if _run_state["running"]:
+                outcome["error"] = "sweep restarted before RCA could take the session"
+                return
+            _run_state.update({"running": True, "error": None, "cancel_requested": False,
+                               "current_system": system_name, "profile_id": "rca"})
+        try:
+            outcome.update(run_rca(cfg, reason, cfg=_rca_cfg))
+            outcome["ok"] = True
+        finally:
+            with _run_lock:
+                _run_state.update({"running": False, "current_system": None, "profile_id": None})
+    except Exception as exc:   # noqa: BLE001
+        log.error(f"RCA run failed for {system_name}: {type(exc).__name__}: {exc}")
+        outcome["error"] = f"{type(exc).__name__}: {exc}"
+    finally:
+        outcome["finished_at"] = datetime.now().isoformat(timespec="seconds")
+        with _rca_lock:
+            _rca_state.update({"running": False, "system": None, "last": outcome})
+
+
+@app.post("/api/perf-rca/{system_name}", dependencies=[Depends(require_token)])
+def rca_run_now(system_name: str):
+    """The Performance monitoring button. Starts an RCA on one system now."""
+    if not any(c.get("name") == system_name for c in get_systems()):
+        raise HTTPException(status_code=404, detail=f"Unknown system: {system_name}")
+    if _rca_trigger is None:
+        _rca_load()
+    if not _rca_trigger.cfg.enabled:
+        raise HTTPException(status_code=409, detail=(
+            "Performance RCA is disabled. Set IBO_ENABLE_RCA=1 in .env and enabled: true "
+            "in config/rca.yaml, then restart."))
+    r = _rca_start(system_name, "manual: Performance monitoring button", manual=True)
+    if not r.get("started"):
+        raise HTTPException(status_code=409, detail=r.get("reason", "busy"))
+    r["note"] = (f"Pre-empting the running sweep on {_run_state.get('current_system')}; "
+                 f"the RCA starts once it yields the SAP GUI session."
+                 if _run_state["running"] else "Starting now.")
+    return r
+
+
+@app.get("/api/perf-rca/{system_name}/status")
+def rca_status(system_name: str):
+    if _rca_trigger is None:
+        _rca_load()
+    with _rca_lock:
+        st = dict(_rca_state)
+    return {"trigger": _rca_trigger.status(system_name),
+            "running": st["running"] and st["system"] == system_name,
+            "running_system": st["system"], "started_at": st["started_at"],
+            "last": st["last"] if (st["last"] or {}).get("system") == system_name else {},
+            "sweep_running": bool(_run_state["running"]),
+            "sweep_system": _run_state.get("current_system")}

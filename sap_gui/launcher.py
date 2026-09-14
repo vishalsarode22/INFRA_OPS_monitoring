@@ -9,7 +9,13 @@ the same "0 sessions" scripting issue encountered earlier.
 
 import subprocess
 import time
+import os as _os
 from pywinauto import Desktop
+
+# Post-visibility settle for the SAP Logon pad. The pad is usable the moment
+# .wait("visible") returns; the extra second was defensive padding for old
+# machines. Override with IBO_SAPLOGON_SETTLE in .env.
+_PAD_SETTLE = float(_os.environ.get("IBO_SAPLOGON_SETTLE", "0.3") or 0.3)
 from pywinauto.application import Application
 
 from utils.logger import get_logger
@@ -36,7 +42,7 @@ def launch_saplogon(exe_path: str, timeout: int = 30):  # was 15
             pad = Desktop(backend="win32").window(title="SAP Logon 800")
             pad.wait("visible", timeout=2)
             log.info("SAP Logon 800 pad is visible.")
-            time.sleep(1)
+            time.sleep(_PAD_SETTLE)
             return pad
         except Exception:
             time.sleep(1)

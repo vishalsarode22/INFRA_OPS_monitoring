@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<!-- saved from url=(0300)https://shared.officeapps.live.com/clipboard/shared.aspx?CreatorOrigin=https%3A%2F%2Finc-excel.officeapps.live.com&usid=e4888768-28cb-c3c0-9dd0-2c307626dc4a&BulsEndpointUrl=https%3A%2F%2Fexcel-telemetry.officeapps.live.com%2Fxt%2FRemoteUls.ashx&corrid=00f0d259-d490-4c37-a132-085ecc9cef23&NoAuth=true -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>
+	Shared Clipboard iframe content
+</title>
+  <script type="text/javascript" nonce="">
+  var sharedClipboardBypassPolicy = "";
+    try {
+      var ttTinyFill = {
+        createPolicy: (_, options) => options,
+      };
+      var defaultTTApi = 
+        typeof self !== 'undefined' && self.trustedTypes
+        ? self.trustedTypes
+        : ttTinyFill;
+      sharedClipboardBypassPolicy = defaultTTApi.createPolicy('xlSCBypassPolicy', { 
+        createScriptURL: (url) => url
+      });
+    } catch (e) {}
+
+var sharedClipboardSettings = {
+ whitelistOriginComponents: 1,
+ staticContentURLPrefix: "https://res.public.onecdn.static.microsoft:443/officeonline/clipboard/s/162050242300_App_Scripts/",
+ is1CDNEnabled: "True",
+ sharedClipboardExpirationInMinutes: 3600,
+ clipboardPromiseTimeoutInMinutes: 2,
+ sharedClipboardSchemaVersion: 2,
+ remoteLoggerPath: "/xt/RemoteUls.ashx",
+
+ sharedClipboardHostingApp: "shared",
+ sharedClipboardHostingApps: "[\"broadcast\", \"excel\", \"onenote\", \"powerpoint\", \"view\", \"visio\", \"word-edit\", \"word-view\", \"shared\"]",
+ sharedClipboardHostingEnvironments: "[\"officeapps.live.com\", \"office.svc.cloud.microsoft\", \"office.guest.usercontent.microsoft\", \"office.core.microsoft\", \"word.cloud.microsoft\", \"excel.cloud.microsoft\", \"powerpoint.cloud.microsoft\"]"
+
+};
+
+var sharedClipboardScriptFileName = 'sharedclipboard.min.js';
+
+function loadScript(fileName) {
+  var scriptElement = document.createElement('script');
+  var fileSrc = getScriptSrc(fileName);
+  if (sharedClipboardBypassPolicy !== "") {
+    var trustedFileName = sharedClipboardBypassPolicy.createScriptURL(fileSrc);
+    scriptElement.setAttribute('src', trustedFileName);
+  }
+  else {
+    scriptElement.setAttribute('src', fileSrc);
+  }
+  scriptElement.setAttribute('type', 'text/javascript');
+  scriptElement.setAttribute('async', 'false');
+  scriptElement.setAttribute('defer', 'defer');
+  if (sharedClipboardSettings.is1CDNEnabled === "True") {
+    scriptElement.setAttribute('crossorigin', 'anonymous');
+  }
+  var body = document.getElementsByTagName('body')[0];
+  body.appendChild(scriptElement);
+}
+
+function getScriptSrc(fileName) {
+  var prefix = sharedClipboardSettings.staticContentURLPrefix;
+  if (!prefix) {
+    return fileName;
+  }
+
+  var queryMark = prefix.indexOf('?');
+  if (queryMark < 0) {
+    return prefix + fileName;
+  }
+
+  var postfix = prefix.substr(queryMark);
+  prefix = prefix.substr(0, queryMark);
+  return prefix + fileName + postfix;
+}
+  </script>
+ </head>
+
+<body>
+  <script nonce="">
+    document.body.onload = () => { window.sharedClipboard.initialize(); };
+    loadScript(sharedClipboardScriptFileName);
+  </script><script src="./sharedclipboard.min.js.download" type="text/javascript" async="false" defer="defer" crossorigin="anonymous"></script>
+
+
+
+
+</body></html>

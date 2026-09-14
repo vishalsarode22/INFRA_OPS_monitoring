@@ -23,6 +23,7 @@ how an incident waits two hours for the next sweep to mention it.
 from __future__ import annotations
 
 import os
+import time
 import threading
 from datetime import datetime, timedelta
 
@@ -48,17 +49,47 @@ _DEFAULT_ALERTS = {
 VALID_CHANNELS = ("email", "whatsapp")
 
 
+_raw_cache: dict = {"data": None, "at": 0.0, "mtime": None}
+_raw_cache_lock = threading.Lock()
+_RAW_TTL_S = 2.0
+
+
 def _load_raw() -> dict:
+    """
+    Parsed monitoring_profiles.yaml, cached for a couple of seconds.
+
+    This is read on every /api/scheduler poll (every 15s per open tab). YAML
+    parsing plus a disk open on each of those, while the single SAP GUI thread
+    is busy, is what made the endpoint take seconds. The cache serves the
+    parsed dict without touching disk, refreshing when it is older than the
+    TTL or when the file's mtime changes -- so an edit still shows up within
+    a couple of seconds, and a burst of polls costs one read at most.
+    """
     if not os.path.isfile(PROFILES_PATH):
         return {}
-    try:
-        with open(PROFILES_PATH, "r", encoding="utf-8") as handle:
-            return yaml.safe_load(handle) or {}
-    except Exception as exc:
-        # A broken profiles file must not stop monitoring. Falling back to no
-        # profiles means the legacy per-system schedule still runs.
-        log.error(f"Could not read {PROFILES_PATH}: {exc}")
-        return {}
+    now = time.monotonic()
+    with _raw_cache_lock:
+        cached = _raw_cache["data"]
+        if cached is not None and (now - _raw_cache["at"]) < _RAW_TTL_S:
+            return cached
+        try:
+            mtime = os.path.getmtime(PROFILES_PATH)
+        except OSError:
+            mtime = None
+        # File unchanged since last parse: reuse it, just extend the window.
+        if cached is not None and mtime is not None and mtime == _raw_cache["mtime"]:
+            _raw_cache["at"] = now
+            return cached
+        try:
+            with open(PROFILES_PATH, "r", encoding="utf-8") as handle:
+                data = yaml.safe_load(handle) or {}
+        except Exception as exc:
+            # A broken profiles file must not stop monitoring. Falling back to
+            # no profiles means the legacy per-system schedule still runs.
+            log.error(f"Could not read {PROFILES_PATH}: {exc}")
+            return cached if cached is not None else {}
+        _raw_cache.update({"data": data, "at": now, "mtime": mtime})
+        return data
 
 
 def _recipients(raw) -> list[str]:

@@ -1,0 +1,255 @@
+"""
+Per-system production reporting -- Milestone 8.7B / 8.8.
+
+One Excel workbook and one branded PDF per system per cycle:
+
+    reports/<YYYY-MM-DD>/<SYSTEM>/<SYSTEM>_Monitoring_Report.xlsx
+    reports/<YYYY-MM-DD>/<SYSTEM>/<SYSTEM>_Monitoring_Report.pdf
+
+The Excel is the machine-readable record: metric history, GUI evidence with
+evidence IDs / attempts / recovery actions, and the AI analysis. The PDF is
+the human-readable equivalent of the same cycle.
+"""
+import os
+from datetime import datetime
+
+import openpyxl
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
+from openpyxl.utils import get_column_letter
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table,
+                                TableStyle, Image, KeepTogether)
+
+from core.models import MonitoringResult
+from reporting.system_paths import (
+    system_report_dir, system_excel_path, system_pdf_path, system_evidence_root,
+)
+from utils.logger import get_logger
+
+log = get_logger(__name__, "application")
+
+
+def _text(v):
+    """
+    Display text for a value that may be an Enum, an Enum-like string, or None.
+
+    Status is a (str, Enum), so a bare str(Status.WARNING) yields the repr
+    "Status.WARNING" -- which is exactly what leaked into the PDF subtitle.
+    Read .value when there is one, and strip the class prefix if the value
+    arrives already stringified, so the report reads "WARNING" either way.
+    """
+    if v is None:
+        return ""
+    text = str(getattr(v, "value", v))
+    return text.split(".", 1)[1] if text.startswith("Status.") else text
+
+
+def _sheet(wb, title, headers, rows):
+    ws = wb.create_sheet(title)
+    ws.append(headers)
+    for c in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=c)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="37474F")
+    for r in rows:
+        ws.append(r)
+    for c in range(1, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(c)].width = 22
+    return ws
+
+
+def generate_system_excel(result: MonitoringResult, gui_results=None) -> str:
+    path = system_excel_path(result.system, result.cycle_timestamp)
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    _sheet(wb, "Metrics",
+           ["Timestamp", "Metric", "Value", "Display", "Unit",
+            "Warning", "Critical", "Status", "T-code", "Detail", "Screenshot"],
+           [[result.cycle_timestamp, m.name, m.value, m.display_value, m.unit,
+             m.threshold_warning,
+             m.threshold_critical, _text(m.status), m.tcode or "", m.detail, m.screenshot_path or ""]
+            for m in result.metrics])
+
+    _sheet(wb, "GUI_Evidence",
+           ["Evidence ID", "T-code", "Status", "Attempts", "Started", "Finished",
+            "Detail", "Screenshots"],
+           [[(getattr(m, "extra_data", {}) or {}).get("evidence_id", ""), m.tcode or "",
+             _text(m.display_value), (getattr(m, "extra_data", {}) or {}).get("attempts", ""),
+             (getattr(m, "extra_data", {}) or {}).get("started_at", ""),
+             (getattr(m, "extra_data", {}) or {}).get("finished_at", ""),
+             m.detail, "; ".join(m.screenshot_paths or [])] for m in (gui_results or [])])
+
+    _sheet(wb, "Recovery",
+           ["Evidence ID", "T-code", "Attempts", "Recovery actions", "Screenshots"],
+           [[(getattr(m, "extra_data", {}) or {}).get("evidence_id", ""),
+             m.tcode or "",
+             (getattr(m, "extra_data", {}) or {}).get("attempts", ""),
+             "; ".join((getattr(m, "extra_data", {}) or {}).get("recovery_actions", []) or []),
+             "; ".join(m.screenshot_paths or [])] for m in (gui_results or [])])
+
+    ai = result.ai_analysis
+    _sheet(wb, "AI_Analysis",
+           ["Severity", "Likely root cause", "Evidence", "Recommended actions", "Confidence"],
+           [[ai.severity, ai.likely_root_cause, "; ".join(ai.evidence or []),
+             "; ".join(ai.recommended_actions or []), ai.confidence]] if ai else [])
+
+    wb.save(path)
+    log.info(f"System Excel written: {path}")
+    return str(path)
+
+
+def generate_system_pdf(result: MonitoringResult, gui_results=None) -> str:
+    path = system_pdf_path(result.system, result.cycle_timestamp)
+    doc = SimpleDocTemplate(str(path), pagesize=A4,
+                            leftMargin=1.4 * cm, rightMargin=1.4 * cm,
+                            topMargin=1.4 * cm, bottomMargin=1.4 * cm)
+    styles = getSampleStyleSheet()
+    h1 = ParagraphStyle("h1", parent=styles["Heading1"], textColor=colors.HexColor("#263238"))
+    h2 = ParagraphStyle("h2", parent=styles["Heading2"], textColor=colors.HexColor("#37474F"))
+    body = ParagraphStyle("body", parent=styles["BodyText"], fontSize=9, leading=12)
+
+    story = [Paragraph(f"SAP BASIS Monitoring Report — {result.system}", h1),
+             Paragraph(f"Client {result.client} · Cycle "
+                       f"{result.cycle_timestamp:%Y-%m-%d %H:%M:%S} · "
+                       f"Overall status: <b>{_text(result.overall_status)}</b>", body),
+             Spacer(1, .5 * cm)]
+
+    # Metric Summary section removed on request: it duplicated, in raw
+    # metric-name form, what the T-code narrative table below says readably.
+    # ---- 1. What each T-code capture found -------------------------------
+    # Each capture is described: what was seen, its status, the headline
+    # count, and what to do about it. The screenshots themselves are embedded
+    # in section 4 -- feasible again now that each one is 50-140KB losslessly
+    # compressed instead of the 5.8MB SAP hardCopy originals that once made
+    # this PDF a 25-page image dump.
+    from reporting.check_narratives import narrate_all, summary_counts, deterministic_analysis
+    narratives = narrate_all(gui_results)
+    counts = summary_counts(narratives)
+    story += [Paragraph("1. T-Code Checks — what was captured", h2)]
+    story.append(Paragraph(
+        f"{counts['captured']} of {counts['total']} checks captured · "
+        f"<b>{counts['attention']}</b> need attention · {counts['failed']} failed. "
+        f"The screen captured for each check is reproduced in section 3; "
+        f"Evidence IDs are listed in the accompanying workbook.", body))
+    small = ParagraphStyle("small", parent=body, fontSize=7, leading=9)
+    crow = [["T-code", "Check", "Status", "Count / Value", "Observation", "Recommendation"]]
+    for n in narratives:
+        crow.append([Paragraph(n.tcode, small), Paragraph(n.task, small),
+                     Paragraph(n.status, small), Paragraph(n.value or "", small),
+                     Paragraph(n.observation, small), Paragraph(n.recommendation or "", small)])
+    ct = Table(crow, colWidths=[1.6 * cm, 2.6 * cm, 1.9 * cm, 2.2 * cm, 5.4 * cm, 4.3 * cm], repeatRows=1)
+    ct_style = [("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#37474F")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTSIZE", (0, 0), (-1, -1), 7),
+                ("GRID", (0, 0), (-1, -1), .3, colors.grey),
+                ("VALIGN", (0, 0), (-1, -1), "TOP")]
+    for i, n in enumerate(narratives, start=1):
+        colour = {"ATTENTION": "#FFE0B2", "FAILED": "#FFCDD2", "OK": "#E8F5E9"}.get(n.status)
+        if colour:
+            ct_style.append(("BACKGROUND", (2, i), (2, i), colors.HexColor(colour)))
+    ct.setStyle(TableStyle(ct_style))
+    story += [ct, Spacer(1, .4 * cm)]
+
+    # ---- 3. Analysis --------------------------------------------------------
+    # The model narrative when available, always backed by the rules-based
+    # analysis so the section is never "No AI analysis available" -- the
+    # findings and actions below trace to metric statuses and captured facts.
+    story.append(Paragraph("2. Analysis", h2))
+    da = deterministic_analysis(result, narratives)
+    ai = result.ai_analysis
+    story.append(Paragraph(f"<b>Severity:</b> {(getattr(ai, 'severity', None) or da['severity'])}", body))
+    story.append(Paragraph(f"<b>Summary:</b> {da['headline']}", body))
+    if ai:
+        story.append(Paragraph(f"<b>Likely root cause (model):</b> {ai.likely_root_cause}", body))
+        for a in (ai.recommended_actions or []):
+            story.append(Paragraph(f"• {a}", body))
+        story.append(Paragraph(f"<b>Confidence:</b> {ai.confidence}", body))
+    else:
+        story.append(Paragraph("<i>Model narrative unavailable this cycle; the findings below are rules-based "
+                               "and trace directly to metric thresholds and captured screens.</i>", body))
+    if da["findings"]:
+        story.append(Paragraph("<b>Findings</b>", body))
+        for f_ in da["findings"]:
+            story.append(Paragraph(f"• {f_}", body))
+    if da["actions"]:
+        story.append(Paragraph("<b>Recommended actions</b>", body))
+        for a in da["actions"]:
+            story.append(Paragraph(f"• {a}", body))
+    if not da["findings"]:
+        story.append(Paragraph("No metric breached a threshold and every captured check read normal.", body))
+
+
+    # ---- 3. Screen evidence -------------------------------------------------
+    # Each screenshot is shown under the finding it produced, so the figure in
+    # the table above and the screen it was read from are on the page together.
+    # A screenshot with no caption is just an image dump; a caption with no
+    # screenshot is an assertion the reader cannot check.
+    #
+    # KeepTogether stops a caption being orphaned at a page break. Sizing is
+    # computed from the real pixel dimensions so tall screens are not stretched;
+    # this is affordable now that captures are 50-180KB compressed rather than
+    # the 5.7MB hardCopy originals.
+    shot_styles = ParagraphStyle("shotcap", parent=body, fontSize=8, leading=11)
+    shots_shown = 0
+    evidence_story = []
+    for n in narratives:
+        files = [f for f in (n.screenshots or []) if f and os.path.exists(f)]
+        if not files:
+            continue
+        for idx, shot in enumerate(files, start=1):
+            block = []
+            label = f"<b>{n.tcode} — {n.task}</b> · {n.status}"
+            if n.value:
+                label += f" · {n.value}"
+            if len(files) > 1:
+                label += f" · capture {idx} of {len(files)}"
+            block.append(Paragraph(label, shot_styles))
+            if n.observation:
+                block.append(Paragraph(n.observation, shot_styles))
+            if n.recommendation:
+                block.append(Paragraph(f"<i>Action: {n.recommendation}</i>", shot_styles))
+            block.append(Spacer(1, .15 * cm))
+            try:
+                from PIL import Image as _PILImage
+                with _PILImage.open(shot) as im:
+                    px_w, px_h = im.size
+                scale = min(17.0 * cm / max(px_w, 1), 20.0 * cm / max(px_h, 1))
+                img = Image(shot, width=px_w * scale, height=px_h * scale)
+            except Exception as e:
+                log.warning(f"Screenshot not embeddable ({shot}): {e}")
+                continue
+            block.append(img)
+            block.append(Spacer(1, .5 * cm))
+            evidence_story.append(KeepTogether(block))
+            shots_shown += 1
+
+    story.append(Paragraph("3. Screen Evidence", h2))
+    if shots_shown:
+        story.append(Paragraph(
+            f"{shots_shown} captured screen(s), each shown under the finding it "
+            f"produced. Files are retained at {system_evidence_root(result.system, result.cycle_timestamp)}.",
+            body))
+        story.append(Spacer(1, .3 * cm))
+        story += evidence_story
+    else:
+        story.append(Paragraph(
+            "No screenshot files were readable for this cycle. Check that the "
+            "capture step ran and that the evidence directory is reachable.", body))
+    doc.build(story)
+    log.info(f"System PDF written: {path}")
+    return str(path)
+
+
+def generate_system_reports(result: MonitoringResult, gui_results=None):
+    return {
+        "excel": generate_system_excel(result, gui_results),
+        "pdf": generate_system_pdf(result, gui_results),
+        "report_dir": str(system_report_dir(result.system, result.cycle_timestamp)),
+        "evidence_root": str(system_evidence_root(result.system, result.cycle_timestamp)),
+    }

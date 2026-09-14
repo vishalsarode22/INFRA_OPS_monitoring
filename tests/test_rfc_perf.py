@@ -90,8 +90,44 @@ def _frame(instance, recs):
     return {"SYSTEMID": "PRD", "INSTANCE": instance, "INTERVAL_COMPLETED": "X", "STATRECS": recs}
 
 
-def _rec(tasktype, resp, user, maxbytes=0, priv=b"\x00", db=None, report="", tcode="", dsql=0):
-    main = {"TASKTYPE": tasktype, "RESPTI": resp, "ACCOUNT": user, "MAXBYTES": maxbytes,
+from contextlib import contextmanager
+
+
+@contextmanager
+def _min_steps(n):
+    """
+    Temporarily relax MIN_DIALOG_STEPS.
+
+    build_metrics() falls back to the ST03N daily aggregate whenever the
+    live STAT window holds fewer than MIN_DIALOG_STEPS dialog steps, and
+    omits the metric entirely when there is no aggregate either. Tests that
+    exercise record SHAPE rather than grading use a handful of records on
+    purpose, so they lower the threshold instead of padding the fixture with
+    rows that would change every median, mean and per-instance assertion.
+    """
+    original = rp.MIN_DIALOG_STEPS
+    rp.MIN_DIALOG_STEPS = n
+    try:
+        yield
+    finally:
+        rp.MIN_DIALOG_STEPS = original
+
+
+def _rec(tasktype, resp_ms, user, maxbytes=0, priv=b"\x00", db=None, report="", tcode="", dsql=0):
+    """
+    One live STAT record, built from a response time given in MILLISECONDS.
+
+    RESPTI from SWNC_GET_STATRECS_FRAME is in MICROSECONDS and the collector
+    divides by 1000. Writing an ms figure straight into RESPTI only matched
+    reality while that division was missing, so these fixtures encoded the
+    1000x inflation bug and began failing when it was fixed. Converting here
+    keeps every call site and assertion readable in ms.
+
+    Note this applies to the live STAT path only. RESPTI in
+    SWNC_COLLECTOR_GET_AGGREGATES is a total in ms per bucket, so the
+    aggregate fixtures further down are deliberately left unscaled.
+    """
+    main = {"TASKTYPE": tasktype, "RESPTI": resp_ms * 1000, "ACCOUNT": user, "MAXBYTES": maxbytes,
             "PRIVMODE": priv, "CPUTI": 10, "QUEUETI": 1, "REPORT": report, "TCODE": tcode,
             "DSQLCNT": dsql}
     if db is not None:
@@ -111,7 +147,9 @@ def test_response_time_from_real_all_statrecs_shape():
                                        _rec(b"\x04", 90000, "BATCH")]),        # background: excluded
         ], "EXT_ESI_RECORDS": [], "PROTOCOL": [], "TREX_RECORDS": [], "WEBSERVICE_RECORDS": []}
     s = FakeSession({"TH_SERVER_LIST": SERVERS, "SWNC_GET_STATRECS_FRAME": stat})
-    m = _by_key(s)
+    # Three dialog steps is a shape fixture, not a grading fixture.
+    with _min_steps(1):
+        m = _by_key(s)
     r = m["sap.st03.dialog_resp_ms"]
     # The tile value is the MEDIAN step response, not the mean: one stuck
     # 460s step used to drag a 300ms system to "464549 ms" on the wall. The
@@ -279,31 +317,55 @@ def test_st03n_aggregate_used_when_stat_returns_nothing():
     assert r.extra_data["top_users_by_total_ms"][0]["user"] == "U1"
 
 
-def test_low_sample_response_is_not_graded_critical():
-    # An idle QAS with a single slow dialog step must not paint CRITICAL.
+def test_low_sample_response_is_not_published_as_a_verdict():
+    """
+    An idle QAS with a single slow dialog step must not paint the tile.
+
+    The original form of this test asserted that the figure was still SHOWN,
+    graded NORMAL, carrying a low_sample flag and a "near-idle" note. That
+    design was superseded: build_metrics() now falls back to the ST03N daily
+    aggregate below MIN_DIALOG_STEPS, and omits the metric altogether when no
+    aggregate is available. Showing nothing is the stronger guarantee -- a
+    one-step average is not a reading, and a tile with a number on it invites
+    a conclusion however it is graded.
+
+    See also: the low_sample branch in rfc_perf.build_metrics is now
+    unreachable, because the threshold check above it replaces rs first.
+    """
     def stat(kw):
-        # one dialog record, RESPTI 3712 ms, plus batch noise
+        # one dialog record at 3712 ms (RESPTI in microseconds), plus batch noise
         return {"ALL_STATRECS": [
-            {"TASKTYPE": b"\x01", "RESPTI": "3712", "ACCOUNT": "3318",
+            {"TASKTYPE": b"\x01", "RESPTI": str(3712 * 1000), "ACCOUNT": "3318",
              "STARTDATE": "20260908", "STARTTIME": "115853", "_instance": "srlqsap_QA1_00"},
-            {"TASKTYPE": b"\xfe", "RESPTI": "1024", "ACCOUNT": "SAPSYS",
+            {"TASKTYPE": b"\xfe", "RESPTI": str(1024 * 1000), "ACCOUNT": "SAPSYS",
              "STARTDATE": "20260908", "STARTTIME": "115853", "_instance": "srlqsap_QA1_00"},
         ]}
     servers = {"LIST": [{"NAME": "srlqsap_QA1_00", "HOST": "srlqsap"}]}
     s = FakeSession({"TH_SERVER_LIST": servers, "SWNC_GET_STATRECS_FRAME": stat})
     m = _by_key(s, client="500")
-    r = m["sap.st03.dialog_resp_ms"]
-    assert r.value == 3712                          # the reading is still shown
-    assert r.status == Status.NORMAL                # but not graded on 1 step
-    assert r.extra_data["low_sample"] is True
-    assert "near-idle" in r.detail
-    assert m["sap.st03.max_instance_resp_ms"].status == Status.NORMAL
+    assert "sap.st03.dialog_resp_ms" not in m
+    assert "sap.st03.max_instance_resp_ms" not in m
+
+
+def test_low_sample_is_shown_when_the_threshold_allows_it():
+    """The same single step IS published once MIN_DIALOG_STEPS permits it,
+    which keeps the parsing path covered rather than only its suppression."""
+    def stat(kw):
+        return {"ALL_STATRECS": [
+            {"TASKTYPE": b"\x01", "RESPTI": str(3712 * 1000), "ACCOUNT": "3318",
+             "STARTDATE": "20260908", "STARTTIME": "115853", "_instance": "srlqsap_QA1_00"},
+        ]}
+    servers = {"LIST": [{"NAME": "srlqsap_QA1_00", "HOST": "srlqsap"}]}
+    s = FakeSession({"TH_SERVER_LIST": servers, "SWNC_GET_STATRECS_FRAME": stat})
+    with _min_steps(1):
+        m = _by_key(s, client="500")
+    assert m["sap.st03.dialog_resp_ms"].value == 3712
 
 
 def test_ample_sample_still_grades_normally():
     # 12 dialog steps averaging ~3000 ms SHOULD grade (above warn threshold).
     def stat(kw):
-        recs = [{"TASKTYPE": b"\x01", "RESPTI": "3000", "ACCOUNT": "U1",
+        recs = [{"TASKTYPE": b"\x01", "RESPTI": str(3000 * 1000), "ACCOUNT": "U1",
                  "STARTDATE": "20260908", "STARTTIME": "115853",
                  "_instance": "srlqsap_QA1_00"} for _ in range(12)]
         return {"ALL_STATRECS": recs}
@@ -314,10 +376,23 @@ def test_ample_sample_still_grades_normally():
     assert r.value == 3000
     assert r.extra_data["low_sample"] is False
     assert r.status in (Status.WARNING, Status.CRITICAL)   # graded, as it should be
+
+
+def test_connected_only_e_statrecs_shape_is_read():
+    """
+    The older single-list reply shape (E_STATRECS, no per-instance frames).
+
+    This assertion used to sit at the foot of test_ample_sample_still_grades_
+    normally, where it shared that test's name and could only run if the
+    grading assertions above it passed -- so it was invisible for as long as
+    they failed. It covers a different reply shape and belongs on its own.
+    """
     def stat(kw):
-        return {"E_STATRECS": [{"TASKTYPE": "01", "RESPTI": 700, "ACCOUNT": "U1"}], "RETURN": "X"}
+        return {"E_STATRECS": [{"TASKTYPE": "01", "RESPTI": 700 * 1000, "ACCOUNT": "U1"}],
+                "RETURN": "X"}
     s = FakeSession({"TH_SERVER_LIST": SERVERS, "SWNC_GET_STATRECS_FRAME": stat})
-    m = _by_key(s)
+    with _min_steps(1):
+        m = _by_key(s)
     assert m["sap.st03.dialog_resp_ms"].value == 700
 
 

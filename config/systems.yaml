@@ -31,6 +31,11 @@ systems:
     username: basis2
     password: ${PRD_RFC_PASSWORD}
     language: EN
+  smtp_host: smtp.gmail.com
+  smtp_port: '587'
+  smtp_username: sarodevishal247@gmail.com
+  smtp_password: ${PRD_SMTP_PASSWORD}
+  sender_email: sarodevishal347@gmail.com
 - name: SARLOHA QAS
   client: '500'
   language: EN
@@ -84,5 +89,22 @@ systems:
   smtp_username: sarodevishal247@gmail.com
   smtp_password: ${CARFOUR_QAS_SMTP_PASSWORD}
   sender_email: sarodevishal347@gmail.com
-  alert_receivers: girish.jadhav@infrabeat.com
+  alert_receivers: sarodevishal347@gmail.com
   alert_receivers_cc: vishal.sarode@infrabeat.com
+- name: PS4
+  client: '500'
+  language: EN
+  has_gui_access: true
+  has_os_access: false
+  sap_system_id: PS4
+  connection_name: PS4
+  username: ps4_admin
+  password: ${PS4_SAP_PASSWORD}
+  rfc:
+    ashost: 172.28.202.31
+    sysnr: '00'
+    client: '500'
+    username: ps4_admin
+    password: ${PS4_RFC_PASSWORD}
+    language: EN
+  alert_receivers: sarodevishal347@gmail.com

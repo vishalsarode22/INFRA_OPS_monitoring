@@ -1,0 +1,87 @@
+# ===========================================================================
+# Performance RCA — emergency diagnostic sweep
+#
+# Runs in two situations only:
+#   1. the live wall sees dialog response time over `trigger.threshold_ms`
+#      for `trigger.sustain_polls` consecutive polls on one system, or
+#   2. an operator presses "Performance monitoring" in a system's Health
+#      report tab.
+#
+# It is deliberately NOT a scheduled profile. A scheduled sweep answers
+# "how is the system"; this answers "who is doing this to it, right now".
+# Scheduling it would capture a quiet system and prove nothing.
+#
+# WHY IT PRE-EMPTS
+# A threshold fires at the worst moment: the system is under load, and a
+# routine sweep may be mid-flight holding the single SAP GUI session. The
+# operator chose to stop that sweep and run the RCA instead, because evidence
+# of a spike is only worth having while the spike is happening. Pre-emption
+# is cooperative -- the running sweep finishes the system it is on, then
+# yields -- because aborting mid-system leaves SAP Logon open and a
+# half-written snapshot on disk, a worse state than a late RCA.
+# ===========================================================================
+
+enabled: true              # master switch; IBO_ENABLE_RCA=0 in .env also disables
+
+trigger:
+  metric: sap.st03.dialog_resp_ms
+  threshold_ms: 1500       # matches the SMLG CRITICAL band used in Excel narration
+  sustain_polls: 2         # consecutive live polls over threshold before firing;
+                           # one poll at 30s cadence is a blip, two is a spike
+  cooldown_minutes: 30     # after an RCA runs on a system, no auto-trigger for this long;
+                           # the same spike must not fire five sweeps
+  preempt_running_sweep: true
+
+# T-code capture sequence. Order matters: the cheapest, most diagnostic
+# screens first, so if the session dies mid-run the evidence that survives
+# is the evidence most worth having. ST04 is last because it is the most
+# fragile (it varies by database) and the most likely to need a retry.
+tasks:
+  - tcode: SM50
+    action: rca_sm50
+    what: "Active work processes; long-running ones with user id; PRIV"
+  - tcode: SM66
+    action: rca_sm66
+    what: "All instances: active and long-running work processes with user"
+  - tcode: ST03N
+    action: rca_st03n
+    what: "Busiest instance workload, then its last 15 minutes' load"
+  - tcode: SM12
+    action: rca_sm12
+    what: "All clients/all users, then login client: lock count, users, contended keys"
+  - tcode: STAD
+    action: rca_stad
+    what: "Last 30 minutes: users by response time and by memory"
+  - tcode: ST04
+    action: rca_st04
+    what: "Database memory, expensive SQL, active statements, alerts"
+
+# STAD window. min_response_ms 0 = no response-time filter (all steps in the
+# window, so the by-user totals are complete); set it to trim a busy system.
+stad:
+  min_response_ms: 0
+  lookback_minutes: 30
+
+# ST04 is a different screen on every database. The action reads the
+# DBA Cockpit window title to decide which handler to use; a per-system
+# entry here overrides that detection. Values: ase, hana, oracle, mssql,
+# db2, generic. Unknown -> generic (captures what is on screen, no navigation).
+database:
+  default: detect
+  systems:
+    PRD: ase
+
+analysis:
+  # The RCA prompt gets OCR text always, and the screenshots themselves
+  # when the provider can take images. Images help the model read tables
+  # OCR mangles (SM50 memory columns, ST04 SQL text), at the cost of
+  # sending production screens to a third party. Off by default; a client
+  # should decide this explicitly.
+  send_images: false
+  max_images: 6
+  ocr_chars_per_screen: 6000
+
+deliver:
+  email: true              # also requires IBO_ENABLE_EMAIL=1
+  recipients: []           # empty -> the system's alert_receivers, then global SMTP to_emails
+  subject_prefix: "[InfraBeatOps RCA]"

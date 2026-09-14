@@ -125,7 +125,7 @@ _CHECK_LABELS = {
     "sap.sm13.failed_updates": ("SM13",  "Failed updates"),
     "sap.sm37.cancelled_jobs": ("SM37",  "Cancelled jobs"),
     "sap.sm37.active_jobs":    ("SM37",  "Running jobs"),
-    "sap.sm58.stuck_entries":  ("SM58",  "Stuck tRFC"),
+    "sap.sm58.stuck_entries":  ("SM58",  "tRFC"),
     "sap.smq1.entries":        ("SMQ1",  "Outbound queues"),
     "sap.smq2.entries":        ("SMQ2",  "Inbound queues"),
     "sap.we02.failed_idocs":   ("WE02",  "Failed IDocs"),
@@ -199,6 +199,10 @@ _MS_VALUED_CHECKS = {
 _CHECK_GRID_EXCLUDE = {
     "sap.st03.dialog_resp_ms",
     "sap.st03.top_report_db_ms",
+    "sap.sm12.oldest_lock_minutes",
+    "sap.sm66.max_instance_saturation_pct",
+    "sap.st03.max_instance_resp_ms",
+    "sap.su01.locked_users",
 }
 
 
@@ -316,13 +320,59 @@ def reset_perf_cache(system: str | None = None) -> None:
         pass
 
 
+# Stale-while-revalidate for the perf block. When the 5-minute cache has
+# expired, the caller used to block for the whole 30-40s STAT/SQLM read.
+# Now: an expired-but-present result is returned at once (its age is
+# reported in perf.age_seconds as before) and ONE background thread refreshes
+# it on its own RFC session. Only the very first read of a system after
+# startup is synchronous, because there is nothing to serve yet.
+_perf_refreshing: set = set()
+_PERF_SWR = (_os.environ.get("IBO_PERF_STALE_WHILE_REVALIDATE", "1") or "1").strip().lower() in ("1", "true", "yes")
+
+
+def _perf_refresh_background(system: str, client: str) -> None:
+    try:
+        from core.config_loader import get_systems
+        cfg = next((c for c in get_systems() if c.get("name") == system), None)
+        if cfg is None:
+            return
+        with SapSession(system, cfg) as bg:
+            if not bg.ok:
+                log.info(f"[{system}] perf background refresh skipped: {bg.error}")
+                return
+            read_at = datetime.now().strftime("%H:%M:%S")
+            metrics, error = [], None
+            try:
+                metrics = _perf_build_metrics(system, bg, client) or []
+                if not metrics:
+                    error = "connected, but no performance source was readable"
+            except Exception as exc:  # noqa: BLE001
+                error = f"{type(exc).__name__}: {exc}"
+                log.warning(f"[{system}] live perf background read failed: {error}")
+            with _perf_lock:
+                _perf_cache[system] = (time.monotonic(), metrics, error, read_at)
+            log.info(f"[{system}] perf block refreshed in background ({len(metrics)} metrics)")
+    finally:
+        with _perf_lock:
+            _perf_refreshing.discard(system)
+
+
 def _perf_metrics(session: SapSession, system: str, client: str) -> tuple[list, str | None, float, str]:
     """(MetricResult list, error, age_seconds, read_at). Never raises."""
     with _perf_lock:
         hit = _perf_cache.get(system)
+        already = system in _perf_refreshing
     if hit:
         age = time.monotonic() - hit[0]
         if age <= _PERF_TTL_SECONDS:
+            return hit[1], hit[2], age, hit[3]
+        if _PERF_SWR and hit[1]:
+            # Expired but usable: serve it now, refresh it behind the caller.
+            if not already:
+                with _perf_lock:
+                    _perf_refreshing.add(system)
+                threading.Thread(target=_perf_refresh_background, args=(system, client),
+                                 name=f"perf-refresh-{system}", daemon=True).start()
             return hit[1], hit[2], age, hit[3]
 
     read_at = datetime.now().strftime("%H:%M:%S")
@@ -450,17 +500,20 @@ def _smon_uptime(session: SapSession, system: str) -> dict:
     if not rows:
         return {}
 
-    def field(r, k):
-        return str(r.get(k, "") or "").strip()
+    def field(r, i):
+        try:
+            return str(r[i] if r[i] is not None else "").strip()
+        except (IndexError, TypeError):
+            return ""
 
     stamps: dict[str, list] = {}
     for r in rows:
         try:
-            t = _dt.strptime(field(r, "DATUM") + field(r, "TIME").rjust(6, "0"),
+            t = _dt.strptime(field(r, 0) + field(r, 1).rjust(6, "0"),
                              "%Y%m%d%H%M%S")
         except ValueError:
             continue
-        stamps.setdefault(field(r, "SERVER") or "?", []).append(t)
+        stamps.setdefault(field(r, 2) or "?", []).append(t)
 
     out: dict[str, dict] = {}
     for server, ts in stamps.items():
@@ -2319,17 +2372,15 @@ def read_live(system: str, cfg: dict, use_cache: bool = True, resolve_names: boo
             #     rolling average, this is a 60s window. A value of 0 means
             #     no dialog steps in the window, i.e. idle -- not 0 ms.
             if response is None:
-                sm_row = next((p for p in (payload.get("smon") or {}).get("per_server", [])
-                               if str(p.get("server", "")).strip().lower() == name.lower()), None)
-                if sm_row is not None:
-                    avg60 = sm_row.get("dialog_avg_60s")
-                    if isinstance(avg60, (int, float)) and avg60 > 0:
-                        response = round(avg60)
-                        source = "SMON · 60s avg"
-                        statistic = "average"
-                    elif isinstance(avg60, (int, float)):
-                        inst["response_note"] = "idle — no dialog steps in the last 60s"
-                        smon_idle = True
+                perf_resp = (payload.get("perf_response_by_instance") or {}).get(name)
+                if isinstance(perf_resp, (int, float)):
+                    response = perf_resp
+                    window = payload.get("perf_response_window") or "STAT"
+                    source = f"STAT · {window}"
+                    statistic = "median"
+                    if payload.get("perf_response_low_sample"):
+                        inst["response_low_confidence"] = True
+                        inst["response_confidence_note"] = "few dialog steps — near idle"
 
             # 2. RZLLITAB logon-group response (config table).
             if response is None:
@@ -2383,8 +2434,21 @@ def read_live(system: str, cfg: dict, use_cache: bool = True, resolve_names: boo
             inst["response_statistic"] = statistic
             # STAT was readable and simply held no dialog steps: that is
             # "idle", which is a different statement from "not measured".
+            #
+            # Idle is reported as a NULL reading plus a note, never as 0 ms.
+            # Zero in a response-time field reads as the best possible result,
+            # so an instance nobody used would have outranked every instance
+            # actually serving users. The wall already renders exactly this
+            # shape -- see the response_note branch in wall.html, which was
+            # unreachable for as long as this wrote a number.
             if response is None and payload.get("perf_read_ok"):
-                inst["response_note"] = "idle — no dialog steps in the STAT window"
+                inst["response_ms"] = None
+                inst["response_source"] = "idle"
+                inst["response_statistic"] = None
+                inst["response_measured"] = True
+                inst["response_note"] = (
+                    "STAT read succeeded but this instance had no dialog steps "
+                    "in the window -- idle, not unmeasured.")
 
         # Dispatcher / ICM / gateway state. TH_WPINFO answering at all proves
         # the dispatcher is serving requests -- we are talking to it.
