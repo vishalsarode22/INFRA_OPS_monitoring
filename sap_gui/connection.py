@@ -46,13 +46,30 @@ _LOGIN_TITLE_PATTERNS = [
 ]
 
 # How long to hold out for the title WITH the connection string before
-# settling for the bare "SAP GUI for Windows 800" frame.
+# settling for the bare "SAP GUI for Windows <release>" frame. The release
+# number varies by machine (770, 800, ...) -- never match on it.
 _CONNECTED_TITLE_GRACE_S = 8.0
 
 # Windows that are NOT the logon screen and must never be matched.
+# "SAP Logon( \d+)?$" covers "SAP Logon", "SAP Logon 770", "SAP Logon 800".
 _LOGIN_TITLE_EXCLUDE = re.compile(
     r"SAP Logon( \d+)?$|SAP Logon Pad|Sapgui Splash|SAP Graphics Multiplexer|InfraBeat", re.IGNORECASE
 )
+
+# pywinauto's type_keys() treats these as control characters. A client,
+# username or password containing any of them was silently mistyped -- a
+# password of "Pa%%w0rd+" sends a literal percent-escape and a SHIFT hold,
+# and the login just fails with bad credentials. Wrapping each in braces
+# types it literally.
+_TYPE_KEYS_SPECIALS = "^+%~(){}[]"
+
+
+def _literal(text: str) -> str:
+    """Escape a string so type_keys() sends it character for character."""
+    out = []
+    for ch in str(text):
+        out.append("{" + ch + "}" if ch in _TYPE_KEYS_SPECIALS else ch)
+    return "".join(out)
 
 
 def _visible_window_titles() -> list[str]:
@@ -170,8 +187,8 @@ def find_login_window(timeout: int = 30):
             except Exception as exc:
                 rejected[title] = f"is_visible failed: {type(exc).__name__}"
                 continue
-            # The logon screen first appears as "SAP GUI for Windows 800" and
-            # gets "[/H/host/S/3200 n]" appended once the connection is up.
+            # The logon screen first appears as "SAP GUI for Windows <release>"
+            # and gets "[/H/host/S/3200 n]" appended once the connection is up.
             # Typing into the pre-connection frame is what produced
             # ElementNotVisible: the frame is replaced under our keystrokes.
             # So a title without the connection string is accepted only after
@@ -200,6 +217,7 @@ def find_login_window(timeout: int = 30):
         f"the desktop is probably locked or the RDP session is disconnected -- "
         f"GUI scripting drives a real desktop and cannot run without one."
     )
+
 
 def fill_login_fields(
     login_window,
@@ -236,7 +254,7 @@ def fill_login_fields(
     log.info(f"Entering Client: {client}")
 
     login_window.type_keys(
-        str(client),
+        _literal(client),
         with_spaces=True,
     )
 
@@ -249,7 +267,7 @@ def fill_login_fields(
     log.info(f"Entering Username: {username}")
 
     login_window.type_keys(
-        str(username),
+        _literal(username),
         with_spaces=True,
     )
 
@@ -262,13 +280,14 @@ def fill_login_fields(
     log.info("Entering Password... (masked)")
 
     login_window.type_keys(
-        str(password),
+        _literal(password),
         with_spaces=True,
     )
 
     time.sleep(_LOGIN_KEY_WAIT)
 
     log.info("Client, username and password populated.")
+
 
 def submit_login(login_window):
     """
@@ -342,8 +361,6 @@ def verify_login_success(timeout: int = 10) -> bool:
     Verify that SAP login completed successfully.
     """
 
-    from pywinauto import Desktop
-
     deadline = time.time() + timeout
 
     while time.time() < deadline:
@@ -371,6 +388,8 @@ def verify_login_success(timeout: int = 10) -> bool:
             for title in titles
         )
 
+        # Release-agnostic: matches "SAP GUI for Windows 770",
+        # "SAP GUI for Windows 800", and anything later.
         session_present = any(
             "SAP GUI for Windows" in title
             for title in titles

@@ -23,12 +23,21 @@ load_1m:
 # ============================================================
 
 # SMLG / SMON instance dialog response time (live, per instance)
-# Healthy  : < 1500 ms  (an idle instance reads 0 ms and is healthy)
-# Warning  : 1500 - 3000 ms
-# Critical : > 3000 ms
+# Healthy   : <= 1500 ms  (an idle instance reads 0 ms and is healthy)
+# Warning   : > 1500 ms   yellow
+# Critical  : > 2000 ms   red
+# Emergency : > 2500 ms   red, flashing on the dashboard
+#
+# `emergency` is a third band the generic threshold engine does not read --
+# it grades on warning/critical only. SMLG is graded by
+# sap_gui/smlg_analyzer.py instead, which understands all three and also
+# emits the `alert_level` the dashboard uses to decide whether to flash.
+# The two numbers below are kept in step with that module so the limits
+# shown next to a value on screen match the ones that actually graded it.
 sap.smlg.response_time:
   warning: 1500
-  critical: 3000
+  critical: 2000
+  emergency: 2500
 
 # ST22 ABAP runtime errors / short dumps per day
 # Healthy  : 0

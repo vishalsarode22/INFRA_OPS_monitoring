@@ -7,6 +7,7 @@ been observed to only reliably attach to sessions started fresh
 the same "0 sessions" scripting issue encountered earlier.
 """
 
+import re
 import subprocess
 import time
 import os as _os
@@ -23,6 +24,22 @@ from utils.logger import get_logger
 log = get_logger(__name__, "application")
 
 
+# The Logon Pad's window title carries the SAP GUI RELEASE, which differs
+# per workstation: "SAP Logon 800" on one machine, "SAP Logon 770" on the
+# next, plain "SAP Logon" or "SAP Logon Pad 750" on others. Matching one
+# literal release meant the pad was launched, sat visible on screen, and
+# was never found -- the whole sweep then reported "SAP GUI unavailable"
+# for 30s on a machine where nothing was actually wrong.
+#
+# Anchored at both ends on purpose: an unanchored "SAP Logon" also matches
+# the logon SCREEN and helper windows, which is the ambiguity that broke
+# the login finder in sap_gui/connection.py.
+_PAD_TITLE_RE = re.compile(r"^SAP Logon( Pad)?(\s+\d+)?$", re.IGNORECASE)
+
+# Override if a site has a pad title this does not cover.
+_PAD_TITLE_OVERRIDE = (_os.environ.get("IBO_SAPLOGON_PAD_TITLE") or "").strip()
+
+
 def kill_sap_processes():
     for proc in ["saplogon.exe", "sapgui.exe"]:
         try:
@@ -32,22 +49,81 @@ def kill_sap_processes():
     time.sleep(1)
 
 
+def _sap_window_titles() -> list[str]:
+    """Every visible top-level title, for a useful failure message."""
+    titles = []
+    try:
+        for win in Desktop(backend="win32").windows():
+            try:
+                text = (win.window_text() or "").strip()
+            except Exception:
+                continue
+            if text:
+                titles.append(text)
+    except Exception:
+        pass
+    return titles
+
+
+def find_pad_title(backend: str = "win32") -> str | None:
+    """
+    Return the Logon Pad's ACTUAL window title, or None if it is not up yet.
+
+    Enumerating with windows() rather than asking for window(title_re=...)
+    is deliberate: the latter RAISES when more than one window matches, and
+    right after launch the splash and the pad can both be present. The raise
+    was swallowed by the retry loop and looked exactly like "not there yet".
+    """
+    if _PAD_TITLE_OVERRIDE:
+        return _PAD_TITLE_OVERRIDE
+    try:
+        candidates = Desktop(backend=backend).windows(visible_only=True)
+    except Exception as exc:
+        log.debug(f"Window enumeration failed: {exc}")
+        return None
+
+    for win in candidates:
+        try:
+            title = (win.window_text() or "").strip()
+        except Exception:
+            continue
+        if title and _PAD_TITLE_RE.match(title):
+            return title
+    return None
+
+
 def launch_saplogon(exe_path: str, timeout: int = 30):  # was 15
     log.info(f"Launching SAP Logon: {exe_path}")
     subprocess.Popen([exe_path])
 
     end_time = time.time() + timeout
     while time.time() < end_time:
-        try:
-            pad = Desktop(backend="win32").window(title="SAP Logon 800")
-            pad.wait("visible", timeout=2)
-            log.info("SAP Logon 800 pad is visible.")
-            time.sleep(_PAD_SETTLE)
-            return pad
-        except Exception:
-            time.sleep(1)
+        title = find_pad_title("win32")
+        if title:
+            try:
+                # Build the spec on the EXACT discovered title so the caller
+                # still gets a WindowSpecification (with .wait()), and so the
+                # match cannot be ambiguous.
+                pad = Desktop(backend="win32").window(title=title)
+                pad.wait("visible", timeout=2)
+                log.info(f"SAP Logon pad is visible: '{title}'.")
+                time.sleep(_PAD_SETTLE)
+                return pad
+            except Exception as exc:
+                log.debug(f"Pad '{title}' seen but not ready yet: {exc}")
+        time.sleep(1)
 
-    raise TimeoutError("SAP Logon 800 pad did not appear in time.")
+    present = ", ".join(f"'{t}'" for t in sorted(set(_sap_window_titles()))) or "none detected"
+    raise TimeoutError(
+        f"No SAP Logon pad appeared within {timeout}s. "
+        f"Looked for a window titled like 'SAP Logon', 'SAP Logon 770', "
+        f"'SAP Logon 800' or 'SAP Logon Pad 750'. "
+        f"Visible windows were: {present}. "
+        f"If the pad IS listed above under another name, set "
+        f"IBO_SAPLOGON_PAD_TITLE in .env to that exact title. If nothing SAP "
+        f"is listed, the desktop is locked or the RDP session is disconnected "
+        f"-- GUI scripting drives a real desktop and cannot run without one."
+    )
 
 
 def _activate(item, label: str) -> bool:
@@ -105,11 +181,19 @@ def select_connection(connection_name: str, timeout: int = 10):
     end_time = time.time() + timeout
     target = (connection_name or "").strip().lower()
     seen: list[str] = []
+    pad_title: str | None = None
 
     while time.time() < end_time:
         try:
-            app = Application(backend="uia").connect(title="SAP Logon 800")
-            window = app.window(title="SAP Logon 800")
+            # Re-discover each pass: the pad may not be up on the first loop,
+            # and the release number is not knowable in advance.
+            pad_title = find_pad_title("uia") or find_pad_title("win32")
+            if not pad_title:
+                time.sleep(1)
+                continue
+
+            app = Application(backend="uia").connect(title=pad_title)
+            window = app.window(title=pad_title)
 
             # The Logon Pad MUST be the foreground window before any click.
             #
@@ -157,8 +241,9 @@ def select_connection(connection_name: str, timeout: int = 10):
         time.sleep(1)
 
     available = ", ".join(f"'{t}'" for t in dict.fromkeys(seen)) or "none detected"
+    where = f"pad '{pad_title}'" if pad_title else "the SAP Logon Pad (pad window never found)"
     raise TimeoutError(
-        f"Could not find connection '{connection_name}' in SAP Logon Pad. "
+        f"Could not find connection '{connection_name}' in {where}. "
         f"Entries present: {available}. "
         f"Set the matching *_SAP_CONNECTION_NAME in .env "
         f"(names are per-workstation and case-sensitive)."

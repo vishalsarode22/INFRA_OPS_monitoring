@@ -24,3 +24,17 @@ smlg_rfc*.txt
 alert_*.html
 Name
 CHANGES.diff
+
+.env
+.venv/
+__pycache__/
+*.pyc
+*.bak*
+
+
+*.broken
+*.working
+*.good
+*.ORIGINAL-REPO
+dev_rfc.log
+

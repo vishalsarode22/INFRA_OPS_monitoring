@@ -1,16 +1,105 @@
 {
   "system": "CENTOR_QAS",
   "client": "100",
-  "cycle_timestamp": "2026-09-10 23:16:03",
-  "overall_status": "UNKNOWN",
-  "metrics": [],
+  "cycle_timestamp": "2026-09-15 11:45:27",
+  "overall_status": "NORMAL",
+  "metrics": [
+    {
+      "name": "sap.st22.dumps",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": ""
+    },
+    {
+      "name": "sap.sm37.cancelled_jobs",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": ""
+    },
+    {
+      "name": "sap.sm12.lock_count",
+      "display_value": "2 count",
+      "status": "NORMAL",
+      "detail": "BASIS, BASIS"
+    },
+    {
+      "name": "sap.sm58.stuck_entries",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": ""
+    },
+    {
+      "name": "sap.al08.user_logons",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": ""
+    },
+    {
+      "name": "sap.sm66.wp_saturation_pct",
+      "display_value": "10%",
+      "status": "NORMAL",
+      "detail": ""
+    },
+    {
+      "name": "sap.sm50.priv_mode_wp",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": ""
+    },
+    {
+      "name": "sap.sm50.long_running_wp",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": ""
+    },
+    {
+      "name": "sap.sm66.max_instance_saturation_pct",
+      "display_value": "10.0%",
+      "status": "NORMAL",
+      "detail": "qassrv_QAS_00 10%"
+    },
+    {
+      "name": "sap.sm12.locks_per_user_max",
+      "display_value": "2 count",
+      "status": "NORMAL",
+      "detail": "BASIS 2"
+    },
+    {
+      "name": "sap.sm12.users_with_many_locks",
+      "display_value": "0 count",
+      "status": "NORMAL",
+      "detail": ""
+    },
+    {
+      "name": "sap.sm12.oldest_lock_minutes",
+      "display_value": "0 min",
+      "status": "NORMAL",
+      "detail": ""
+    }
+  ],
   "ai_analysis": null,
   "operational_intelligence": {
-    "overall_signal": "NO_SIGNIFICANT_INTELLIGENCE",
-    "score": 0.0,
-    "signals": [],
-    "key_findings": [],
-    "limitations": []
+    "overall_signal": "MEDIUM",
+    "score": 0.45,
+    "signals": [
+      {
+        "category": "BASELINE",
+        "metric": "sap.sm12.lock_count",
+        "strength": 1.0,
+        "summary": "sap.sm12.lock_count: deviation 157.1%, trend increasing"
+      }
+    ],
+    "key_findings": [
+      "sap.sm12.lock_count: deviation 157.1%, trend increasing"
+    ],
+    "limitations": [
+      "sap.sm50.priv_mode_wp: insufficient baseline history",
+      "sap.sm50.long_running_wp: insufficient baseline history",
+      "sap.sm66.max_instance_saturation_pct: insufficient baseline history",
+      "sap.sm12.locks_per_user_max: insufficient baseline history",
+      "sap.sm12.users_with_many_locks: insufficient baseline history",
+      "sap.sm12.oldest_lock_minutes: insufficient baseline history"
+    ]
   },
   "events": [],
   "incidents": [],
@@ -712,7 +801,7 @@
       "captured_at": "2026-09-04 15:34:42"
     }
   ],
-  "generated_at": "2026-09-10 23:16:06",
+  "generated_at": "2026-09-15 11:45:41",
   "gui_evidence_stale": true,
   "gui_evidence_captured_at": "2026-09-04 15:34:42"
 }

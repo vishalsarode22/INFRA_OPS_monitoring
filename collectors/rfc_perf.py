@@ -410,7 +410,7 @@ def stat_records(session: SapSession, inst: list[dict], system: str = "") -> tup
     return recs, note
 
 
-def response_summary(recs: list[dict], system: str = "") -> dict | None:
+def response_summary(recs: list[dict], system: str = "", read_note: str = "") -> dict | None:
     """Per-instance and per-user dialog response, plus DB share."""
     dia = [r for r in recs if _tasktype_is_dialog(r.get("TASKTYPE"))]
     if not dia:
@@ -419,14 +419,29 @@ def response_summary(recs: list[dict], system: str = "") -> dict | None:
             known = any(_tasktype_code(r.get("TASKTYPE")) in TASK_LABELS for r in recs)
             if known:
                 # Records decode fine, there just were no dialog steps: idle system.
+                # This is a real, complete reading -- STAT worked. Returning None here
+                # made the caller unable to tell "idle" from "STAT is broken", and it
+                # always chose to fall back to a whole-day aggregate, so a QAS with no
+                # traffic in 5 minutes was shown a stale daily median instead of idle.
                 log.info(f"[{system}] {len(recs)} STAT records, 0 dialog steps in the window "
                          f"(task mix: {', '.join(seen)}) -- no GUI activity, metric left absent")
+                return {"steps": 0, "avg_resp_ms": None, "per_instance": {}, "idle": True}
             else:
                 log.warning(f"[{system}] {len(recs)} STAT records but no task type decoded. "
                             f"Values: {seen}. Record keys: {sorted(recs[0].keys())[:25]}")
         else:
+            # No records at all can mean two different things: the FM genuinely
+            # could not be called (note carries that reason from stat_records),
+            # or it WAS called and simply found nothing in the window -- which is
+            # idle, same as records-but-no-dialog-steps below. Only the first is
+            # a real gap; the second was wrongly treated as one, which fell back
+            # to a daily aggregate or, when that was also empty, left the wall
+            # showing "not measured" for a system that is simply quiet right now.
             log.info(f"[{system}] STAT read returned 0 records in the last "
-                     f"{RESP_WINDOW_MINUTES} minutes")
+                     f"{RESP_WINDOW_MINUTES} minutes"
+                     + (f" ({read_note})" if read_note else " -- idle"))
+            if not read_note:
+                return {"steps": 0, "avg_resp_ms": None, "per_instance": {}, "idle": True}
         return None
 
     def ms(r, *keys):
@@ -850,9 +865,14 @@ def build_metrics(system: str, session: SapSession, client: str) -> list[MetricR
                              extra={"per_instance": sat, "worst_instance": worst[0]}))
 
     recs, note = stat_records(session, inst, system)
-    rs = response_summary(recs, system) if recs is not None else None
+    rs = response_summary(recs, system, note) if recs is not None else None
     window = f"{RESP_WINDOW_MINUTES}min"
-    if rs is None or rs["steps"] < MIN_DIALOG_STEPS:
+    # rs.get("idle") means STAT read fine and genuinely found zero dialog
+    # steps -- that IS the answer, so it must not be overwritten by a
+    # whole-day aggregate. Only a real gap (rs is None, or a low but
+    # NON-zero sample) falls back to the aggregate.
+    idle_now = bool(rs and rs.get("idle"))
+    if not idle_now and (rs is None or rs["steps"] < MIN_DIALOG_STEPS):
         rs = st03n_aggregate(session, inst)
         if rs:
             window, note = "today (ST03N daily aggregate)", ""
@@ -860,7 +880,28 @@ def build_metrics(system: str, session: SapSession, client: str) -> list[MetricR
         else:
             log.info(f"[{system}] response time: no dialog steps in the last {RESP_WINDOW_MINUTES} min "
                      f"and no ST03N aggregate -- metric left absent (system idle or collector off)")
-    if rs:
+    elif idle_now:
+        log.info(f"[{system}] response time: idle -- {rs['steps']} dialog steps in the last "
+                 f"{RESP_WINDOW_MINUTES} min, not falling back to the daily aggregate")
+    if rs and rs.get("idle"):
+        # A genuine, complete idle reading: STAT (or the daily aggregate
+        # window) was read successfully and found zero dialog steps. This
+        # is NOT the same shape as a populated response_summary() result --
+        # it has no per-instance figures, no percentile spread, no top-N
+        # lists -- so it is reported as its own metric with a null value
+        # rather than forced through the block below, which reads keys
+        # (top_users_by_total_ms, max_instance_resp_ms, db_time_pct) this
+        # shape does not have. That mismatch previously raised KeyError,
+        # which made the WHOLE perf read look like it had failed --
+        # perf_read_ok went false, and the wall fell back to the least
+        # informative label it has, "not measured".
+        m.append(_metric("sap.st03.dialog_resp_ms", None, "ms", "workload", "ST03N",
+                         detail=f"0 steps/{window}; idle, no dialog activity in the window"
+                                + (f"; {note}" if note else ""),
+                         extra={"per_instance": {}, "window": window, "steps": 0,
+                                "low_sample": False, "statistic": "median",
+                                "idle": True, "note": note}))
+    elif rs:
         inst_detail = ", ".join(f"{i} {v}ms" for i, v in sorted(rs["per_instance"].items()))
         # A response average over very few steps is noise, not a verdict. On an
         # idle QAS one 3712 ms step should not paint the tile CRITICAL. Below

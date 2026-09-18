@@ -29,11 +29,41 @@ SM58:
 ST03N:
   avg_response_time: "Avg\\. dialog response time[^\\d]*([\\d,\\.]+)"
 
+AL08:
+  # AL08's footer line: "<n> user sessions with <m> ABAP sessions".
+  #
+  # These two keys are named to match core/tcode_metrics.py's AL08
+  # definitions, so a successful OCR read flows straight into
+  # sap.al08.user_logons and sap.al08.backend_sessions without any
+  # further plumbing.
+  #
+  # Why OCR rather than the GridView: action_al08's three candidate
+  # GridView IDs all miss on this system, so the structured read returns
+  # nothing and the screenshot is the only evidence of what was on
+  # screen. Patterns are matched against the FULL OCR text, not the
+  # truncated ocr_excerpt, so the footer is always in range however many
+  # session rows the grid holds.
+  user_logons: "(\\d+)\\s*user sessions?\\s+with"
+  back_end_sessions: "with\\s*(\\d+)\\s*ABAP sessions"
 SMLG:
   # SMLG's instance table row: <name>|<state icon> <resp ms> <users> <HH:MM:SS>.
   # Structure-matched, not name-matched -- OCR mangles lowercase 'q' in SAP
   # hostnames unreliably, but the pipe + two-number + timestamp shape holds.
-  response_time_ms: "\\|\\s*\\D{0,4}(\\d{1,6})\\s+\\d+\\s+\\d{2}:\\d{2}:\\d{2}"
+  #
+  # The response-time group must allow a thousands separator. SMLG prints
+  # 1277 ms as "1.277" (or "1,277"), and the previous group -- a bare
+  # \\d{1,6} -- could not span the separator, so it backtracked onto the
+  # fragment AFTER it and captured 277 for a 1277 ms instance. Anything
+  # over 999 ms was under-reported by exactly its thousands digit, which
+  # is the range the alert thresholds live in.
+  #
+  # The leading "|" must be OPTIONAL. It was mandatory, and on a real
+  # capture the cell edge left of the figure came through OCR as "/@"
+  # rather than "|" -- so a row reading "4.685 21 12:02:27" (4685 ms, a
+  # flashing-critical response time) matched nothing and SMLG was filed
+  # as UNKNOWN. The trailing timestamp is what actually identifies this
+  # row; nothing else on the screen is <number> <integer> <HH:MM:SS>.
+  response_time_ms: "(?:\\|\\s*)?(\\d{1,3}(?:[.,]\\d{3})*|\\d{1,6})\\s+\\d+\\s+\\|?\\s*\\d{2}:\\d{2}:\\d{2}"
 SM37:
   # Job Overview rows: "<JOBNAME>. <USER> <Status> <dd.mm.yyyy>"
   active_job_names_list: "^\\W*([A-Z0-9_/]{4,})\\.?\\s+[A-Z0-9_]+\\s+(?:Active|Running)\\b"

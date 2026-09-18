@@ -35,6 +35,9 @@ from reporting.evidence import EvidenceRecord, create_evidence_id, write_evidenc
 from reporting.system_paths import system_evidence_root
 from sap_gui.sm50_analyzer import analyze_sm50
 from sap_gui.st03n_analyzer import analyze_st03n
+from sap_gui.smlg_analyzer import (
+    SMLG_THRESHOLDS, classify_response_time, parse_response_ms,
+)
 import time
 import os
 
@@ -160,7 +163,22 @@ def collect_tcode_evidence(
                         ocr_text = ""
                     if ocr_text:
                         compact = " ".join(ocr_text.split())
-                        extracted_data.setdefault("ocr_excerpt", compact[:1200])
+                        # Keep head AND tail, not just the first 1200 chars.
+                        # SAP list screens conventionally put the summary
+                        # line ("N user sessions with M ABAP sessions",
+                        # "X entries displayed", ...) in a footer/status-bar
+                        # line AFTER the grid body -- exactly the text a
+                        # head-only truncation drops first on a busy screen.
+                        # Confirmed against a real AL08 capture: a 15-row
+                        # grid pushed "15 user sessions with 19 ABAP
+                        # sessions" past character 1900, so compact[:1200]
+                        # discarded the one figure every downstream reader
+                        # (check_narratives._al08) actually needs.
+                        if len(compact) <= 1200:
+                            excerpt = compact
+                        else:
+                            excerpt = compact[:800] + " … " + compact[-350:]
+                        extracted_data.setdefault("ocr_excerpt", excerpt)
                         extracted_data.setdefault("ocr_lines", len(ocr_text.splitlines()))
                     if ocr_patterns:
                         ocr_data = extract_patterns(ocr_text, ocr_patterns)
@@ -181,7 +199,13 @@ def collect_tcode_evidence(
                     analysis = analyze_st03n(extracted_data)
                     extracted_data["analysis"] = analysis
 
-                elif tcode.upper() == "SMLG" and extracted_data.get("response_time_ms"):
+                elif (tcode.upper() == "SMLG"
+                      and extracted_data.get("response_time_ms") is not None):
+                    # `is not None` rather than a truthiness test: an idle
+                    # instance legitimately reads 0 ms, and a truthy check
+                    # threw that reading away, emitting no metric at all for
+                    # a system that was answering perfectly well.
+                    #
                     # Confirmed on this system: no RFC path exposes per-instance
                     # SMLG response time (SMLG_GET_LOAD_INFO, Z_GET_LOGON_LOAD,
                     # RZL_INTG_READALL_C, TH_LOAD_DISTRIBUTION and
@@ -189,22 +213,40 @@ def collect_tcode_evidence(
                     # OCR reading of the SMLG screen is therefore the only
                     # source for this number -- real, but as of the last sweep,
                     # not live. The wall labels it accordingly.
-                    try:
-                        smlg_ms = float(str(extracted_data["response_time_ms"]).replace(",", "."))
+                    smlg_ms = parse_response_ms(extracted_data["response_time_ms"])
+                    if smlg_ms is not None:
+                        # Grade it. This used to be hardcoded Status.NORMAL,
+                        # which meant the SMLG response-time thresholds could
+                        # never fire no matter how slow the system got: every
+                        # reading was published as healthy.
+                        grade = classify_response_time(smlg_ms)
                         results.append(MetricResult(
                             name="sap.smlg.response_time",
                             value=smlg_ms,
                             display_value=f"{smlg_ms:.0f} ms",
-                            status=Status.NORMAL,
+                            status=grade["status"],
+                            threshold_warning=SMLG_THRESHOLDS["warning_ms"],
+                            threshold_critical=SMLG_THRESHOLDS["critical_ms"],
                             source="sap_gui_collector",
                             tcode="SMLG",
-                            detail="OCR of the SMLG instance table; RFC has no "
-                                   "path to this figure on this system (all "
-                                   "5 candidate FMs return FU_NOT_FOUND).",
-                            extra_data={"ocr_source": True},
+                            unit="ms",
+                            category="performance",
+                            detail=(
+                                f"{grade['description']} Threshold band: "
+                                f"{grade['threshold']}. OCR of the SMLG "
+                                f"instance table; RFC has no path to this "
+                                f"figure on this system (all 5 candidate FMs "
+                                f"return FU_NOT_FOUND)."
+                            ),
+                            extra_data={
+                                "ocr_source": True,
+                                # Finer grade than Status can carry, read by
+                                # the dashboard to decide whether to flash.
+                                "alert_level": grade["alert_level"],
+                                "threshold_band": grade["threshold"],
+                                "emergency_ms": SMLG_THRESHOLDS["emergency_ms"],
+                            },
                         ))
-                    except (TypeError, ValueError):
-                        pass
 
                 final_screenshots = screenshots
                 last_error = None

@@ -83,12 +83,20 @@ def evaluate_metric(
     limits = thresholds.get(key)
 
     if not limits:
+        # A metric we successfully read a number for, with no threshold
+        # configured against it, is NORMAL -- there is nothing for it to
+        # breach. Leaving it UNKNOWN conflated "nobody set a limit" with
+        # "we could not read this", which is why the report showed real
+        # figures (1 application server, 14 user sessions, 0 queued qRFC
+        # entries) sitting next to the word UNKNOWN. The genuine no-data
+        # case is already handled above, where value is None.
         log.debug(
-            "No threshold configured for metric '%s' "
-            "(key='%s') -- leaving UNKNOWN.",
+            "No threshold configured for metric '%s' (key='%s') -- "
+            "grading NORMAL on a successful read.",
             metric.name,
             key,
         )
+        metric.status = Status.NORMAL
         return metric
 
     warning = limits.get("warning")

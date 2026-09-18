@@ -212,6 +212,20 @@ _METRIC_DEFINITIONS: dict[str, list[tuple[str, str, str, str, str]]] = {
             "ms",
             "performance",
         ),
+        # The OCR read of the SMLG instance table writes "response_time_ms",
+        # not "avg_response_time_ms" -- so on any system where the structured
+        # average is unavailable (this one: all five candidate function
+        # modules return FU_NOT_FOUND) normalization matched nothing and
+        # sap.smlg.response_time never reached the report at all. The figure
+        # was captured, graded and then silently dropped. Both keys are
+        # accepted now; the duplicate-name guard below keeps it to one row.
+        (
+            "response_time_ms",
+            "sap.smlg.response_time",
+            "Instance response time",
+            "ms",
+            "performance",
+        ),
     ],
 
     # Keep ST03N separately.
@@ -287,11 +301,26 @@ def normalize_tcode_result(result: MetricResult) -> list[MetricResult]:
 
     extra_data = result.extra_data or {}
 
+    # A metric name can be reachable through more than one evidence key
+    # (SMLG below). The first key that yields a value wins; the rest are
+    # skipped so one capture never produces two rows for one signal.
+    emitted: set[str] = set()
+
     for key, name, label, unit, category in definitions:
+
+        if name in emitted:
+            continue
 
         raw_value = extra_data.get(key)
 
-        value = _to_number(raw_value)
+        if name == "sap.smlg.response_time":
+            # SMLG renders 1265 ms as "1.265". _to_number reads that as
+            # 1.265, so the metric under-reported by a factor of a thousand
+            # and sat permanently below every alert band.
+            from sap_gui.smlg_analyzer import parse_response_ms
+            value = parse_response_ms(raw_value)
+        else:
+            value = _to_number(raw_value)
 
         if value is None:
             continue
@@ -301,12 +330,38 @@ def normalize_tcode_result(result: MetricResult) -> list[MetricResult]:
         else:
             display = f"{value:g} {unit}"
 
+        # SMLG response time is graded here rather than being left UNKNOWN
+        # for the generic threshold engine, because that engine understands
+        # only warning/critical and SMLG has a third "flashing" band. See
+        # sap_gui/smlg_analyzer.py.
+        status = Status.UNKNOWN
+        warn = crit = None
+        smlg_extra: dict[str, Any] = {}
+
+        if name == "sap.smlg.response_time":
+            from sap_gui.smlg_analyzer import (
+                SMLG_THRESHOLDS, classify_response_time,
+            )
+            grade = classify_response_time(value)
+            status = grade["status"]
+            warn = SMLG_THRESHOLDS["warning_ms"]
+            crit = SMLG_THRESHOLDS["critical_ms"]
+            smlg_extra = {
+                "alert_level": grade["alert_level"],
+                "threshold_band": grade["threshold"],
+                "emergency_ms": SMLG_THRESHOLDS["emergency_ms"],
+            }
+
+        emitted.add(name)
+
         normalized.append(
             MetricResult(
                 name=name,
                 value=value,
                 display_value=display,
-                status=Status.UNKNOWN,
+                status=status,
+                threshold_warning=warn,
+                threshold_critical=crit,
                 source="sap_gui_collector",
                 tcode=tcode,
                 detail=(
@@ -319,6 +374,7 @@ def normalize_tcode_result(result: MetricResult) -> list[MetricResult]:
                     "raw_key": key,
                     "raw_value": raw_value,
                     "evidence_metric": True,
+                    **smlg_extra,
                 },
                 timestamp=result.timestamp,
                 category=category,
@@ -333,6 +389,77 @@ def normalize_tcode_result(result: MetricResult) -> list[MetricResult]:
 # ---------------------------------------------------------------------------
 # Normalize all GUI results
 # ---------------------------------------------------------------------------
+
+def merge_normalized_metrics(
+    existing: list[MetricResult],
+    normalized: list[MetricResult],
+) -> tuple[list[MetricResult], list[str]]:
+    """
+    Merge GUI-normalized metrics into a metric list, one row per name.
+
+    The GUI collector deliberately reuses the metric names the RFC
+    collector emits -- sap.sm12.lock_count, sap.st22.dump_count and so on
+    -- so that one signal keeps one history. But the merge at the call
+    site was a bare list.extend(), so a system read over BOTH RFC and SAP
+    GUI published every shared metric twice. A real client report carried
+    two `sap.sm12.lock_count` rows, reading "2 count" and "3 count", one
+    above the other, with nothing to say which was true.
+
+    Most of these are point-in-time gauges of volatile quantities -- an
+    enqueue lock can live for seconds -- and the two collectors read them
+    at different moments of the same cycle, so a disagreement is usually
+    two correct readings taken seconds apart rather than a fault. The
+    freshest reading therefore wins, being the best description of "now".
+    Where the values actually differ, the discarded reading is recorded in
+    the survivor's detail, so a divergence stays visible to whoever reads
+    the report instead of being silently resolved.
+
+    Returns the merged list, plus one human-readable note per conflict.
+    """
+
+    merged: list[MetricResult] = list(existing)
+
+    first_index: dict[str, int] = {}
+    for index, metric in enumerate(merged):
+        first_index.setdefault(metric.name, index)
+
+    notes: list[str] = []
+
+    for incoming in normalized:
+
+        index = first_index.get(incoming.name)
+
+        if index is None:
+            first_index[incoming.name] = len(merged)
+            merged.append(incoming)
+            continue
+
+        current = merged[index]
+
+        if incoming.timestamp >= current.timestamp:
+            newer, older = incoming, current
+        else:
+            newer, older = current, incoming
+
+        if _to_number(current.value) != _to_number(incoming.value):
+            second = (
+                f"Second reading: {older.source or 'another collector'} "
+                f"read {older.display_value} at "
+                f"{older.timestamp:%H:%M:%S}."
+            )
+            newer.detail = f"{newer.detail} {second}".strip()
+            notes.append(
+                f"{newer.name}: kept {newer.display_value} from "
+                f"{newer.source or 'unknown source'} at "
+                f"{newer.timestamp:%H:%M:%S}; {older.source or 'another '
+                'collector'} read {older.display_value} at "
+                f"{older.timestamp:%H:%M:%S}."
+            )
+
+        merged[index] = newer
+
+    return merged, notes
+
 
 def normalize_tcode_results(
     results: list[MetricResult],

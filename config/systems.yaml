@@ -4,7 +4,7 @@ systems:
   client: '100'
   language: EN
   has_gui_access: true
-  connection_name: ${QAS_SAP_CONNECTION_NAME}
+  connection_name: Centaur QAS System
   username: ${QAS_SAP_USERNAME}
   password: ${QAS_SAP_PASSWORD}
   has_os_access: false
@@ -36,38 +36,6 @@ systems:
   smtp_username: sarodevishal247@gmail.com
   smtp_password: ${PRD_SMTP_PASSWORD}
   sender_email: sarodevishal347@gmail.com
-- name: SARLOHA QAS
-  client: '500'
-  language: EN
-  has_gui_access: true
-  has_os_access: false
-  sap_system_id: QA1
-  connection_name: SARLOHA QAS
-  username: basis
-  password: ${SARLOHA_QAS_SAP_PASSWORD}
-  rfc:
-    ashost: 172.22.1.127
-    sysnr: '00'
-    client: '500'
-    username: basis
-    password: ${SARLOHA_QAS_RFC_PASSWORD}
-    language: EN
-- name: SARLOHA PRD
-  client: '500'
-  language: EN
-  has_gui_access: true
-  has_os_access: false
-  sap_system_id: DB1
-  connection_name: SARLOHA PRD
-  username: basis
-  password: ${SARLOHA_PRD_SAP_PASSWORD}
-  rfc:
-    ashost: 172.22.1.123
-    sysnr: '00'
-    client: '500'
-    username: basis
-    password: ${SARLOHA_PRD_RFC_PASSWORD}
-    language: EN
 - name: CARFOUR QAS
   client: '800'
   language: EN

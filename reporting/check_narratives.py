@@ -27,6 +27,17 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+# An RFC metric name's "sap.<tcode>.<field>" shape usually names the T-code
+# capture that covers the same ground -- but not always. sap.sm37.cancelled_
+# jobs, for instance, splits to tcode "SM37", which is the ACTIVE-jobs
+# capture; the comparable capture is the separate "SM37_CANCELLED" check.
+# Without this override, the conflict-detector below compared the cancelled-
+# jobs RFC count against the active-jobs screen and reported the two as
+# disagreeing over unrelated numbers.
+_METRIC_TCODE_OVERRIDES = {
+    "sap.sm37.cancelled_jobs": "SM37_CANCELLED",
+}
+
 # Keys that are bookkeeping, never observations.
 _META_KEYS = {
     "evidence_id", "attempts", "system", "client", "recovery_actions",
@@ -53,7 +64,7 @@ class CheckNarrative:
 TASKS = {
     "SM21": "SAP System Log", "ST22": "ABAP Dumps", "SM13": "Update Requests",
     "SM12": "Lock Entries", "SP01": "Spool Requests", "SM37": "Active Background Jobs",
-    "SM37_CANCELLED": "Cancelled Background Jobs", "AL08": "User Activities",
+    "SM37_CANCELLED": "Cancelled Background Jobs", "AL08": "User Logons",
     "SM51": "Application Servers", "SM66": "Work Processes (global)",
     "SM50": "Work Processes (instance)", "SCOT": "SAPconnect Configuration",
     "ST03N": "Dialog Response Time", "SMLG": "Logon Groups / Load",
@@ -74,6 +85,76 @@ def _num(s) -> int | None:
 def _grab(pattern: str, text: str, flags=re.I):
     m = re.search(pattern, text, flags)
     return m.group(1) if m else None
+
+
+# --------------------------------------------------------------------------
+# Reconciliation with the Excel sheet
+#
+# Excel reads the structured extra_data fields; the handlers further down
+# mine the OCR excerpt with regexes. Two readings of one capture is how a
+# single run reported DB01 as "1 blocked" in the PDF and "0 locks" in the
+# sheet, SCOT as "0 nodes" against "Mail Port 25", and SMLG as
+# "1 ms, 216 users" against "no data captured".
+#
+# The regexes lose that argument on the evidence: _db01 counted the status
+# bar's clock as a blocked row, _scot needed a token before "SMTP" that the
+# screen does not have, and _smlg's fallback split "1.216" on the decimal
+# point. Structured fields do not have those failure modes, and where no
+# structured field exists the sheet says UNKNOWN rather than guessing.
+#
+# So for any T-code the sheet carries, the sheet is authoritative for status
+# and figures. The handlers stay in charge of T-codes the sheet does not
+# carry (SM21, ST03N, ST06, SM50) and of the recommendation text, which is
+# advice rather than data.
+# --------------------------------------------------------------------------
+
+# Excel statuses -> the four this module uses.
+_EXCEL_STATUS = {
+    "OK": "OK",
+    "WARNING": "ATTENTION",
+    "CRITICAL": "ATTENTION",
+    "UNKNOWN": "NOT COLLECTED",
+}
+
+# The PDF's Count/Value column is narrow; anything longer than a short
+# phrase belongs in Observation instead of being truncated mid-word.
+_VALUE_MAX_CHARS = 30
+
+
+def _excel_view(metric):
+    """
+    (status, value, observation) as the Excel sheet will render this metric,
+    or None when the sheet does not cover it and the handler should stand.
+
+    Imported lazily: reporting.excel_template_writer imports core.models, and
+    a module-level import here would make check_narratives unusable in the
+    lighter contexts that only want narrate().
+    """
+    try:
+        from reporting.excel_template_writer import (
+            TCODE_ROW_MAP, NO_DATA_TEXT,
+            _status_for_metric, _build_actual_result,
+        )
+    except Exception:
+        return None
+
+    tcode = (getattr(metric, "tcode", "") or "").upper()
+    if tcode not in set(TCODE_ROW_MAP.values()):
+        return None
+
+    try:
+        status = _EXCEL_STATUS.get(_status_for_metric(metric), "NOT COLLECTED")
+        result = str(_build_actual_result(metric) or "").strip()
+    except Exception:
+        return None
+
+    # Nothing structured to show: leave the handler's narrative in place
+    # rather than replacing a real sentence with a placeholder.
+    if not result or result == NO_DATA_TEXT:
+        return None
+
+    value = result if len(result) <= _VALUE_MAX_CHARS else ""
+    return status, value, result
 
 
 # --------------------------------------------------------------------------
@@ -155,12 +236,24 @@ def narrate(metric) -> CheckNarrative:
     handler(n, facts, ocr)
     if not n.observation:
         _generic(n, facts, ocr)
+
+    # The sheet wins on status and figures; the handler keeps its advice.
+    # Run this last so it overrides whatever the handler concluded -- the
+    # point is that section 2 of the PDF and the Excel row cannot disagree.
+    view = _excel_view(metric)
+    if view is not None:
+        n.status, n.value, n.observation = view
+
     return n
 
 
 # --------------------------------------------------------------------------
 # Per-T-code handlers. Each sets observation/status/value/recommendation.
 # They read parsed fields first, then mine the OCR excerpt.
+#
+# For T-codes the Excel sheet carries, _excel_view() overrides the status,
+# value and observation set here; the recommendation survives. For the rest
+# (SM21, ST03N, ST06, SM50) these handlers remain the only source.
 # --------------------------------------------------------------------------
 
 def _st22(n, f, ocr):
@@ -233,7 +326,15 @@ def _sm37(n, f, ocr):
 
 
 def _sm37_cancelled(n, f, ocr):
-    c = _num(f.get("cancelled_jobs"))
+    # action_sm37_cancelled's authoritative figure is "records_passed" /
+    # "cancelled_job_count", read from SM37's Shift+F7 "List Status"
+    # popup -- "cancelled_jobs" is a leftover key that action always sets
+    # to [] ("No individual job extraction is performed", per its own
+    # docstring), so reading it as a count here made _num() fail on every
+    # run and the real figure never reached the report.
+    c = _num(f.get("records_passed"))
+    if c is None:
+        c = _num(f.get("cancelled_job_count"))
     jobs = re.findall(r"\b([A-Z][A-Z0-9_]{6,})\s+\S*\s*\S*\s*[A-Z_]+\s+Canceled", ocr)
     if c is None and "Canceled" in ocr:
         c = len(jobs) or 1
@@ -603,8 +704,10 @@ def deterministic_analysis(result, narratives: list[CheckNarrative]) -> dict:
         # 3 stuck entries over RFC while the captured screen showed none --
         # saying so is the report's job. Printing both without comment leaves
         # the reader to notice the contradiction, which is how trust is lost.
-        parts = str(getattr(m, "name", "")).split(".")
+        metric_name = str(getattr(m, "name", ""))
+        parts = metric_name.split(".")
         tcode = parts[1].upper() if len(parts) > 2 and parts[0] == "sap" else ""
+        tcode = _METRIC_TCODE_OVERRIDES.get(metric_name, tcode)
         n = by_tcode.get(tcode)
         if n is not None and n.status == "OK":
             conflicts.append(

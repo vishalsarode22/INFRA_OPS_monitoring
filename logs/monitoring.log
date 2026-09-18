@@ -832,3 +832,262 @@ COUNTER     2
 2026-09-14 17:19:10,152 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
 2026-09-14 17:19:10,153 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sp01.spool_count' (key='sap.sp01.spool_count') -- leaving UNKNOWN.
 2026-09-14 17:19:10,165 | INFO     | core.event_engine | Resolved event EVT-0BE21E49A7: PS4/sap.st03.top_user_memory_mb
+2026-09-15 11:21:33,718 | INFO     | core.orchestrator | No SSH access configured for CENTOR_QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 11:21:34,377 | INFO     | core.orchestrator | [CENTOR_QAS] RFC collector: 6 metrics added.
+2026-09-15 11:21:39,846 | INFO     | core.orchestrator | [CENTOR_QAS] RFC perf collector: 6 metrics added.
+2026-09-15 11:21:39,846 | INFO     | core.orchestrator | Monitoring cycle complete for CENTOR_QAS/100: overall=NORMAL, metrics=12, errors=0
+2026-09-15 11:23:43,158 | INFO     | core.orchestrator | No SSH access configured for CENTOR_QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 11:23:43,331 | INFO     | core.orchestrator | [CENTOR_QAS] RFC collector: 6 metrics added.
+2026-09-15 11:23:43,895 | INFO     | core.orchestrator | [CENTOR_QAS] RFC perf collector: 6 metrics added.
+2026-09-15 11:23:43,895 | INFO     | core.orchestrator | Monitoring cycle complete for CENTOR_QAS/100: overall=NORMAL, metrics=12, errors=0
+2026-09-15 11:24:54,620 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 11:24:55,631 | WARNING  | core.orchestrator | [CARFOUR QAS] RFC collector: host 172.28.202.213:3300 not reachable (TimeoutError) -- network/Basis check, not a code issue
+2026-09-15 11:24:55,631 | WARNING  | core.orchestrator | [CARFOUR QAS] RFC perf collector: host 172.28.202.213:3300 not reachable (TimeoutError) -- network/Basis check, not a code issue (retrying in 120s)
+2026-09-15 11:24:55,631 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=UNKNOWN, metrics=0, errors=2
+2026-09-15 11:26:37,651 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 11:26:37,817 | INFO     | core.orchestrator | [PRD] RFC collector: 13 metrics added.
+2026-09-15 11:26:41,373 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-15 11:26:41,373 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=19, errors=0
+2026-09-15 11:26:41,391 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-15 11:26:41,405 | INFO     | core.event_engine | Resolved event EVT-07268551D5: PRD/sap.st22.dumps
+2026-09-15 11:28:44,018 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 11:28:44,986 | INFO     | core.orchestrator | [PRD] RFC collector: 13 metrics added.
+2026-09-15 11:28:48,470 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-15 11:28:48,470 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=19, errors=0
+2026-09-15 11:28:48,487 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-15 11:41:40,433 | INFO     | core.orchestrator | No SSH access configured for CENTOR_QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 11:41:41,024 | INFO     | core.orchestrator | [CENTOR_QAS] RFC collector: 6 metrics added.
+2026-09-15 11:41:46,302 | INFO     | core.orchestrator | [CENTOR_QAS] RFC perf collector: 6 metrics added.
+2026-09-15 11:41:46,302 | INFO     | core.orchestrator | Monitoring cycle complete for CENTOR_QAS/100: overall=NORMAL, metrics=12, errors=0
+2026-09-15 11:42:50,067 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 11:42:50,109 | INFO     | core.orchestrator | [PRD] RFC collector: 13 metrics added.
+2026-09-15 11:42:50,704 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-15 11:42:50,704 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=19, errors=0
+2026-09-15 11:42:50,720 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-15 11:45:27,044 | INFO     | core.orchestrator | No SSH access configured for CENTOR_QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 11:45:27,202 | INFO     | core.orchestrator | [CENTOR_QAS] RFC collector: 6 metrics added.
+2026-09-15 11:45:27,672 | INFO     | core.orchestrator | [CENTOR_QAS] RFC perf collector: 6 metrics added.
+2026-09-15 11:45:27,672 | INFO     | core.orchestrator | Monitoring cycle complete for CENTOR_QAS/100: overall=NORMAL, metrics=12, errors=0
+2026-09-15 11:48:44,781 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 11:48:44,914 | INFO     | core.orchestrator | [PRD] RFC collector: 13 metrics added.
+2026-09-15 11:48:48,435 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-15 11:48:48,435 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=19, errors=0
+2026-09-15 11:49:56,532 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-15 11:49:56,533 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm37.active_jobs' (key='sap.sm37.active_jobs') -- leaving UNKNOWN.
+2026-09-15 11:49:56,533 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-15 11:49:56,533 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sp01.spool_count' (key='sap.sp01.spool_count') -- leaving UNKNOWN.
+2026-09-15 12:24:01,630 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 12:24:01,656 | INFO     | core.orchestrator | [PRD] RFC collector: 13 metrics added.
+2026-09-15 12:24:02,234 | INFO     | core.orchestrator | [PRD] RFC perf collector: 6 metrics added.
+2026-09-15 12:24:02,234 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=19, errors=0
+2026-09-15 12:25:05,519 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-15 12:25:05,520 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm37.active_jobs' (key='sap.sm37.active_jobs') -- leaving UNKNOWN.
+2026-09-15 12:25:05,520 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-15 12:25:05,520 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sp01.spool_count' (key='sap.sp01.spool_count') -- leaving UNKNOWN.
+2026-09-15 14:20:18,517 | INFO     | core.orchestrator | No SSH access configured for PRD -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 14:20:23,622 | INFO     | core.orchestrator | [PRD] RFC collector: 13 metrics added.
+2026-09-15 14:20:26,979 | INFO     | core.orchestrator | [PRD] RFC perf collector: 9 metrics added.
+2026-09-15 14:20:26,979 | INFO     | core.orchestrator | Monitoring cycle complete for PRD/100: overall=CRITICAL, metrics=22, errors=0
+2026-09-15 14:21:48,221 | DEBUG    | evaluation.threshold_engine | Metric 'sap.db12.last_backup' has no numeric value -- leaving UNKNOWN.
+2026-09-15 14:21:48,221 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.backend_sessions' (key='sap.al08.backend_sessions') -- leaving UNKNOWN.
+2026-09-15 14:21:48,221 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.user_logons' (key='sap.al08.user_logons') -- leaving UNKNOWN.
+2026-09-15 14:21:48,221 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm37.active_jobs' (key='sap.sm37.active_jobs') -- leaving UNKNOWN.
+2026-09-15 14:21:48,221 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-15 14:21:48,221 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-15 14:21:48,221 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-15 14:21:48,221 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-15 14:21:48,221 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sp01.spool_count' (key='sap.sp01.spool_count') -- leaving UNKNOWN.
+2026-09-15 14:52:43,987 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 14:52:50,122 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-15 14:53:03,797 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-15 14:53:03,797 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-15 14:55:01,481 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-15 14:55:01,481 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-15 14:55:01,482 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-15 14:55:01,482 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-15 14:55:01,482 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-15 14:55:01,482 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-15 14:55:01,485 | WARNING  | core.event_engine | New CRITICAL event EVT-A7EF0B30A9: CARFOUR QAS/sap.st03.db_time_pct=2352.7%
+2026-09-15 15:01:04,722 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 15:01:05,016 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-15 15:01:06,301 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-15 15:01:06,301 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-15 15:02:59,930 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-15 15:02:59,930 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-15 15:02:59,930 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-15 15:02:59,930 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-15 15:02:59,931 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-15 15:02:59,931 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.send_requests' (key='sap.sost.send_requests') -- leaving UNKNOWN.
+2026-09-15 15:02:59,931 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-15 15:05:11,437 | INFO     | core.orchestrator | No SSH access configured for PS4 -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 15:05:12,457 | INFO     | core.orchestrator | [PS4] RFC collector: 5 metrics added.
+2026-09-15 15:05:37,792 | INFO     | core.orchestrator | [PS4] RFC perf collector: 11 metrics added.
+2026-09-15 15:05:37,793 | INFO     | core.orchestrator | Monitoring cycle complete for PS4/500: overall=CRITICAL, metrics=16, errors=0
+2026-09-15 15:07:49,568 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-15 15:07:49,569 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-15 15:07:49,569 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-15 15:07:49,569 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-15 15:07:49,569 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-15 15:07:49,569 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.send_requests' (key='sap.sost.send_requests') -- leaving UNKNOWN.
+2026-09-15 15:07:49,569 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-15 15:42:58,470 | INFO     | core.orchestrator | No SSH access configured for PS4 -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 15:43:04,715 | INFO     | core.orchestrator | [PS4] RFC collector: 5 metrics added.
+2026-09-15 15:43:38,017 | INFO     | core.orchestrator | [PS4] RFC perf collector: 11 metrics added.
+2026-09-15 15:43:38,017 | INFO     | core.orchestrator | Monitoring cycle complete for PS4/500: overall=CRITICAL, metrics=16, errors=0
+2026-09-15 15:45:48,182 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-15 15:45:48,182 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-15 15:45:48,182 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-15 15:45:48,183 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-15 15:45:48,183 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-15 15:45:48,183 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.send_requests' (key='sap.sost.send_requests') -- leaving UNKNOWN.
+2026-09-15 15:45:48,183 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-15 18:15:20,426 | INFO     | core.orchestrator | No SSH access configured for PS4 -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-15 18:15:20,740 | INFO     | core.orchestrator | [PS4] RFC collector: 5 metrics added.
+2026-09-15 18:15:31,906 | INFO     | core.orchestrator | [PS4] RFC perf collector: 11 metrics added.
+2026-09-15 18:15:31,906 | INFO     | core.orchestrator | Monitoring cycle complete for PS4/500: overall=CRITICAL, metrics=16, errors=0
+2026-09-15 18:17:34,725 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-15 18:17:34,725 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-15 18:17:34,725 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-15 18:17:34,725 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-15 18:17:34,726 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-15 18:17:34,726 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.send_requests' (key='sap.sost.send_requests') -- leaving UNKNOWN.
+2026-09-15 18:17:34,726 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-16 11:19:53,476 | INFO     | core.orchestrator | No SSH access configured for PS4 -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-16 11:19:53,945 | INFO     | core.orchestrator | [PS4] RFC collector: 5 metrics added.
+2026-09-16 11:20:01,870 | INFO     | core.orchestrator | [PS4] RFC perf collector: 11 metrics added.
+2026-09-16 11:20:01,870 | INFO     | core.orchestrator | Monitoring cycle complete for PS4/500: overall=CRITICAL, metrics=16, errors=0
+2026-09-16 11:25:13,778 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-16 11:25:24,143 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-16 11:25:41,596 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 6 metrics added.
+2026-09-16 11:25:41,596 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=WARNING, metrics=11, errors=0
+2026-09-16 11:27:43,496 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-16 11:27:43,496 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-16 11:27:43,496 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-16 11:27:43,496 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-16 11:27:43,496 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-16 11:27:43,496 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-16 11:27:43,506 | INFO     | core.event_engine | Resolved event EVT-CE652D6A26: CARFOUR QAS/sap.sm37.cancelled_jobs
+2026-09-16 12:26:15,879 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-16 12:26:22,118 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-16 12:26:47,625 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 9 metrics added.
+2026-09-16 12:26:47,625 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=WARNING, metrics=14, errors=0
+2026-09-16 12:28:52,196 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-16 12:28:52,196 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-16 12:28:52,196 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-16 12:28:52,196 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-16 12:28:52,197 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-16 12:28:52,197 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-16 12:28:52,197 | INFO     | core.event_engine | Resolved event EVT-A7EF0B30A9: CARFOUR QAS/sap.st03.db_time_pct
+2026-09-16 16:25:30,658 | INFO     | core.orchestrator | No SSH access configured for PS4 -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-16 16:25:36,943 | INFO     | core.orchestrator | [PS4] RFC collector: 5 metrics added.
+2026-09-16 16:26:10,503 | INFO     | core.orchestrator | [PS4] RFC perf collector: 11 metrics added.
+2026-09-16 16:26:10,504 | INFO     | core.orchestrator | Monitoring cycle complete for PS4/500: overall=CRITICAL, metrics=16, errors=0
+2026-09-16 16:28:26,594 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-16 16:28:26,594 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-16 16:28:26,594 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-16 16:28:26,594 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-16 16:28:26,594 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-16 16:28:26,594 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.send_requests' (key='sap.sost.send_requests') -- leaving UNKNOWN.
+2026-09-16 16:28:26,595 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-16 16:28:26,595 | INFO     | core.event_engine | Resolved event EVT-3BBBDB6651: PS4/sap.sm37.cancelled_jobs
+2026-09-17 14:46:12,796 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-17 14:46:18,833 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-17 14:46:48,118 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 9 metrics added.
+2026-09-17 14:46:48,118 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=WARNING, metrics=14, errors=0
+2026-09-17 14:48:52,375 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-17 14:48:52,375 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-17 14:48:52,375 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-17 14:48:52,376 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-17 14:48:52,376 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-17 14:48:52,376 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-17 14:48:52,387 | WARNING  | core.event_engine | New WARNING event EVT-5F51026DD8: CARFOUR QAS/sap.st22.dump_count=4 count
+2026-09-17 16:24:19,020 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-17 16:24:25,181 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-17 16:24:49,411 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 9 metrics added.
+2026-09-17 16:24:49,412 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=WARNING, metrics=14, errors=0
+2026-09-17 16:26:57,638 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-17 16:26:57,638 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-17 16:26:57,638 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-17 16:26:57,638 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-17 16:26:57,638 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-17 16:26:57,638 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-17 17:18:07,203 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-17 17:18:13,474 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-17 17:18:30,069 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-17 17:18:30,069 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-17 17:20:34,004 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.user_logons' (key='sap.al08.user_logons') -- leaving UNKNOWN.
+2026-09-17 17:20:34,004 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.backend_sessions' (key='sap.al08.backend_sessions') -- leaving UNKNOWN.
+2026-09-17 17:20:34,004 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- leaving UNKNOWN.
+2026-09-17 17:20:34,004 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- leaving UNKNOWN.
+2026-09-17 17:20:34,004 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- leaving UNKNOWN.
+2026-09-17 17:20:34,004 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- leaving UNKNOWN.
+2026-09-17 17:20:34,004 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- leaving UNKNOWN.
+2026-09-17 17:20:34,004 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- leaving UNKNOWN.
+2026-09-17 17:20:34,015 | INFO     | core.event_engine | Resolved event EVT-F0DF1977B4: CARFOUR QAS/sap.st03.dialog_resp_ms
+2026-09-17 17:20:34,015 | INFO     | core.event_engine | Resolved event EVT-397CDE7127: CARFOUR QAS/sap.st03.max_instance_resp_ms
+2026-09-18 10:50:02,768 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-18 10:50:08,756 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-18 10:50:26,565 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-18 10:50:26,565 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-18 10:52:31,786 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.user_logons' (key='sap.al08.user_logons') -- grading NORMAL on a successful read.
+2026-09-18 10:52:31,786 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.backend_sessions' (key='sap.al08.backend_sessions') -- grading NORMAL on a successful read.
+2026-09-18 10:52:31,786 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- grading NORMAL on a successful read.
+2026-09-18 10:52:31,786 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- grading NORMAL on a successful read.
+2026-09-18 10:52:31,786 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- grading NORMAL on a successful read.
+2026-09-18 10:52:31,786 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- grading NORMAL on a successful read.
+2026-09-18 10:52:31,786 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- grading NORMAL on a successful read.
+2026-09-18 10:52:31,787 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- grading NORMAL on a successful read.
+2026-09-18 10:52:31,796 | INFO     | core.event_engine | Resolved event EVT-CE652D6A26: CARFOUR QAS/sap.sm37.cancelled_jobs
+2026-09-18 10:52:31,796 | INFO     | core.event_engine | Resolved event EVT-5F51026DD8: CARFOUR QAS/sap.st22.dump_count
+2026-09-18 11:12:28,608 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-18 11:12:35,225 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-18 11:12:55,652 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-18 11:12:55,653 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-18 11:15:05,290 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.user_logons' (key='sap.al08.user_logons') -- grading NORMAL on a successful read.
+2026-09-18 11:15:05,290 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.backend_sessions' (key='sap.al08.backend_sessions') -- grading NORMAL on a successful read.
+2026-09-18 11:15:05,291 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- grading NORMAL on a successful read.
+2026-09-18 11:15:05,291 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- grading NORMAL on a successful read.
+2026-09-18 11:15:05,291 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- grading NORMAL on a successful read.
+2026-09-18 11:15:05,291 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- grading NORMAL on a successful read.
+2026-09-18 11:15:05,291 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- grading NORMAL on a successful read.
+2026-09-18 11:15:05,291 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.send_requests' (key='sap.sost.send_requests') -- grading NORMAL on a successful read.
+2026-09-18 11:15:05,291 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- grading NORMAL on a successful read.
+2026-09-18 11:33:58,385 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-18 11:34:18,410 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-18 11:34:36,449 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-18 11:34:36,449 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-18 11:36:49,572 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.user_logons' (key='sap.al08.user_logons') -- grading NORMAL on a successful read.
+2026-09-18 11:36:49,572 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.backend_sessions' (key='sap.al08.backend_sessions') -- grading NORMAL on a successful read.
+2026-09-18 11:36:49,572 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- grading NORMAL on a successful read.
+2026-09-18 11:36:49,572 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- grading NORMAL on a successful read.
+2026-09-18 11:36:49,572 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- grading NORMAL on a successful read.
+2026-09-18 11:36:49,572 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- grading NORMAL on a successful read.
+2026-09-18 11:36:49,572 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- grading NORMAL on a successful read.
+2026-09-18 11:36:49,573 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.send_requests' (key='sap.sost.send_requests') -- grading NORMAL on a successful read.
+2026-09-18 11:36:49,573 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- grading NORMAL on a successful read.
+2026-09-18 12:00:37,057 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-18 12:00:43,473 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-18 12:01:07,191 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-18 12:01:07,191 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-18 12:03:21,206 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.user_logons' (key='sap.al08.user_logons') -- grading NORMAL on a successful read.
+2026-09-18 12:03:21,206 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.backend_sessions' (key='sap.al08.backend_sessions') -- grading NORMAL on a successful read.
+2026-09-18 12:03:21,206 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- grading NORMAL on a successful read.
+2026-09-18 12:03:21,206 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- grading NORMAL on a successful read.
+2026-09-18 12:03:21,206 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- grading NORMAL on a successful read.
+2026-09-18 12:03:21,206 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- grading NORMAL on a successful read.
+2026-09-18 12:03:21,207 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- grading NORMAL on a successful read.
+2026-09-18 12:03:21,207 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.send_requests' (key='sap.sost.send_requests') -- grading NORMAL on a successful read.
+2026-09-18 12:03:21,207 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- grading NORMAL on a successful read.
+2026-09-18 12:18:39,457 | INFO     | core.orchestrator | No SSH access configured for CARFOUR QAS -- skipping Linux/OS-level metrics (SAP GUI evidence only).
+2026-09-18 12:18:53,132 | INFO     | core.orchestrator | [CARFOUR QAS] RFC collector: 5 metrics added.
+2026-09-18 12:19:19,852 | INFO     | core.orchestrator | [CARFOUR QAS] RFC perf collector: 11 metrics added.
+2026-09-18 12:19:19,852 | INFO     | core.orchestrator | Monitoring cycle complete for CARFOUR QAS/800: overall=CRITICAL, metrics=16, errors=0
+2026-09-18 12:21:31,260 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.user_logons' (key='sap.al08.user_logons') -- grading NORMAL on a successful read.
+2026-09-18 12:21:31,260 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.al08.backend_sessions' (key='sap.al08.backend_sessions') -- grading NORMAL on a successful read.
+2026-09-18 12:21:31,260 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm51.instances_started' (key='sap.sm51.instances_started') -- grading NORMAL on a successful read.
+2026-09-18 12:21:31,260 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.process_rows' (key='sap.sm66.process_rows') -- grading NORMAL on a successful read.
+2026-09-18 12:21:31,260 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sm66.running_processes' (key='sap.sm66.running_processes') -- grading NORMAL on a successful read.
+2026-09-18 12:21:31,261 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq1.queues' (key='sap.smq1.queues') -- grading NORMAL on a successful read.
+2026-09-18 12:21:31,261 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.smq2.queues' (key='sap.smq2.queues') -- grading NORMAL on a successful read.
+2026-09-18 12:21:31,261 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.send_requests' (key='sap.sost.send_requests') -- grading NORMAL on a successful read.
+2026-09-18 12:21:31,261 | DEBUG    | evaluation.threshold_engine | No threshold configured for metric 'sap.sost.sent' (key='sap.sost.sent') -- grading NORMAL on a successful read.

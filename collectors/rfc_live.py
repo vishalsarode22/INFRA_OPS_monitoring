@@ -203,6 +203,15 @@ _CHECK_GRID_EXCLUDE = {
     "sap.sm66.max_instance_saturation_pct",
     "sap.st03.max_instance_resp_ms",
     "sap.su01.locked_users",
+    # Dropped from the wall grid on request (16 Sep 2026). All are still
+    # collected, graded and written to rfc_metrics and the reports.
+    "sap.sm12.lock_count",
+    "sap.sm66.wp_saturation_pct",
+    "sap.sm58.stuck_entries",
+    "sap.st03.db_time_pct",
+    "sap.sm12.locks_per_user_max",
+    "sap.sm12.users_with_many_locks",
+    "sap.db12.last_backup",
 }
 
 
@@ -475,6 +484,13 @@ def _ccms_total_mb(session: SapSession, system: str) -> int | None:
     return total
 
 
+# How far back _smon_uptime walks looking for a restart. SMON retention is
+# typically 7-14 days; 30 caps the worst case at ~30 cheap single-day reads
+# on the deep clock, and the loop stops early the moment every instance has
+# shown a gap. Override with IBO_SMON_UPTIME_DAYS.
+_SMON_MAX_DAYS = int(_os.environ.get("IBO_SMON_UPTIME_DAYS", "30") or 30)
+
+
 def _smon_uptime(session: SapSession, system: str) -> dict:
     """
     Uptime and last downtime per instance, from gaps in /SDF/SMON_HEADER.
@@ -486,19 +502,19 @@ def _smon_uptime(session: SapSession, system: str) -> dict:
     with no kernel start-time FM needed (TH_GET_VIRT_SERVER carries none
     on this release).
 
-    Reads today + yesterday (up to ~2900 rows/instance), on the deep clock.
+    This used to read today + yesterday only. Every system in the fleet had
+    been up longer than that, so every card showed the identical floor
+    ">= 1d 13h" -- the window, not the uptime. Now it walks back one day at
+    a time, most recent first, and stops as soon as a gap is found for
+    every instance seen, or after _SMON_MAX_DAYS. A system that restarted
+    six days ago now reads "6d 4h"; one that has not restarted within
+    SMON's retention reads ">= <retention>", which is the honest answer.
+
     Honest limits: a gap also appears if the SMON job itself stopped, so
-    the note says "no SMON rows", not "instance down"; and with no gap in
-    the window uptime is reported as ">= window", never invented.
+    the note says "no SMON rows", not "instance down".
     """
     from datetime import datetime as _dt, timedelta as _td
     now = _dt.now()
-    days = [now.strftime("%Y%m%d"), (now - _td(days=1)).strftime("%Y%m%d")]
-    where = f"DATUM = '{days[0]}' OR DATUM = '{days[1]}'"
-    rows = session.read_table("/SDF/SMON_HEADER",
-                              ["DATUM", "TIME", "SERVER"], where, rows=6000)
-    if not rows:
-        return {}
 
     def field(r, i):
         try:
@@ -507,20 +523,56 @@ def _smon_uptime(session: SapSession, system: str) -> dict:
             return ""
 
     stamps: dict[str, list] = {}
-    for r in rows:
-        try:
-            t = _dt.strptime(field(r, 0) + field(r, 1).rjust(6, "0"),
-                             "%Y%m%d%H%M%S")
-        except ValueError:
+    days_read = 0
+    oldest_day = None
+
+    def _all_have_gap() -> bool:
+        if not stamps:
+            return False
+        for ts in stamps.values():
+            ts.sort()
+            if len(ts) < 2:
+                return False
+            deltas = sorted((b - a).total_seconds() for a, b in zip(ts, ts[1:]))
+            interval = deltas[len(deltas) // 2] or 60
+            threshold = max(interval * 3, 180)
+            if not any((b - a).total_seconds() > threshold for a, b in zip(ts, ts[1:])):
+                return False
+        return True
+
+    for back in range(_SMON_MAX_DAYS):
+        day = (now - _td(days=back)).strftime("%Y%m%d")
+        rows = session.read_table("/SDF/SMON_HEADER",
+                                  ["DATUM", "TIME", "SERVER"],
+                                  f"DATUM = '{day}'", rows=4000)
+        if rows is None:
+            break                       # table unreadable: stop, keep what we have
+        days_read += 1
+        if not rows:
+            # A whole day with no SMON rows at all. Either retention ends here
+            # or SMON was not running; either way older days will not help.
+            if back > 0:
+                break
             continue
-        stamps.setdefault(field(r, 2) or "?", []).append(t)
+        oldest_day = day
+        for r in rows:
+            try:
+                t = _dt.strptime(field(r, 0) + field(r, 1).rjust(6, "0"),
+                                 "%Y%m%d%H%M%S")
+            except ValueError:
+                continue
+            stamps.setdefault(field(r, 2) or "?", []).append(t)
+        if _all_have_gap():
+            break
+
+    if not stamps:
+        return {}
 
     out: dict[str, dict] = {}
     for server, ts in stamps.items():
         ts.sort()
         if len(ts) < 2:
             continue
-        # Interval = the typical spacing; gap threshold = 3x that.
         deltas = sorted((b - a).total_seconds() for a, b in zip(ts, ts[1:]))
         interval = deltas[len(deltas) // 2] or 60
         threshold = max(interval * 3, 180)
@@ -548,10 +600,10 @@ def _smon_uptime(session: SapSession, system: str) -> dict:
             up_s = int((now - window_start).total_seconds())
             out[server] = {
                 "uptime_seconds": max(up_s, 0),
-                "uptime_text": "≥ " + _fmt_dur(up_s),
+                "uptime_text": "\u2265 " + _fmt_dur(up_s),
                 "since": None,
                 "last_downtime_seconds": None,
-                "last_downtime_text": "none in last 2 days",
+                "last_downtime_text": f"none in last {days_read} day(s) of SMON data",
                 "source": "SMON row gaps",
                 "bounded": True,
             }
@@ -1849,37 +1901,64 @@ def _uptime(session: SapSession, system: str) -> dict:
     """
     ABAP instance uptime, from the kernel start time.
 
-    "Server time" as a wall-clock had limited value -- it is just the SAP
-    system clock, useful for correcting lock-age offsets but not something an
-    operator watches. Uptime is the operational number: how long since this
-    instance last (re)started, and therefore whether an unplanned bounce has
-    happened since the last look.
+    The START field's name is not stable across kernel releases -- this
+    looked for STARTDATE/STARTTIME, found neither on any of the four fleet
+    systems, returned {} every time, and the tile fell through to the SMON
+    gap floor, which reads ">= 1d 13h" on every card because the lookback
+    window is the same for all of them. That is a floor, not an uptime.
 
-    Source order:
-      1. TH_GET_VIRT_SERVER -- carries STARTTIME/STARTDATE on most releases.
-      2. Fallback: the dispatcher start recorded in the SMON header, if the
-         Z FM or SMON already read it this pass.
-    Returns {} when neither is available, so the tile falls back to the
-    system clock rather than showing a wrong or zero uptime.
+    So instead of knowing the field name: scan every scalar the FM returns
+    for a YYYYMMDD date and an HHMMSS time that sit next to each other, on
+    the FMs that carry instance start information. The first plausible pair
+    wins; the source is recorded so the wall can say where it came from.
+    Returns {} only when nothing plausible is found, and logs what WAS
+    returned once per system so the missing field can be named later.
     """
-    try:
-        info = session.call("TH_GET_VIRT_SERVER") or {}
-    except Exception:
-        info = {}
+    import re as _re
+
+    def _pairs(info: dict):
+        dates, times = {}, {}
+        for k, v in (info or {}).items():
+            if isinstance(v, (list, dict)):
+                continue
+            t = str(v).strip()
+            if _re.fullmatch(r"(19|20)\d{6}", t):
+                dates[k.upper()] = t
+            elif _re.fullmatch(r"\d{6}", t):
+                times[k.upper()] = t
+        # Prefer a key that says START; a bare date on its own means nothing.
+        for dk in sorted(dates, key=lambda k: (0 if "START" in k else 1, k)):
+            base = dk.replace("DATE", "").replace("DAT", "").replace("DT", "")
+            for tk in sorted(times, key=lambda k: (0 if "START" in k else 1, k)):
+                tbase = tk.replace("TIME", "").replace("TIM", "").replace("TM", "")
+                if base == tbase or ("START" in dk and "START" in tk):
+                    yield dates[dk], times[tk], f"{dk}/{tk}"
 
     start_dt = None
-    # Field names vary by release; try the common ones. Date is YYYYMMDD,
-    # time is HHMMSS.
-    date_raw = str(info.get("STARTDATE") or info.get("START_DATE") or "").strip()
-    time_raw = str(info.get("STARTTIME") or info.get("START_TIME") or "").strip()
-    if len(date_raw) == 8 and date_raw.isdigit():
+    source = None
+    seen = {}
+    for fm in ("TH_GET_VIRT_SERVER", "SAPTUNE_GET_SUMMARY_STATISTIC"):
         try:
-            time_raw = (time_raw or "000000").rjust(6, "0")[:6]
-            start_dt = datetime.strptime(date_raw + time_raw, "%Y%m%d%H%M%S")
-        except ValueError:
-            start_dt = None
+            info = session.call(fm) or {}
+        except Exception:
+            continue
+        seen[fm] = sorted(k for k, v in info.items() if not isinstance(v, (list, dict)))
+        for date_raw, time_raw, fields in _pairs(info):
+            try:
+                start_dt = datetime.strptime(date_raw + time_raw, "%Y%m%d%H%M%S")
+                source = f"{fm} {fields}"
+                break
+            except ValueError:
+                continue
+        if start_dt is not None:
+            break
 
     if start_dt is None:
+        # One line per system per process, so the log tells us exactly which
+        # fields these kernels DO return instead of silently showing a floor.
+        if not getattr(_uptime, "_logged", set()).__contains__(system):
+            _uptime._logged = getattr(_uptime, "_logged", set()) | {system}
+            log.warning(f"[{system}] kernel start time not found; FM scalar fields were {seen}")
         return {}
 
     # Measure against the SAP system clock where we have learned it, so the
@@ -1904,8 +1983,8 @@ def _uptime(session: SapSession, system: str) -> dict:
     else:
         text = f"{mins}m"
     return {"uptime_text": text, "uptime_seconds": total_s,
-            "started_at": start_dt.strftime("%Y-%m-%d %H:%M:%S")}
-
+            "started_at": start_dt.strftime("%Y-%m-%d %H:%M:%S"),
+            "source": source}
 
 def read_live(system: str, cfg: dict, use_cache: bool = True, resolve_names: bool = False) -> dict:
     """
@@ -2171,7 +2250,7 @@ def read_live(system: str, cfg: dict, use_cache: bool = True, resolve_names: boo
             payload["uptime_text"] = up["uptime_text"]
             payload["uptime_seconds"] = up["uptime_seconds"]
             payload["uptime_since"] = up["started_at"]
-            payload["uptime_source"] = "RFC · TH_GET_VIRT_SERVER"
+            payload["uptime_source"] = "RFC · " + str(up.get("source") or "kernel start")
 
         # SMLG instance response, the number transaction SMLG actually shows.
         # Read from the message server's own load table so the dashboard and
@@ -2378,9 +2457,21 @@ def read_live(system: str, cfg: dict, use_cache: bool = True, resolve_names: boo
                     window = payload.get("perf_response_window") or "STAT"
                     source = f"STAT · {window}"
                     statistic = "median"
-                    if payload.get("perf_response_low_sample"):
+                    # This branch used to check ONLY low-sample, never
+                    # aggregate -- so a whole-day ST03N median (plenty of
+                    # steps, just old ones) sailed through unflagged and
+                    # painted red exactly like a live 5-minute reading.
+                    # An aggregate window is not comparable to SMLG's
+                    # live figure regardless of step count.
+                    steps = payload.get("perf_response_steps")
+                    aggregate = "aggregate" in (window or "")
+                    if payload.get("perf_response_low_sample") or aggregate:
                         inst["response_low_confidence"] = True
-                        inst["response_confidence_note"] = "few dialog steps — near idle"
+                        inst["response_confidence_note"] = (
+                            "daily ST03N aggregate — no dialog steps in the "
+                            "live window" if aggregate else
+                            f"only {steps} dialog step(s) in the window — "
+                            f"near idle, not comparable to SMLG")
 
             # 2. RZLLITAB logon-group response (config table).
             if response is None:
@@ -2398,7 +2489,13 @@ def read_live(system: str, cfg: dict, use_cache: bool = True, resolve_names: boo
                     source = "ST03 workload"
                     statistic = "average"
 
-            if response is None and not smon_idle:
+            # Idle (STAT read fine, just zero steps this window) is now
+            # handled by the idle branch below, not by falling back to a
+            # whole-day aggregate. An instance with no traffic in the last
+            # 5 minutes is idle -- that IS the answer, not a gap to paper
+            # over with yesterday's median. The aggregate fallback now
+            # only fires when the live STAT read itself failed.
+            if response is None and not smon_idle and not payload.get("perf_read_ok"):
                 # 4. Last resort: the perf collector's STAT read (or its ST03N
                 #    daily aggregate). Per-step RESPTI has a long tail, so this
                 #    is a median and clearly labelled as such -- it is why the
@@ -2449,6 +2546,36 @@ def read_live(system: str, cfg: dict, use_cache: bool = True, resolve_names: boo
                 inst["response_note"] = (
                     "STAT read succeeded but this instance had no dialog steps "
                     "in the window -- idle, not unmeasured.")
+
+        # AL08 USER SESSIONS: TH_USER_LIST only lists users on the instance
+        # the RFC connection happened to land on, and on these systems it
+        # answers empty -- so the wall said "0 count" beside an instance
+        # table showing 152 users. The per-instance figures (SMON, then
+        # SMLG) are system-wide and match transaction SMLG by construction,
+        # so when they add up to more than the AL08 read, they win.
+        _inst_users = [i.get("users") for i in payload.get("instances") or []
+                       if isinstance(i.get("users"), (int, float))]
+        if _inst_users:
+            _al08_total = int(sum(_inst_users))
+            for _row in payload.get("checks") or []:
+                if _row.get("metric") != "sap.al08.user_logons":
+                    continue
+                try:
+                    _al08_read = int(str(_row.get("value", "0")).split()[0])
+                except (ValueError, IndexError):
+                    _al08_read = 0
+                if _al08_total > _al08_read:
+                    _warn, _crit = 150, 250
+                    _row["value"] = f"{_al08_total} count"
+                    _row["status"] = ("CRITICAL" if _al08_total >= _crit
+                                      else "WARNING" if _al08_total >= _warn
+                                      else "NORMAL")
+                    _row["detail"] = (f"sum of {len(_inst_users)} instance(s); "
+                                      f"TH_USER_LIST read {_al08_read}")
+            if (payload.get("users") or 0) < _al08_total:
+                payload["users"] = _al08_total
+                payload.setdefault("fallback_sources", {})["users"] = {
+                    "source": "RFC \u00b7 per-instance (SMON/SMLG)", "age_minutes": 0}
 
         # Dispatcher / ICM / gateway state. TH_WPINFO answering at all proves
         # the dispatcher is serving requests -- we are talking to it.
@@ -2562,6 +2689,10 @@ def attach_snapshot_extras(payload: dict, snapshot: dict | None) -> dict:
             "status": hit.get("status", "UNKNOWN"),
             "source": label,
             "age_minutes": age_minutes,
+            # Finer grade than Status can express, set by the SMLG analyzer.
+            # Without it the wall can show a 2600 ms response as an ordinary
+            # red chip, indistinguishable from a 2100 ms one.
+            "alert_level": (hit.get("extra_data") or {}).get("alert_level"),
         }
 
     carry("response_time", "sap.smlg.response_time", "SAP GUI · SMLG")

@@ -4562,3 +4562,286 @@
 2026-09-14 17:50:43,149 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 6 system(s) still reading. Their cached values are held and they are left to finish in the background.
 2026-09-14 17:51:43,207 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
 2026-09-14 17:56:43,139 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 11:02:02,477 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-15 11:02:02,497 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-15 11:02:02,615 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-15 11:02:02,663 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-15 11:02:02,685 | INFO     | dashboard.app | Scheduler: profile 'prd-quick' is due (PRD, 4 T-code(s), -> ['whatsapp']).
+2026-09-15 11:02:03,152 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 11:02:03,171 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 11:02:03,190 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 11:02:03,197 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 11:02:03,198 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 11:02:03,201 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 11:19:14,378 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-15 11:19:14,406 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-15 11:19:14,430 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-15 11:19:14,458 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-15 11:19:23,234 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 11:24:41,373 | INFO     | dashboard.app | Stop requested from the dashboard. Finishing CARFOUR QAS then stopping. Automatic monitoring paused.
+2026-09-15 11:25:06,559 | INFO     | dashboard.app | Stop requested from the dashboard. Finishing CARFOUR QAS then stopping. Automatic monitoring paused.
+2026-09-15 11:25:21,339 | INFO     | dashboard.app | Stop requested from the dashboard. Finishing CARFOUR QAS then stopping. Automatic monitoring paused.
+2026-09-15 11:27:19,181 | INFO     | dashboard.app | Stop requested from the dashboard. Finishing PRD then stopping. Automatic monitoring paused.
+2026-09-15 11:27:49,071 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-15 11:27:49,091 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-15 11:27:49,103 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-15 11:27:49,121 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-15 11:27:56,375 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 11:41:49,459 | INFO     | dashboard.app | Stop requested from the dashboard. Finishing CENTOR_QAS then stopping. Automatic monitoring paused.
+2026-09-15 11:42:51,489 | INFO     | dashboard.app | Stop requested from the dashboard. Finishing PRD then stopping. Automatic monitoring paused.
+2026-09-15 11:47:39,974 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-15 11:47:39,976 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-15 11:47:40,028 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-15 11:47:40,046 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-15 11:47:47,312 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 12:32:25,247 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 12:49:26,068 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 12:50:26,067 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 14:19:46,997 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-15 14:19:47,011 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-15 14:19:47,035 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-15 14:19:47,057 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-15 14:19:47,068 | INFO     | dashboard.app | Scheduler: profile 'prd-quick' is due (PRD, 4 T-code(s), -> ['whatsapp']).
+2026-09-15 14:19:58,984 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 14:20:32,032 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 14:34:32,029 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 14:48:25,430 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-15 14:48:25,433 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-15 14:48:25,472 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-15 14:48:25,493 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-15 14:48:37,707 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 14:49:10,460 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 14:50:10,445 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 15:39:14,006 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-15 15:39:14,009 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-15 15:39:14,076 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-15 15:39:14,091 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-15 15:39:26,458 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-15 15:39:59,041 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 15:40:59,024 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 15:41:59,025 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-15 18:36:58,473 | WARNING  | dashboard.app | SLOW GET /api/incidents -> 5834 ms
+2026-09-15 18:38:31,047 | ERROR    | dashboard.app | RCA run failed for PS4: TimeoutError: Could not find connection 'PS4' in pad 'SAP Logon 770'. Entries present: none detected. Set the matching *_SAP_CONNECTION_NAME in .env (names are per-workstation and case-sensitive).
+2026-09-16 02:09:06,579 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 03:06:06,968 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 11:23:39,298 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 11:23:39,301 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 11:23:39,408 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 11:23:39,432 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 11:23:52,535 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 11:24:24,342 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 11:25:24,407 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 11:26:25,280 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 11:31:25,274 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 11:49:10,355 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 11:49:10,358 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 11:49:10,411 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 11:49:10,427 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 11:49:22,640 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 11:49:55,379 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 11:50:55,392 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 3 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 11:52:42,396 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 11:52:42,399 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 11:52:42,469 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 11:52:42,484 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 11:52:54,271 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 11:53:27,441 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 11:54:27,429 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 12:01:27,423 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 12:38:10,516 | ERROR    | dashboard.app | RCA run failed for CARFOUR QAS: TimeoutError: SAP login window did not appear within 30s. SAP windows considered -- 'SAP Logon 770': excluded (pad / splash / helper). Visible windows were: '.env - infrabeatops - Visual Studio Code', 'Battery Meter', 'BluetoothNotificationAreaIconWindowClass', 'Chat | Kalpesh Pawar | Microsoft Teams', 'CrossDeviceResumeWindow', 'DDE Server Window', 'DWM Notification Window', 'Default IME', 'DesktopWindowXamlSource', 'Documents - File Explorer', 'EXPLORER', 'FortiTray Daemon', 'FortiTray Desktop', 'GDI+ Window (Explorer.EXE)', 'GDI+ Window (TabTip.exe)', 'GDI+ Window (saplogon.exe)', 'InfraBeatOps Report - CARFOUR QAS - sarodevishal347@gmail.com - Gmail and 7 more pages - Profile 1 - Microsoft​ Edge', 'InfraBeatOps · Live Wall - [InPrivate] - Microsoft​ Edge', 'M', 'MS_WebcheckMonitor', 'Mail - Vishal Sarode - Outlook', 'Microsoft OneDrive Sync Service', 'Microsoft Teams', 'MiracastConnectionWindow', 'New tab - Profile 1 - Microsoft​ Edge', 'OneDrive - Personal', 'PopupHost', 'Program Manager', 'Progress', 'Rtc Video PnP Listener', 'SAP Logon 770', 'SecurityHealthSystray', 'Shell Handwriting Canvas', 'Sophos Connect', 'System tray overflow window.', 'Task Host Window', 'Task Switching', 'This is a DataTip :)', 'Widgets', 'Windows Input Experience', 'Windows Push Notifications Platform', 'ibops - File Explorer'. If a SAP window IS listed, add its title pattern to _LOGIN_TITLE_PATTERNS in sap_gui/connection.py. If none is listed, the desktop is probably locked or the RDP session is disconnected -- GUI scripting drives a real desktop and cannot run without one.
+2026-09-16 13:30:31,785 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 13:30:31,788 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 13:30:31,841 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 13:30:31,857 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 13:30:46,488 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 13:31:16,811 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:32:16,809 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:38:03,796 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 13:38:03,799 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 13:38:03,861 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 13:38:03,876 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 13:38:16,183 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 13:38:48,836 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:39:48,810 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:43:15,192 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 13:43:15,195 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 13:43:15,256 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 13:43:15,271 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 13:43:27,900 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 13:44:00,224 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:45:00,212 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:48:27,527 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 13:48:27,543 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 13:48:27,588 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 13:48:27,612 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 13:48:40,334 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 13:49:12,564 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:50:12,554 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:51:12,551 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:52:12,567 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:53:50,467 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 13:53:50,479 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 13:53:50,521 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 13:53:50,536 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 13:54:02,862 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 13:54:35,491 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:55:35,509 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:56:35,507 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:57:35,494 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:58:35,503 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 3 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 13:59:35,521 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:00:45,971 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 14:00:45,973 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 14:00:46,029 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 14:00:46,064 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 14:00:58,713 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 14:01:30,993 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:02:30,990 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:03:31,002 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:07:47,764 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 14:07:47,776 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 14:07:47,820 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 14:07:47,835 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 14:07:59,375 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 14:08:32,792 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:09:32,784 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:10:32,803 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:13:35,631 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 14:13:35,634 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 14:13:35,696 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 14:13:35,711 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 14:13:47,322 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 14:14:20,665 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:15:20,653 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:16:20,649 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:17:20,645 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 3 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:21:21,775 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 14:21:21,777 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 14:21:21,842 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 14:21:21,860 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 14:21:23,156 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 14:22:06,803 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:23:06,807 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:24:06,806 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:25:40,587 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 14:25:40,589 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 14:25:40,642 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 14:25:40,657 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 14:25:52,691 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 14:26:25,609 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:27:25,608 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:28:25,605 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:29:25,602 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:30:25,594 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:32:37,752 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-16 14:32:37,755 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-16 14:32:37,808 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-16 14:32:37,822 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-16 14:32:49,301 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-16 14:33:22,775 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:34:22,774 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:35:22,768 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:36:22,771 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:37:22,782 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 14:38:22,801 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 15:10:22,819 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 15:17:22,819 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 15:53:22,849 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 16:13:22,832 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 16:14:22,847 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 16:25:22,836 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 16:26:35,772 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 17:22:07,761 | ERROR    | dashboard.app | RCA run failed for CARFOUR QAS: TimeoutError: SAP login window did not appear within 30s. SAP windows considered -- 'SAP Logon 770': excluded (pad / splash / helper). Visible windows were: '.env - infrabeatops - Visual Studio Code', 'Battery Meter', 'BluetoothNotificationAreaIconWindowClass', 'Chat | Om Dighe | Microsoft Teams', 'CrossDeviceResumeWindow', 'DDE Server Window', 'DWM Notification Window', 'Default IME', 'DesktopWindowXamlSource', 'EXPLORER', 'FortiTray Daemon', 'FortiTray Desktop', 'GDI+ Window (Explorer.EXE)', 'GDI+ Window (TabTip.exe)', 'GDI+ Window (saplogon.exe)', 'IBOPS_Presentation.pptx and 1 more page - Profile 1 - Microsoft​ Edge', 'InfraBeatOps · Live Wall - [InPrivate] - Microsoft​ Edge', 'InnoSetupLdrWindow', 'M', 'MS_WebcheckMonitor', 'Microsoft OneDrive Sync Service', 'Microsoft Teams', 'MiracastConnectionWindow', 'OneDrive - Personal', 'Program Manager', 'Progress', 'Rtc Video PnP Listener', 'SAP Logon 770', 'SecurityHealthSystray', 'Shell Handwriting Canvas', 'Sophos Connect', 'System tray overflow window.', 'Task Host Window', 'Task Switching', 'This is a DataTip :)', 'Widgets', 'Windows Input Experience', 'Windows Push Notifications Platform'. If a SAP window IS listed, add its title pattern to _LOGIN_TITLE_PATTERNS in sap_gui/connection.py. If none is listed, the desktop is probably locked or the RDP session is disconnected -- GUI scripting drives a real desktop and cannot run without one.
+2026-09-16 17:57:58,831 | ERROR    | dashboard.app | RCA run failed for CARFOUR QAS: TimeoutError: SAP login window did not appear within 30s. SAP windows considered -- 'SAP Logon 770': excluded (pad / splash / helper). Visible windows were: '.env - infrabeatops - Visual Studio Code', 'Battery Meter', 'BluetoothNotificationAreaIconWindowClass', 'Chat | Om Dighe | Microsoft Teams', 'CrossDeviceResumeWindow', 'DDE Server Window', 'DWM Notification Window', 'Default IME', 'DesktopWindowXamlSource', 'EXPLORER', 'FortiTray Daemon', 'FortiTray Desktop', 'GDI+ Window (Explorer.EXE)', 'GDI+ Window (TabTip.exe)', 'GDI+ Window (saplogon.exe)', 'IBOPS_Presentation.pptx and 1 more page - Profile 1 - Microsoft​ Edge', 'InfraBeatOps · Live Wall - [InPrivate] - Microsoft​ Edge', 'InnoSetupLdrWindow', 'M', 'MS_WebcheckMonitor', 'Microsoft OneDrive Sync Service', 'Microsoft Teams', 'MiracastConnectionWindow', 'OneDrive - Personal', 'Program Manager', 'Progress', 'Rtc Video PnP Listener', 'SAP Logon 770', 'SecurityHealthSystray', 'Shell Handwriting Canvas', 'Sophos Connect', 'System tray overflow window.', 'Task Host Window', 'Task Switching', 'This is a DataTip :)', 'Widgets', 'Windows Input Experience', 'Windows Push Notifications Platform'. If a SAP window IS listed, add its title pattern to _LOGIN_TITLE_PATTERNS in sap_gui/connection.py. If none is listed, the desktop is probably locked or the RDP session is disconnected -- GUI scripting drives a real desktop and cannot run without one.
+2026-09-16 18:02:49,401 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 18:21:49,406 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 18:46:09,660 | ERROR    | dashboard.app | RCA run failed for CARFOUR QAS: TimeoutError: SAP login window did not appear within 30s. SAP windows considered -- 'SAP Logon 770': excluded (pad / splash / helper). Visible windows were: '.env - infrabeatops - Visual Studio Code', 'Battery Meter', 'BluetoothNotificationAreaIconWindowClass', 'Chat | Om Dighe | Microsoft Teams', 'CrossDeviceResumeWindow', 'DDE Server Window', 'DWM Notification Window', 'Default IME', 'DesktopWindowXamlSource', 'EXPLORER', 'FortiTray Daemon', 'FortiTray Desktop', 'GDI+ Window (Explorer.EXE)', 'GDI+ Window (TabTip.exe)', 'GDI+ Window (saplogon.exe)', 'IBOPS_Presentation.pptx and 1 more page - Profile 1 - Microsoft​ Edge', 'InfraBeatOps · Live Wall - [InPrivate] - Microsoft​ Edge', 'InnoSetupLdrWindow', 'M', 'MS_WebcheckMonitor', 'Microsoft OneDrive Sync Service', 'Microsoft Teams', 'MiracastConnectionWindow', 'OneDrive - Personal', 'Program Manager', 'Progress', 'Rtc Video PnP Listener', 'SAP Logon 770', 'SecurityHealthSystray', 'Shell Handwriting Canvas', 'Sophos Connect', 'System tray overflow window.', 'Task Host Window', 'Task Switching', 'This is a DataTip :)', 'Widgets', 'Windows Input Experience', 'Windows Push Notifications Platform'. If a SAP window IS listed, add its title pattern to _LOGIN_TITLE_PATTERNS in sap_gui/connection.py. If none is listed, the desktop is probably locked or the RDP session is disconnected -- GUI scripting drives a real desktop and cannot run without one.
+2026-09-16 22:47:59,134 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-16 23:44:59,208 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 01:37:59,253 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 04:28:00,726 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 06:23:00,732 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 07:19:00,786 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 14:43:39,591 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-17 14:43:39,593 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-17 14:43:39,698 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-17 14:43:39,722 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-17 14:43:46,748 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-17 14:46:33,430 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 14:47:28,619 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 14:48:28,618 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 14:49:28,874 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 14:51:28,614 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 3 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 16:21:32,227 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-17 16:21:32,232 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-17 16:21:32,289 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-17 16:21:32,310 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-17 16:21:39,263 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-17 16:24:17,250 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 16:25:28,322 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 16:26:28,320 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 16:29:51,673 | INFO     | dashboard.app | Stop requested from the dashboard. Finishing CARFOUR QAS then stopping. Automatic monitoring paused.
+2026-09-17 16:30:16,352 | INFO     | dashboard.app | Stop requested from the dashboard. Finishing CARFOUR QAS then stopping. Automatic monitoring paused.
+2026-09-17 17:15:32,870 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-17 17:15:32,874 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-17 17:15:32,940 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-17 17:15:32,959 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-17 17:15:40,384 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-17 17:17:17,887 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 17:18:28,089 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 17:19:17,922 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-17 17:41:17,979 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 10:46:28,495 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-18 10:46:28,499 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-18 10:46:28,602 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-18 10:46:28,647 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-18 10:46:36,726 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-18 10:48:13,511 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 10:49:13,512 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 10:50:23,157 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:09:47,273 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-18 11:09:47,278 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-18 11:09:47,336 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-18 11:09:47,360 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-18 11:09:54,208 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-18 11:12:32,294 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:13:35,831 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:14:35,826 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 3 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:15:35,831 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:31:45,193 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-18 11:31:45,198 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-18 11:31:45,255 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-18 11:31:45,277 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-18 11:31:57,970 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-18 11:32:30,221 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:33:30,220 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:34:33,308 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:35:30,208 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:36:30,228 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:37:37,960 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 11:58:51,240 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-18 11:58:51,245 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-18 11:58:51,300 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-18 11:58:51,322 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-18 11:59:02,912 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-18 11:59:36,259 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:00:36,256 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:01:47,685 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:02:47,680 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:03:48,239 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:04:54,317 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:05:54,322 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:06:54,310 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 1 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:15:12,369 | INFO     | dashboard.app | Scheduler started -- runs only what the Profiles page schedules.
+2026-09-18 12:15:12,375 | INFO     | dashboard.app | Live refresher started -- background RFC reads every 60s (pass ceiling 45s); HTTP requests never call RFC directly.
+2026-09-18 12:15:12,439 | INFO     | dashboard.app | Scheduler: no run on startup.
+2026-09-18 12:15:12,464 | INFO     | dashboard.app | Scheduler: profile-driven. prd-quick (PRD -> whatsapp); prd-full (PRD -> email)
+2026-09-18 12:15:57,398 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:15:57,883 | INFO     | dashboard.app | Performance RCA enabled: sap.st03.dialog_resp_ms > 1500 ms for 2 polls, cooldown 30 min, preempt=True
+2026-09-18 12:16:57,389 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:17:57,380 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:19:17,222 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:20:03,238 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:21:03,239 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 4 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:22:15,253 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 3 system(s) still reading. Their cached values are held and they are left to finish in the background.
+2026-09-18 12:23:03,239 | WARNING  | dashboard.app | Live refresh pass hit the 45s ceiling with 2 system(s) still reading. Their cached values are held and they are left to finish in the background.

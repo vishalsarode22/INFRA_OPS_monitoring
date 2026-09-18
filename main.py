@@ -38,7 +38,7 @@ from sap_gui.launcher import kill_sap_processes, launch_saplogon, select_connect
 from sap_gui.connection import login
 from sap_gui.scripting_connection import get_scripting_session
 from core.orchestrator import run_monitoring_cycle
-from core.tcode_metrics import normalize_tcode_results
+from core.tcode_metrics import normalize_tcode_results, merge_normalized_metrics
 from core.event_engine import EventEngine
 from core.correlation import CorrelationEngine
 from evaluation.threshold_engine import evaluate_all
@@ -56,7 +56,7 @@ from utils.logger import get_logger
 
 log = get_logger(__name__, "application")
 
-TEMPLATE_PATH = "config/templates/MetroBrands_template.xlsx"
+TEMPLATE_PATH = "config/templates/InfraBeatOps_Simple_Monitoring_Sheet.xlsx"
 
 
 from reporting.system_paths import system_pdf_path, system_excel_path, system_template_path
@@ -115,7 +115,16 @@ def run_full_pipeline(system: str, client: str):
 
     # Finalize the complete result only after both OS and SAP GUI evidence are available.
     thresholds = get_thresholds()
-    result.metrics.extend(normalize_tcode_results(gui_results))
+    # One row per metric name. The GUI collector reuses the RFC collector's
+    # metric names on purpose, so a bare extend() published every shared
+    # metric twice -- a real report showed sap.sm12.lock_count as both
+    # "2 count" and "3 count" in adjacent rows. See
+    # core.tcode_metrics.merge_normalized_metrics for the reconciliation rule.
+    result.metrics, _metric_conflicts = merge_normalized_metrics(
+        result.metrics, normalize_tcode_results(gui_results)
+    )
+    for _note in _metric_conflicts:
+        log.info(f"[{result.system}] metric reconciled -- {_note}")
     result.metrics = evaluate_all(result.metrics, thresholds)
     result.compute_overall_status()
     result.events = EventEngine(result.system, result.client).process_metrics(result.metrics)
@@ -509,7 +518,16 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
 
     # Finalize only after OS and GUI collectors have both contributed.
     thresholds = get_thresholds()
-    result.metrics.extend(normalize_tcode_results(gui_results))
+    # One row per metric name. The GUI collector reuses the RFC collector's
+    # metric names on purpose, so a bare extend() published every shared
+    # metric twice -- a real report showed sap.sm12.lock_count as both
+    # "2 count" and "3 count" in adjacent rows. See
+    # core.tcode_metrics.merge_normalized_metrics for the reconciliation rule.
+    result.metrics, _metric_conflicts = merge_normalized_metrics(
+        result.metrics, normalize_tcode_results(gui_results)
+    )
+    for _note in _metric_conflicts:
+        log.info(f"[{result.system}] metric reconciled -- {_note}")
     result.metrics = evaluate_all(result.metrics, thresholds)
     result.compute_overall_status()
     result.events = EventEngine(result.system, result.client).process_metrics(result.metrics)

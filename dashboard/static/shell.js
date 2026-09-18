@@ -23,8 +23,16 @@ const IB = {
     return IB.esc(n) + IB.esc(suffix);
   },
 
-  statusClass(s) {
-    return "c-" + String(s || "UNKNOWN").toLowerCase().replace(/[^a-z]/g, "");
+  /* Base chip class from a Status value, plus an optional finer grade.
+
+     `alertLevel` is the extra severity a metric can carry beside its
+     Status (see sap_gui/smlg_analyzer.py): Status has only four members
+     and much of the pipeline switches on it, so "critical, and flashing"
+     rides alongside rather than inside it. Passing it is optional -- every
+     existing call site keeps its current behaviour. */
+  statusClass(s, alertLevel) {
+    const base = "c-" + String(s || "UNKNOWN").toLowerCase().replace(/[^a-z]/g, "");
+    return alertLevel === "critical_flashing" ? base + " c-flash" : base;
   },
 
   /* Collector provenance badge. `stale` is its own state: a two-hour-old

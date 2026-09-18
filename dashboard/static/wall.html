@@ -328,10 +328,17 @@ function instances(list) {
       // Never render an unmeasured instance as 0 ms -- an instance nothing has
       // measured is not a fast instance. The tooltip names what would make it
       // measurable, so "not measured" is a next step rather than a dead end.
+      // Changed on request (16 Sep 2026): show "idle" here too rather than
+      // "not measured". This branch used to mean "no source could ever
+      // measure this instance" as distinct from the response_note branch
+      // above ("a source measured it and found nothing") -- but from the
+      // wall the two look identical, and the distinction was getting lost
+      // whenever a backend edge case produced this branch instead of the
+      // other one. The full explanation stays in the tooltip.
       return '<span style="color:var(--muted-dim)" title="No RFC source has ' +
              'a response time for this instance. RZLLITAB only measures users ' +
              'who connect via a logon group; ST03 workload needs stat/level ' +
-             'enabled in RZ11; the STAT read found no dialog steps.">not measured</span>';
+             'enabled in RZ11; the STAT read found no dialog steps.">idle</span>';
     }
     const ms = i.response_ms;
     // A sparse-sample or daily-aggregate STAT figure is informational, not a
@@ -455,7 +462,6 @@ function card(s) {
     </div>
     <div id="morePanel-${IB.esc(s.system)}" style="display:none">
       ${checks(s.checks, s.check_source, s.check_error)}
-      ${smonPanel(s.smon)}
     </div>
     ${err}
 

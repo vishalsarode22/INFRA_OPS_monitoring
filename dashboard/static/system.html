@@ -131,7 +131,7 @@ function allRfcTable(rows) {
         <td>${IB.esc(m.metric)}<div style="font-family:system-ui;color:var(--muted-dim);font-size:11px">${IB.esc(m.label)}</div></td>
         <td class="mono">${IB.esc(m.tcode)}</td>
         <td class="mono">${IB.esc(m.display_value)}${thr}</td>
-        <td><span class="chip ${IB.statusClass(m.status)}">${IB.esc(m.status)}</span></td>
+        <td><span class="chip ${IB.statusClass(m.status, (m.extra||{}).alert_level)}">${IB.esc(m.status)}</span></td>
         <td style="color:var(--muted-dim);font-size:11.5px">${IB.esc(m.detail||"")}
           ${hasExtra ? `<details class="xd"><summary>data</summary><pre class="xtra">${IB.esc(JSON.stringify(m.extra, null, 1))}</pre></details>` : ""}</td>
         <td class="mono" style="font-size:10.5px;color:var(--muted-dim)">${IB.esc(m.collector||"")}<br>${IB.esc(m.read_at||"")}</td>
@@ -231,9 +231,11 @@ ${(s.perf && s.perf.error && !(s.perf.metrics||[]).length)
                        '<span class="src src-rfc">LIVE</span>'
                      : IB.val(null)}</b></div>
               <div><div class="lbl" style="font-size:9.5px;color:var(--muted-dim)">DIALOG RESPONSE (SMLG)</div>
-                <b>${s.response_time ? IB.esc(s.response_time.value) + " " +
-                    IB.srcBadge(s.response_time.source, s.response_time.age_minutes)
-                    : IB.val(null)}</b></div>
+                <b>${s.response_time
+                     ? `<span class="chip ${IB.statusClass(s.response_time.status, s.response_time.alert_level)}">`
+                       + IB.esc(s.response_time.value) + `</span> `
+                       + IB.srcBadge(s.response_time.source, s.response_time.age_minutes)
+                     : IB.val(null)}</b></div>
             </div>
           </div>
         </div>
@@ -259,7 +261,7 @@ async function loadMetrics() {
       <table class="mtable"><tr><th>Metric</th><th>Value</th><th>Status</th><th>Detail</th></tr>
       ${(d.metrics||[]).map(m=>`<tr><td>${IB.esc(m.name)}</td>
         <td class="mono">${IB.esc(m.display_value)}</td>
-        <td><span class="chip ${IB.statusClass(m.status)}">${IB.esc(m.status)}</span></td>
+        <td><span class="chip ${IB.statusClass(m.status, (m.extra_data||{}).alert_level)}">${IB.esc(m.status)}</span></td>
         <td style="color:var(--muted-dim);font-size:11.5px">${IB.esc(m.detail||"")}</td></tr>`).join("")}
       </table></div>`;
   } catch (e) { el.innerHTML = `<div class="banner banner-err">${IB.esc(e.message)}</div>`; }

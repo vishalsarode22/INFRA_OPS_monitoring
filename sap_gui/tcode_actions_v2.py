@@ -17,6 +17,48 @@ from utils.logger import get_logger
 log = get_logger(__name__, "application")
 
 
+def _press_labelled_toolbar_button(session, *needle_groups):
+    """
+    Press a toolbar button identified by its visible text/tooltip.
+
+    SAP GUI toolbar button IDs (btn[5], btn[8] ...) shift between patch
+    levels and themes, so matching on the label is far more durable than
+    hard-coding an index -- action_sm50 already does this inline, and this
+    is that idiom made reusable. Each needle group is a tuple of lowercase
+    substrings that must ALL appear in one button's tooltip, text or name.
+    Returns True if a button was pressed.
+    """
+    for toolbar_id in ("wnd[0]/tbar[1]", "wnd[0]/tbar[0]"):
+        try:
+            toolbar = session.findById(toolbar_id)
+            child_count = int(toolbar.Children.Count)
+        except Exception:
+            continue
+
+        for index in range(child_count):
+            try:
+                obj = toolbar.Children(index)
+                label = " ".join([
+                    str(getattr(obj, "Tooltip", "") or ""),
+                    str(getattr(obj, "Text", "") or ""),
+                    str(getattr(obj, "Name", "") or ""),
+                ]).lower()
+            except Exception:
+                continue
+
+            for needles in needle_groups:
+                if all(n in label for n in needles):
+                    try:
+                        obj.press()
+                        log.info("Pressed toolbar button '%s' in %s",
+                                 label.strip(), toolbar_id)
+                        return True
+                    except Exception as exc:
+                        log.debug("Toolbar button press failed (%s): %s",
+                                  label.strip(), exc)
+    return False
+
+
 def _optional(session, wnd_id: str, fn, description: str = ""):
     try:
         obj = session.findById(wnd_id)
@@ -113,7 +155,11 @@ def action_al08(session, capture):
         log.warning(
             "AL08: native GridView not found."
         )
-        return result
+        # See sap_gui/tcode_actions.py action_al08 for why this must be {}
+        # and not `result`: the zero-filled placeholder is indistinguishable
+        # from a genuine zero-sessions reading downstream, and suppresses
+        # the OCR fallback that would otherwise recover the real figures.
+        return {}
 
     # ---------------------------------------------------------
     # Get column names
@@ -3153,6 +3199,23 @@ def action_sm66(session, capture):
     """
     goto_tcode(session, "SM66")
     wait_until_not_busy(session)
+
+    # SM66 opens on the "all work processes" list, where every row on a
+    # healthy system reads "Waiting". Extracting from that screen is why
+    # running_processes has always come back 0 while visible_process_rows
+    # came back 32, and why the screenshot evidence shows a wall of idle
+    # processes rather than the work actually in flight. Press "Active Work
+    # Processes" first so both the counts and the captured screen describe
+    # the processes that are doing something. action_sm50 already does this;
+    # SM66 never got it.
+    if _press_labelled_toolbar_button(session, ("active", "process")):
+        wait_until_not_busy(session)
+        time.sleep(0.5)
+    else:
+        log.warning(
+            "SM66: 'Active Work Processes' toolbar action not found; "
+            "capturing the default all-processes view instead."
+        )
 
     grid_id = (
         "wnd[0]/usr/cntlGRID1/shellcont/shell/"
