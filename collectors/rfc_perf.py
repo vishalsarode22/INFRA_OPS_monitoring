@@ -145,6 +145,29 @@ def _s(raw, n=40):
 
 def _metric(name, value, unit, category, tcode, detail="", display=None, extra=None, status=None):
     warn, crit = _thresholds_for(name)
+
+    # A null value is a deliberate state, not a failure. The idle branch in
+    # build_metrics publishes sap.st03.dialog_resp_ms with no figure when a
+    # window contains zero dialog steps, because "we looked and there was
+    # nothing to measure" is a different claim from "we could not read
+    # this", and _grade already returns UNKNOWN for None.
+    #
+    # The formatting and the float() below both assumed a number, so that
+    # deliberate path raised TypeError and took the ENTIRE perf read down
+    # with it. That is the "live perf read failed: unsupported format
+    # string passed to NoneType.__format__" line repeating in the logs for
+    # every idle system, once per refresh -- the metrics that WERE read
+    # successfully in that pass were discarded along with it.
+    if value is None:
+        return MetricResult(
+            name=name, value=None, display_value=display or "not measured",
+            status=status or Status.UNKNOWN,
+            threshold_warning=warn, threshold_critical=crit,
+            source="rfc_perf", tcode=tcode, detail=detail, category=category,
+            unit=unit,
+            extra_data={"collector": "RFC_PERF", **(extra or {})},
+        )
+
     if display is None:
         display = f"{value:.1f}{unit}" if unit == "%" else f"{value:.0f} {unit}"
     return MetricResult(
@@ -445,6 +468,11 @@ def response_summary(recs: list[dict], system: str = "", read_note: str = "") ->
         return None
 
     def ms(r, *keys):
+        """
+        Sum several STAD time fields. The result is in whatever unit the
+        record uses (microseconds on this release) -- despite the name,
+        this converts nothing. The caller converts.
+        """
         return sum((_num(r.get(k)) or 0) for k in keys)
 
     # per_user holds every step's response, not a running total. A sum tells
@@ -467,6 +495,20 @@ def response_summary(recs: list[dict], system: str = "", read_note: str = "") ->
             db = _num(r.get("DBTIME")) or 0
         else:
             db = ms(r, "READDIRTI", "READSEQTI", "CHNGTI")
+
+        # The DB times come from the SAME STAD record as RESPTI, so they
+        # carry the same unit and need the same conversion. None of the
+        # three branches above did it, so every DB figure was published a
+        # thousand times too large: a report that spent 0.8s in the
+        # database was reported as 836,044 ms, and sap.st03.db_time_pct --
+        # a percentage -- reached 20,142%. Both crossed their CRITICAL
+        # thresholds and drove the whole report's severity, so this one
+        # missing division was manufacturing critical alerts on a system
+        # whose real DB share was around 20%.
+        #
+        # The same inflation was found and fixed for RESPTI earlier; these
+        # fields were missed in that pass.
+        db = db / 1000
         per_inst[r["_instance"]].append(resp)
         rep = _s(r.get("REPORT"), 40)
         if rep:

@@ -23697,3 +23697,303 @@ pywintypes.com_error: (-2147417848, 'The object invoked has disconnected from it
 2026-09-18 12:27:18,517 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
 2026-09-18 12:27:18,544 | WARNING  | collectors.rfc_live | [PRD] live perf read failed: TypeError: unsupported format string passed to NoneType.__format__
 2026-09-18 12:28:13,501 | INFO     | collectors.rfc_live | [PS4] perf block refreshed in background (11 metrics)
+2026-09-18 12:50:32,773 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:32,773 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:32,773 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:32,773 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:32,871 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:32,871 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:32,871 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:32,871 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:33,033 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:33,037 | INFO     | collectors.rfc_perf | [PRD] 1 STAT records, 0 dialog steps in the window (task mix: RFC) -- no GUI activity, metric left absent
+2026-09-18 12:50:33,037 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 12:50:33,209 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:33,209 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:33,209 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:33,342 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:33,344 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:33,345 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:33,345 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:33,411 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:33,411 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:33,411 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:33,411 | INFO     | collectors.rfc_perf | [PRD] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 12:50:33,414 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:33,415 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:33,416 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:33,485 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:33,485 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:33,486 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:33,486 | WARNING  | collectors.rfc_perf | [PRD] SQLMD present but essential columns not matched. Have: ['SOMETHING', 'ELSE']. Looked for program in ['PROGNAME', 'PROGRAM_NAME', 'PROGRAM', 'ENTRY_PROGRAM'] and time in ['DBSUM', 'TOTAL_DB_TIME', 'TOTAL_TIME', 'SUM_TIME'].
+2026-09-18 12:50:33,487 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:33,487 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:33,489 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:33,489 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:33,491 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:33,491 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:33,491 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:33,492 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:33,493 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:33,493 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:33,593 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:33,593 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:33,594 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:33,691 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:33,694 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (instance not identified in frames)
+2026-09-18 12:50:33,694 | INFO     | collectors.rfc_perf | [PRD] response time: STAT records unavailable, using ST03N aggregates
+2026-09-18 12:50:33,790 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:33,792 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:33,792 | INFO     | collectors.rfc_perf | [PRD] response time: instance not identified in frames
+2026-09-18 12:50:33,793 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:33,859 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:33,965 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:34,037 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:34,039 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (instance not identified in frames)
+2026-09-18 12:50:34,040 | INFO     | collectors.rfc_perf | [PRD] response time: STAT records unavailable, using ST03N aggregates
+2026-09-18 12:50:34,141 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:34,144 | INFO     | collectors.rfc_perf | [PRD] 1 STAT records, 0 dialog steps in the window (task mix: BTC) -- no GUI activity, metric left absent
+2026-09-18 12:50:34,144 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 12:50:34,249 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:34,250 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:34,250 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:34,349 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:50:34,351 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:34,351 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:34,352 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:50:34,352 | WARNING  | collectors.rfc_perf | [PRD] lock owner stamps run 330 min ahead of SAP system time -- OS time zone on the app server differs from the SAP time zone. Ages corrected; tell Basis.
+2026-09-18 12:50:34,451 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:50:34,452 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:50:34,452 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,054 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,054 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,054 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,055 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:26,154 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,154 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,155 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,155 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:26,317 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:26,321 | INFO     | collectors.rfc_perf | [PRD] 1 STAT records, 0 dialog steps in the window (task mix: RFC) -- no GUI activity, metric left absent
+2026-09-18 12:51:26,321 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 12:51:26,505 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,506 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,506 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,614 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:26,616 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,616 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,616 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,698 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,698 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,699 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,699 | INFO     | collectors.rfc_perf | [PRD] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 12:51:26,701 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,702 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,702 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,769 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,769 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,770 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,770 | WARNING  | collectors.rfc_perf | [PRD] SQLMD present but essential columns not matched. Have: ['SOMETHING', 'ELSE']. Looked for program in ['PROGNAME', 'PROGRAM_NAME', 'PROGRAM', 'ENTRY_PROGRAM'] and time in ['DBSUM', 'TOTAL_DB_TIME', 'TOTAL_TIME', 'SUM_TIME'].
+2026-09-18 12:51:26,772 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,772 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,772 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,772 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:26,774 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,774 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,775 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,777 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,777 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,777 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,877 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:26,878 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:26,878 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:26,977 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:26,979 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (instance not identified in frames)
+2026-09-18 12:51:26,979 | INFO     | collectors.rfc_perf | [PRD] response time: STAT records unavailable, using ST03N aggregates
+2026-09-18 12:51:27,078 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:27,080 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:27,080 | INFO     | collectors.rfc_perf | [PRD] response time: instance not identified in frames
+2026-09-18 12:51:27,081 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:27,149 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:27,221 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:27,289 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:27,292 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (instance not identified in frames)
+2026-09-18 12:51:27,292 | INFO     | collectors.rfc_perf | [PRD] response time: STAT records unavailable, using ST03N aggregates
+2026-09-18 12:51:27,391 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:27,393 | INFO     | collectors.rfc_perf | [PRD] 1 STAT records, 0 dialog steps in the window (task mix: BTC) -- no GUI activity, metric left absent
+2026-09-18 12:51:27,393 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 12:51:27,499 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:27,499 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:27,500 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:27,602 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:27,605 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:27,605 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:27,605 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:27,606 | WARNING  | collectors.rfc_perf | [PRD] lock owner stamps run 330 min ahead of SAP system time -- OS time zone on the app server differs from the SAP time zone. Ages corrected; tell Basis.
+2026-09-18 12:51:27,708 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:27,708 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:27,709 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:32,252 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:32,253 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:32,253 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:32,253 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:32,352 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:32,353 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:32,353 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:32,353 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:32,516 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:32,520 | INFO     | collectors.rfc_perf | [PRD] 1 STAT records, 0 dialog steps in the window (task mix: RFC) -- no GUI activity, metric left absent
+2026-09-18 12:51:32,520 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 12:51:32,697 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:32,697 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:32,698 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:32,799 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:32,801 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:32,801 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:32,801 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:32,881 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:32,881 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:32,881 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:32,882 | INFO     | collectors.rfc_perf | [PRD] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 12:51:32,884 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:32,884 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:32,885 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:32,951 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:32,952 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:32,952 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:32,952 | WARNING  | collectors.rfc_perf | [PRD] SQLMD present but essential columns not matched. Have: ['SOMETHING', 'ELSE']. Looked for program in ['PROGNAME', 'PROGRAM_NAME', 'PROGRAM', 'ENTRY_PROGRAM'] and time in ['DBSUM', 'TOTAL_DB_TIME', 'TOTAL_TIME', 'SUM_TIME'].
+2026-09-18 12:51:32,954 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:32,954 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:32,955 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:32,955 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:32,956 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:32,957 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:32,957 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:32,959 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:32,959 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:32,959 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:33,062 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:33,062 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:33,063 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:33,165 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:33,167 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (instance not identified in frames)
+2026-09-18 12:51:33,168 | INFO     | collectors.rfc_perf | [PRD] response time: STAT records unavailable, using ST03N aggregates
+2026-09-18 12:51:33,274 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:33,277 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:33,277 | INFO     | collectors.rfc_perf | [PRD] response time: instance not identified in frames
+2026-09-18 12:51:33,278 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:33,345 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:33,412 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:33,484 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:33,486 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (instance not identified in frames)
+2026-09-18 12:51:33,487 | INFO     | collectors.rfc_perf | [PRD] response time: STAT records unavailable, using ST03N aggregates
+2026-09-18 12:51:33,584 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:33,587 | INFO     | collectors.rfc_perf | [PRD] 1 STAT records, 0 dialog steps in the window (task mix: BTC) -- no GUI activity, metric left absent
+2026-09-18 12:51:33,587 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 12:51:33,686 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:33,686 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:33,686 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:33,782 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 12:51:33,784 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:33,785 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:33,785 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 12:51:33,785 | WARNING  | collectors.rfc_perf | [PRD] lock owner stamps run 330 min ahead of SAP system time -- OS time zone on the app server differs from the SAP time zone. Ages corrected; tell Basis.
+2026-09-18 12:51:33,882 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 12:51:33,883 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 12:51:33,883 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:25,629 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:25,630 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:25,630 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:25,630 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:25,732 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:25,732 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:25,732 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:25,732 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:25,897 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:25,901 | INFO     | collectors.rfc_perf | [PRD] 1 STAT records, 0 dialog steps in the window (task mix: RFC) -- no GUI activity, metric left absent
+2026-09-18 13:55:25,901 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 13:55:25,918 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:25,921 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:25,922 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:25,922 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:26,024 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:26,027 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:26,027 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:26,027 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:26,100 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:26,101 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:26,101 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:26,101 | INFO     | collectors.rfc_perf | [PRD] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 13:55:26,104 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:26,104 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:26,105 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:26,174 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:26,175 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:26,175 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:26,175 | WARNING  | collectors.rfc_perf | [PRD] SQLMD present but essential columns not matched. Have: ['SOMETHING', 'ELSE']. Looked for program in ['PROGNAME', 'PROGRAM_NAME', 'PROGRAM', 'ENTRY_PROGRAM'] and time in ['DBSUM', 'TOTAL_DB_TIME', 'TOTAL_TIME', 'SUM_TIME'].
+2026-09-18 13:55:26,176 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:26,177 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:26,177 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:26,177 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:26,179 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:26,179 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:26,179 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:26,181 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:26,181 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:26,181 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:26,284 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:26,285 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:26,285 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:26,386 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:26,389 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (instance not identified in frames)
+2026-09-18 13:55:26,389 | INFO     | collectors.rfc_perf | [PRD] response time: STAT records unavailable, using ST03N aggregates
+2026-09-18 13:55:26,489 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:26,492 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:26,492 | INFO     | collectors.rfc_perf | [PRD] response time: instance not identified in frames
+2026-09-18 13:55:26,492 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:26,561 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:26,631 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:26,702 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:26,705 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (instance not identified in frames)
+2026-09-18 13:55:26,705 | INFO     | collectors.rfc_perf | [PRD] response time: STAT records unavailable, using ST03N aggregates
+2026-09-18 13:55:26,811 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:26,813 | INFO     | collectors.rfc_perf | [PRD] 1 STAT records, 0 dialog steps in the window (task mix: BTC) -- no GUI activity, metric left absent
+2026-09-18 13:55:26,813 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 13:55:26,933 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:26,935 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:26,935 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:26,936 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:27,038 | INFO     | collectors.rfc_perf | [PRD] SQLMD: no field info returned -- table absent or not readable
+2026-09-18 13:55:27,040 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:27,041 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:27,041 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:55:27,041 | WARNING  | collectors.rfc_perf | [PRD] lock owner stamps run 330 min ahead of SAP system time -- OS time zone on the app server differs from the SAP time zone. Ages corrected; tell Basis.
+2026-09-18 13:55:27,146 | INFO     | collectors.rfc_perf | [PRD] STAT read returned 0 records in the last 5 minutes (SWNC_GET_STATRECS_FRAME not callable)
+2026-09-18 13:55:27,146 | INFO     | collectors.rfc_perf | [PRD] response time: no dialog steps in the last 5 min and no ST03N aggregate -- metric left absent (system idle or collector off)
+2026-09-18 13:55:27,146 | INFO     | collectors.rfc_perf | [PRD] response time: SWNC_GET_STATRECS_FRAME not callable
+2026-09-18 13:56:08,940 | INFO     | collectors.ccms_os | [PRD] CCMS OS monitor 'Operating System': matched cpu=1, load_5m=1, mem_free=4, mem_free_inc=1, mem_total=2, swap_free=1
+2026-09-18 13:56:09,345 | INFO     | collectors.ccms_os | [CENTOR_QAS] CCMS OS monitor 'Operating System': matched cpu=1, load_5m=1, mem_free=4, mem_free_inc=1, mem_total=2, swap_free=1
+2026-09-18 13:56:11,589 | INFO     | collectors.rfc_perf | [PRD] 95 STAT records, 0 dialog steps in the window (task mix: 0x12, 0xb, 0xe, AUTOABAP, BTC, BUF.SYNC, OTHER, SPOOL) -- no GUI activity, metric left absent
+2026-09-18 13:56:11,589 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 13:56:11,689 | WARNING  | collectors.rfc_perf | [PRD] lock owner stamps run 315 min ahead of SAP system time -- OS time zone on the app server differs from the SAP time zone. Ages corrected; tell Basis.
+2026-09-18 13:56:12,030 | INFO     | collectors.rfc_perf | [PRD] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 13:56:13,672 | INFO     | collectors.rfc_perf | [CENTOR_QAS] 39 STAT records, 0 dialog steps in the window (task mix: 0x12, 0xb, 0xe, 0xf, AUTOABAP, BTC, BUF.SYNC, SPOOL) -- no GUI activity, metric left absent
+2026-09-18 13:56:13,673 | INFO     | collectors.rfc_perf | [CENTOR_QAS] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 13:56:14,196 | INFO     | collectors.rfc_perf | [CENTOR_QAS] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 13:56:16,340 | INFO     | collectors.ccms_os | [CARFOUR QAS] CCMS OS monitor 'Operating System': matched cpu=1, load_5m=1, mem_free=6, mem_free_inc=1, mem_total=4, swap_free=1
+2026-09-18 13:56:30,356 | INFO     | collectors.rfc_perf | [CARFOUR QAS] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 13:56:45,178 | INFO     | collectors.ccms_os | [PS4] CCMS OS monitor 'Operating System': matched cpu=2, load_5m=2, mem_free=8, mem_free_inc=2, mem_total=6, swap_free=2
+2026-09-18 13:57:11,122 | INFO     | collectors.ccms_os | [CENTOR_QAS] CCMS OS monitor 'Operating System': matched cpu=1, load_5m=1, mem_free=4, mem_free_inc=1, mem_total=2, swap_free=1
+2026-09-18 13:57:13,265 | INFO     | collectors.rfc_perf | [PS4] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 13:57:15,416 | INFO     | collectors.rfc_perf | [CENTOR_QAS] 39 STAT records, 0 dialog steps in the window (task mix: 0x12, 0xb, 0xe, 0xf, AUTOABAP, BTC, BUF.SYNC, OTHER, SPOOL) -- no GUI activity, metric left absent
+2026-09-18 13:57:15,417 | INFO     | collectors.rfc_perf | [CENTOR_QAS] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 13:57:15,919 | INFO     | collectors.rfc_perf | [CENTOR_QAS] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 13:57:21,454 | INFO     | collectors.ccms_os | [PRD] CCMS OS monitor 'Operating System': matched cpu=1, load_5m=1, mem_free=4, mem_free_inc=1, mem_total=2, swap_free=1
+2026-09-18 13:57:24,249 | INFO     | collectors.rfc_perf | [PRD] 94 STAT records, 0 dialog steps in the window (task mix: 0x12, 0x21, 0xb, 0xe, AUTOABAP, BTC, BUF.SYNC, OTHER, SPOOL) -- no GUI activity, metric left absent
+2026-09-18 13:57:24,249 | INFO     | collectors.rfc_perf | [PRD] response time: idle -- 0 dialog steps in the last 5 min, not falling back to the daily aggregate
+2026-09-18 13:57:24,311 | WARNING  | collectors.rfc_perf | [PRD] lock owner stamps run 315 min ahead of SAP system time -- OS time zone on the app server differs from the SAP time zone. Ages corrected; tell Basis.
+2026-09-18 13:57:24,602 | INFO     | collectors.rfc_perf | [PRD] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 13:57:29,303 | INFO     | collectors.ccms_os | [CARFOUR QAS] CCMS OS monitor 'Operating System': matched cpu=1, load_5m=1, mem_free=6, mem_free_inc=1, mem_total=4, swap_free=1
+2026-09-18 13:57:45,255 | INFO     | collectors.rfc_perf | [CARFOUR QAS] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.
+2026-09-18 13:57:46,689 | INFO     | collectors.ccms_os | [PS4] CCMS OS monitor 'Operating System': matched cpu=2, load_5m=2, mem_free=8, mem_free_inc=2, mem_total=6, swap_free=2
+2026-09-18 13:58:17,845 | INFO     | collectors.rfc_perf | [PS4] SQLMD readable but 0 rows matched DDATE >= '20260911' -- SQL Monitor (transaction SQLM) is not activated on this system. Skipping this read until restart or a manual refresh.

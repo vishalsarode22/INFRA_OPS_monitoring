@@ -123,6 +123,14 @@ def _rec(tasktype, resp_ms, user, maxbytes=0, priv=b"\x00", db=None, report="", 
     1000x inflation bug and began failing when it was fixed. Converting here
     keeps every call site and assertion readable in ms.
 
+    The DB fields are scaled the same way, and for the same reason. They
+    come from the same record as RESPTI and share its microsecond unit, but
+    the collector was summing them raw while dividing RESPTI -- so these
+    fixtures wrote a millisecond figure into DBREQTIME to compensate, which
+    kept the assertions green while production published DB times and
+    db_time_pct a thousand times too high. `db` stays in ms at the call
+    sites; the conversion happens here.
+
     Note this applies to the live STAT path only. RESPTI in
     SWNC_COLLECTOR_GET_AGGREGATES is a total in ms per bucket, so the
     aggregate fixtures further down are deliberately left unscaled.
@@ -131,7 +139,7 @@ def _rec(tasktype, resp_ms, user, maxbytes=0, priv=b"\x00", db=None, report="", 
             "PRIVMODE": priv, "CPUTI": 10, "QUEUETI": 1, "REPORT": report, "TCODE": tcode,
             "DSQLCNT": dsql}
     if db is not None:
-        main.update({"DBREQTIME": db, "DBPREQTIME": 0})     # confirmed live field names
+        main.update({"DBREQTIME": db * 1000, "DBPREQTIME": 0})  # confirmed live field names
     return {"MAINREC": main, "DBRECS": [], "TABLERECS": []}
 
 
@@ -183,12 +191,38 @@ def test_tasktype_accepts_bytes_hexstring_and_repr():
     assert rp._tasktype_code(b"f") == 0x66
 
 
-def test_idle_window_emits_no_response_metric():
+def test_idle_window_emits_a_null_response_metric():
+    """
+    An idle window publishes the response metric with NO value, rather than
+    omitting it.
+
+    This test previously asserted the opposite -- that no sap.st03.* metric
+    appears at all -- and had been failing, because build_metrics was
+    changed to emit a null-valued metric and the test was never updated to
+    match. The reason for that change is in the comment beside the idle
+    branch: omitting the metric made "the system is idle" indistinguishable
+    from "the perf read failed", and the wall fell back to its least
+    informative label, "not measured".
+
+    So the contract is: the metric is present, its value is None, its
+    status is UNKNOWN, and extra_data marks it idle. A consumer that wants
+    to skip idle systems checks the flag; one that wants to show "idle" has
+    something to show.
+    """
     def stat(kw):
         return {"ALL_STATRECS": [_frame("qassrv_QAS_00", [_rec(b"f", 70000, "UNKNOWN")])]}
     s = FakeSession({"TH_SERVER_LIST": [], "SWNC_GET_STATRECS_FRAME": stat})
     m = _by_key(s)
-    assert not any(k.startswith("sap.st03.") for k in m)
+
+    resp = m["sap.st03.dialog_resp_ms"]
+    assert resp.value is None
+    assert resp.status == Status.UNKNOWN
+    assert resp.extra_data["idle"] is True
+    assert resp.extra_data["steps"] == 0
+    assert "idle" in resp.detail
+
+    # A null value must not be mistaken for a reading of zero.
+    assert resp.display_value != "0 ms"
 
 
 def test_lock_aggregation_users_dups_and_age():
