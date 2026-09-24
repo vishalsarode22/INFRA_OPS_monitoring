@@ -1,56 +1,46 @@
-﻿.env
+﻿# Credentials
+.env
+.env.*
+config/systems.yaml
+config/systems.yaml.*
+!config/systems.yaml.example
+
+# Python / editors
 .venv/
 venv/
 __pycache__/
 *.pyc
-*.log
-logs/
-reports/
+.pytest_cache/
 .vscode/
 .idea/
+
+# Logs, reports, client data
+logs/
+*.log
+reports/
 *.pdf
 *.xlsx
 *.xlsm
+!config/templates/*.xlsx
 ~$*
-config/systems.yaml
-
-# --- added 2026-09-10 ---
 dashboard/snapshots/
-config/profile_state.json
-config/schedules.json
-*.bak
-probe_out.txt
-smlg_rfc*.txt
-alert_*.html
-Name
-CHANGES.diff
-
-.env
-.venv/
-__pycache__/
-*.pyc
-*.bak*
-
-
-*.broken
-*.working
-*.good
-*.ORIGINAL-REPO
-dev_rfc.log
-
-
-logs/
-*.log
-
-
-reports/
-
-
-# --- runtime state, added 2026-09-24 ---
 dashboard/events/
 dashboard/incidents/
 dashboard/intelligence_state/
 dashboard/history/
 dashboard/run_history.json
 dashboard/latest_status.json
+config/profile_state.json
+config/schedules.json
 
+# Scratch and backups
+*.bak*
+*.broken
+*.working
+*.good
+*.ORIGINAL-REPO
+probe_out.txt
+smlg_rfc*.txt
+alert_*.html
+Name
+CHANGES.diff
