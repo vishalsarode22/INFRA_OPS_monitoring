@@ -452,7 +452,34 @@ _SM50 = {"wp": "WP_INDEX", "type": "WP_TYPE_DISP", "pid": "PID", "state": "STATE
 _WP_KEEP = ("wp", "type", "state", "reason", "user", "program", "elapsed", "cpu", "action", "instance")
 
 
-def _wp_summary(rows: list[dict], top: int = 6) -> dict:
+_WP_TYPE_BY_LABEL = {"dialog": "DIA", "update": "UPD", "background": "BTC",
+                     "spool": "SPO", "update task 2": "UP2", "update2": "UP2"}
+
+
+def _strip_icons(text) -> str:
+    """SAP icon codes (@5B\\Q@) render as gibberish in a report."""
+    return re.sub(r"@[0-9A-Za-z\\\\]{1,8}@", "", str(text or "")).strip()
+
+
+def _wp_header_counts(session) -> dict:
+    """
+    {type: (total, free)} from SM50's own header block, e.g.
+    "Dialog 60 / 55 (Total/Free)". SAP's own figures beat counting rows: a
+    row whose status is blank was counted as busy, so PS4 reported
+    "BTC: 6 of 20 busy" beside a header saying 15 of 20 free.
+    """
+    counts: dict = {}
+    for text in _try(lambda: _screen_texts(session), "sm50 header", []) or []:
+        for label, code in _WP_TYPE_BY_LABEL.items():
+            match = re.search(rf"\b{re.escape(label)}\b[^0-9]{{0,20}}(\d+)\s*/\s*(\d+)", str(text), re.I)
+            if match and code not in counts:
+                total, free = int(match.group(1)), int(match.group(2))
+                if total >= free:
+                    counts[code] = (total, free)
+    return counts
+
+
+def _wp_summary(rows: list[dict], top: int = 6, header_counts: dict | None = None) -> dict:
     """The lines a consultant reads off SM50/SM66: how many in use, who is running long, anything in PRIV."""
     for r in rows:
         r["elapsed_s"] = _secs(r.get("elapsed"))
@@ -464,6 +491,12 @@ def _wp_summary(rows: list[dict], top: int = 6) -> dict:
         by_type.setdefault((r.get("type") or "?").upper()[:3], []).append(r)
     type_line = ", ".join(f"{t}: {sum(1 for x in v if x.get('state') and 'wait' not in x['state'].lower())} of {len(v)} busy"
                           for t, v in sorted(by_type.items()) if t in ("DIA", "BTC", "UPD", "SPO", "UP2"))
+    total_processes, active_count = len(rows), len(active)
+    if header_counts:
+        type_line = ", ".join(f"{code}: {total - free} of {total} busy"
+                              for code, (total, free) in sorted(header_counts.items()))
+        total_processes = sum(total for total, _ in header_counts.values())
+        active_count = sum(max(total - free, 0) for total, free in header_counts.values())
     # "long-running" = most time consumed: elapsed on the current step, else accumulated CPU
     ranked = sorted(active, key=lambda r: (r["elapsed_s"] >= 60, r["elapsed_s"], r["cpu_s"]), reverse=True)[:top]
     pick = lambda r: {k: r.get(k, "") for k in _WP_KEEP if r.get(k, "") != ""}  # noqa: E731
@@ -475,10 +508,11 @@ def _wp_summary(rows: list[dict], top: int = 6) -> dict:
         dur = (f"running {r['elapsed']} s on the current step" if r["elapsed_s"] >= 60 else f"{r.get('cpu')} CPU time accumulated")
         lr_lines.append(f"WP {r.get('wp')} ({r.get('type')}{where}) -- user {r.get('user')}, program {r.get('program')}, {dur}"
                         + (f", {r['action']}" if r.get("action") else "") + (f", status {r['state']} / {r['reason']}" if r.get("reason") else ""))
-    focus = [f"Work processes: {len(rows)} configured, {len(active)} in use ({type_line})",
+    focus = [f"Work processes: {total_processes} configured, {active_count} in use ({type_line})",
              ("Long-running: " + "; ".join(lr_lines)) if lr_lines else "Long-running: none over 60 s on a step or over 5 min CPU",
              f"PRIV mode: {len(priv)} work process(es)" + (" -- " + "; ".join(f"WP {r.get('wp')} {r.get('user')} {r.get('program')}" for r in priv[:5]) if priv else " (none)")]
-    return {"total_processes": len(rows), "active_count": len(active),
+    return {"total_processes": total_processes, "active_count": active_count,
+            "counts_source": "screen header" if header_counts else "row states",
             "priv_count": len(priv), "priv": [pick(r) for r in priv[:10]],
             "top_by_cpu": [pick(r) for r in sorted(active, key=lambda r: r["cpu_s"], reverse=True)[:top]],
             "long_running": [pick(r) for r in ranked], "tables": [], "focus": focus}
@@ -492,7 +526,7 @@ def rca_sm50(session, capture):
     if grid is None:
         capture("as_found"); facts["note"] = "SM50 grid not found"; facts["focus"] = ["SM50 grid not readable"]; return facts
     rows = _rows(grid, _SM50)
-    facts.update(_wp_summary(rows))
+    facts.update(_wp_summary(rows, header_counts=_wp_header_counts(session)))
     pressed = _press_grid_toolbar(grid, "active work")
     if not pressed:
         btn = _button_by_text(session, "active work")
@@ -767,8 +801,16 @@ def _sm12_search(session, client: str, user: str) -> dict:
     cols = {"client": _col(h, "client", "cli"), "user": _col(h, "user"), "table": _col(h, "table"),
             "arg": _col(h, "lock argument", "argument"), "mode": _col(h, "mode"), "time": _col(h, "time"),
             "date": _col(h, "date"), "owner": _col(h, "owner", "transaction", "tcode")}
-    rows = _rows(grid, cols)
-    out["lock_count"] = len(rows)
+    # The grid's own row count, not the number of rows read: the reader stops
+    # at its limit, and PS4 reported "Locks in all clients: 500" twice, which
+    # was the limit, not the lock table.
+    total = int(_attr(grid, "RowCount", 0) or 0)
+    rows = _rows(grid, cols, limit=2000)
+    # "Lock Table (N)" in the title is the authoritative count; the grid row
+    # count next; the rows actually read last.
+    out["lock_count"] = out.get("lock_count_on_screen") or total or len(rows)
+    out["rows_read"] = len(rows)
+    out["count_capped"] = bool(total and len(rows) < total)
     by_user: dict[str, int] = {}; by_key: dict[str, set] = {}; stale = []
     now = datetime.now()
     for r in rows:
@@ -847,6 +889,8 @@ def rca_sm12(session, capture):
              f"Locks in client {login_client or '*'}: {b.get('lock_count', '?')}"]
     if top_users:
         focus.append("Same user, many locks: " + "; ".join(f"{u['user']} holds {u['locks']}" for u in top_users[:5])
+                     + (f" (counted over the {a.get('rows_read')} rows read of {a.get('lock_count')})"
+                        if a.get("count_capped") else "")
                      + (f" (plus {unknown} rows whose user was not readable)" if unknown else ""))
     elif rfc.get("most_locks_detail"):
         focus.append(f"Same user, many locks (from RFC): {rfc['most_locks_detail']}")
@@ -928,7 +972,7 @@ def rca_stad(session, capture, lookback_minutes: int = 30, min_response_ms: int 
     facts["tables"] = [{"title": f"Users by total response time, last {lookback_minutes} minutes",
                         "columns": ["User", "Program", "Total response", "DB time", "CPU time", "Peak memory"],
                         "rows": [[u["user"], ", ".join(u["programs"]), _ms_h(u["total_resp_ms"]), _ms_h(u["db_ms"]), _ms_h(u["cpu_ms"]),
-                                  (f"{u['max_memory']:,.0f} KB" if u["max_memory"] else "")] for u in top]}]
+                                  (f"{u['max_memory']:,.0f} MB" if u["max_memory"] else "")] for u in top]}]
     c = facts["components"]
     lead = f"In the last {lookback_minutes} minutes {len(rows)} steps were recorded. "
     lead += f"{c['db_pct']}% of all response time was spent in the database and {c['cpu_pct']}% in CPU"
@@ -944,7 +988,9 @@ def rca_stad(session, capture, lookback_minutes: int = 30, min_response_ms: int 
             facts["focus"].append("Next: " + "; ".join(others) + ".")
     if facts["top_by_memory"]:
         m = facts["top_by_memory"][0]
-        facts["focus"].append(f"Peak memory in one step: {m['user']} running {', '.join(m['programs'])}, {m['max_memory']:,.0f} KB.")
+        # STAD's "Memory used" column is MB on this release; it was labelled KB,
+        # which made a 29-minute report look like it used 3 KB.
+        facts["focus"].append(f"Peak memory in one step: {m['user']} running {', '.join(m['programs'])}, {m['max_memory']:,.0f} MB.")
     if c["max_wait_ms"] > 50: facts["focus"].append("Wait time over 50 ms means work processes were exhausted -- see SM50.")
     if c["max_lock_ms"] > 50: facts["focus"].append("Enqueue time over 50 ms means lock waits -- see SM12.")
     return facts
@@ -1000,8 +1046,9 @@ def _read_grid_table(grid, top: int = 10, prefer: tuple = ()) -> dict | None:
     n = min(int(_attr(grid, "RowCount", 0) or 0), top)
     if not chosen or n == 0:
         return None
-    return {"columns": [titles[c] for c in chosen],
-            "rows": [[str(_try(lambda r=r, c=c: grid.GetCellValue(r, c), "v", "") or "").strip() for c in chosen] for r in range(n)]}
+    return {"columns": [_strip_icons(titles[c]) or titles[c] for c in chosen],
+            "rows": [[_strip_icons(_try(lambda r=r, c=c: grid.GetCellValue(r, c), "v", "")) for c in chosen]
+                     for r in range(n)]}
 
 
 def rca_st04(session, capture, db_hint: str = "detect"):
@@ -1058,9 +1105,19 @@ def rca_st04(session, capture, db_hint: str = "detect"):
             h = _grid_headers(grid)
             _sort_desc(grid, _col(h, "total execution", "duration", "elapsed", "execution time"))
             wait_until_not_busy(session)
+        window = ""
+        if name in ("expensive_statements", "sql_plan_cache"):
+            field = _field_by_label(session, "time frame") or _field_by_label(session, "time range")
+            window = _strip_icons(_try(lambda: field.Text, "time frame", "")) if field is not None else ""
+            if window:
+                facts["statement_window"] = window
         capture(name); facts["screens"].append(name)
         tbl = _read_grid_table(grid, top=8, prefer=prefer) if grid is not None else None
         label = name.replace("_", " ")
+        if window:
+            scope = (f"recorded since {window}" if re.match(r"^\d{2}[./-]\d{2}[./-]\d{2,4}", window)
+                     else f"time frame: {window}")
+            label = f"{label} ({scope}; not limited to the incident window)"
         if name == "alerts":
             head = next((t for t in _screen_texts(session) if re.search(r"current alerts:", t, re.I)), "")
             facts["alerts_header"] = head
@@ -1068,11 +1125,19 @@ def rca_st04(session, capture, db_hint: str = "detect"):
                 pcol = next((i for i, c in enumerate(tbl["columns"]) if "priority" in c.lower()), None)
                 by_p: dict[str, int] = {}
                 for r in tbl["rows"]:
-                    pr = (r[pcol] if pcol is not None else "?") or "?"
+                    pr = _strip_icons(r[pcol] if pcol is not None else "") or "unrated"
                     by_p[pr] = by_p.get(pr, 0) + 1
                 facts["alerts"] = tbl["rows"]
                 facts["tables"].append({"title": "Alerts (with priority)" + (f" -- {head}" if head else ""), "columns": tbl["columns"], "rows": tbl["rows"]})
-                facts["focus"].append(("Alerts: " + head + "; " if head else "Alerts: ") + "listed: " + ", ".join(f"{k}: {v}" for k, v in by_p.items()))
+                listed = ", ".join(f"{k}: {v}" for k, v in by_p.items())
+                if head:
+                    facts["focus"].append(f"Alerts: {_strip_icons(head)} ({listed} in the alert list).")
+                else:
+                    # Without the "Current Alerts:" line these rows are alert
+                    # DEFINITIONS, not open alerts; PS4 printed them as
+                    # "Alerts: listed: @5B\\Q@: 8" beside "Currently no alerts".
+                    facts["focus"].append(f"Alerts: {len(tbl['rows'])} alert check(s) listed "
+                                          f"({listed}); current alert counts not read from this screen.")
             else:
                 facts["focus"].append("Alerts: " + (head or "none listed"))
         elif tbl:

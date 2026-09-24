@@ -709,6 +709,8 @@ def build_rca_prompt(context: dict) -> str:
     }
     if context.get("attribution"):
         compact["attribution"] = context["attribution"]
+    if context.get("report_findings"):
+        compact["report_findings"] = context["report_findings"]
 
     # ---------------------------------------------------------------
     # Metrics

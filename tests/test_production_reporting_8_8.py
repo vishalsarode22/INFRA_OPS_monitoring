@@ -8,31 +8,37 @@ def test_system_excel_contains_operational_sheets(tmp_path):
     """
     The per-cycle workbook carries the operational sheets.
 
-    The sheet set was redesigned from seven to four. Three are renames:
+    This previously asserted a four-sheet redesign -- GUI_Evidence,
+    Recovery, AI_Analysis -- and claimed in its own docstring to be
+    "asserting what the code produces". It was not: generate_system_excel
+    writes seven sheets under the original names, and the referenced
+    TEST_FIXES.md does not exist in the repository. The test described a
+    redesign that was never implemented, so it failed on every run and told
+    the reader the opposite of the truth about the code.
 
-        TCode Results   -> GUI_Evidence
-        Recovery History-> Recovery
-        AI Analysis     -> AI_Analysis
-
-    Two are gone outright, and they held content rather than headings:
-    "System Summary" (system, client, overall status, metric counts) and
-    "Incidents". result.incidents is still populated on the model and is
-    simply no longer written anywhere in production_reports.py.
-
-    This test now asserts what the code produces, so the suite is green and
-    honest. Whether those two sheets should come back is a product decision,
-    not a test one -- see TEST_FIXES.md.
+    It now asserts the seven sheets actually written. If the four-sheet
+    redesign is still wanted, that is a change to production_reports.py and
+    this test moves with it.
     """
     result = MonitoringResult(system="TST", client="000", cycle_timestamp=datetime(2026,8,19,9,0))
     result.metrics.append(MetricResult(name="cpu", value=20, display_value="20%", status=Status.NORMAL))
     p = tmp_path / "TST_Monitoring.xlsx"
     generate_system_excel(result, [], str(p))
     wb = openpyxl.load_workbook(p)
-    assert {"Metrics", "GUI_Evidence", "Recovery", "AI_Analysis"} <= set(wb.sheetnames)
+    assert {"System Summary", "Metrics", "TCode Results", "Evidence Index",
+            "Incidents", "Recovery History", "AI Analysis"} <= set(wb.sheetnames)
     # The metric itself must survive the round trip, not just its sheet.
+    # Columns are located by header name rather than by position: the old
+    # assertion hard-coded a three-column layout (Timestamp, Metric, Value)
+    # that the writer has not produced for some time -- it writes eleven,
+    # starting Timestamp, System, Client -- so it read the system name out
+    # of column 2 and compared it to "cpu".
     metrics = wb["Metrics"]
-    assert [c.value for c in metrics[1]][:3] == ["Timestamp", "Metric", "Value"]
-    assert metrics.cell(2, 2).value == "cpu"
+    header = [c.value for c in metrics[1]]
+    assert header[:5] == ["Timestamp", "System", "Client", "Metric", "Value"]
+    assert metrics.cell(2, header.index("Metric") + 1).value == "cpu"
+    assert metrics.cell(2, header.index("Value") + 1).value == 20
+    assert metrics.cell(2, header.index("Status") + 1).value == "NORMAL"
 
 
 def test_system_excel_honours_an_explicit_output_path(tmp_path):

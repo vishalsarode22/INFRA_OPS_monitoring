@@ -305,6 +305,92 @@ def submit_login(login_window):
     log.info("Login submitted.")
 
 
+# The logon screen's own fields. Addressing them directly beats typing:
+# keyboard input goes to whichever window has focus, and three PS4 sweeps
+# failed with "Logon window changed under us" because Notepad, File Explorer
+# or Teams took focus while the credentials were being typed.
+_LOGIN_FIELDS = (("client", "wnd[0]/usr/txtRSYST-MANDT"),
+                 ("user", "wnd[0]/usr/txtRSYST-BNAME"),
+                 ("password", "wnd[0]/usr/pwdRSYST-BCODE"),
+                 ("language", "wnd[0]/usr/txtRSYST-LANGU"))
+
+
+def login_via_scripting(client: str, username: str, password: str,
+                        language: str = "EN", timeout: int = 20, submit: bool = True) -> bool:
+    """
+    Fill and submit the SAP logon screen through the scripting API.
+
+    Returns True when the screen was filled (and submitted, if asked).
+    False means "not possible here" -- the caller then types, as before.
+    """
+    from sap_gui.scripting_connection import get_scripting_session
+
+    deadline = time.time() + timeout
+    session = None
+    while time.time() < deadline:
+        try:
+            candidate = get_scripting_session()
+            candidate.findById("wnd[0]/usr/txtRSYST-BNAME")     # is this the logon screen?
+            session = candidate
+            break
+        except Exception:
+            time.sleep(1)
+    if session is None:
+        log.info("Scripting logon not available (no session or not on the logon screen); typing instead.")
+        return False
+
+    values = {"client": str(client or ""), "user": str(username or ""),
+              "password": str(password or ""), "language": str(language or "")}
+    for name, control_id in _LOGIN_FIELDS:
+        value = values[name]
+        if not value:
+            continue
+        try:
+            session.findById(control_id).Text = value
+        except Exception as exc:
+            if name in ("user", "password"):
+                log.warning(f"Scripting logon: {name} field not settable ({exc}); typing instead.")
+                return False
+            log.debug(f"Scripting logon: optional field {name} skipped ({exc})")
+    log.info(f"Scripting logon: client {values['client']}, user {values['user']} (no keystrokes).")
+
+    if not submit:
+        return True
+    session.findById("wnd[0]").sendVKey(0)
+    time.sleep(_LOGIN_SUBMIT_WAIT)
+    _handle_multiple_logon(session)
+    return True
+
+
+def _handle_multiple_logon(session) -> None:
+    """
+    The "multiple logon" dialog. Its default option ends the user's OTHER
+    sessions, which on a production system could be a person's work, so this
+    only ever picks "continue without ending any other logons". If that
+    option cannot be selected the dialog is cancelled and the logon fails
+    loudly rather than quietly signing someone else out.
+    """
+    try:
+        popup = session.findById("wnd[1]")
+    except Exception:
+        return
+    for control_id in ("wnd[1]/usr/radMULTI_LOGON_OPT2",
+                       "wnd[1]/usr/radRESTART_OPT2"):
+        try:
+            session.findById(control_id).Select()
+            session.findById("wnd[1]/tbar[0]/btn[0]").press()
+            log.info("Multiple logon dialog: continued without ending other logons.")
+            return
+        except Exception:
+            continue
+    try:
+        popup.sendVKey(12)
+        log.warning("Multiple logon dialog appeared but its options were not recognised; "
+                    "cancelled rather than ending another session.")
+    except Exception:
+        pass
+
+
 def login(
     client: str,
     username: str,
@@ -323,6 +409,16 @@ def login(
         TAB -> Password
         ENTER
     """
+
+    # Scripting first: it does not depend on window focus. Set
+    # IBO_GUI_LOGIN_MODE=keyboard to force the old path.
+    if _os.environ.get("IBO_GUI_LOGIN_MODE", "scripting").strip().lower() != "keyboard":
+        try:
+            if login_via_scripting(client, username, password, language, submit=submit):
+                success = verify_login_success() if (submit and verify) else None
+                return {"window": None, "success": success, "method": "scripting"}
+        except Exception as exc:   # noqa: BLE001 -- fall back to typing
+            log.warning(f"Scripting logon failed ({type(exc).__name__}: {exc}); typing instead.")
 
     login_window = find_login_window()
 

@@ -1,0 +1,83 @@
+# Runs the test suite on every push and pull request.
+#
+# The suite is 88 files and ~240 assertions that already exist and pass;
+# nothing was running them except by hand. A bug that a test would have
+# caught reaches a customer system otherwise.
+#
+# Windows-only and SAP-only dependencies (pywin32, pyrfc, pyodbc, the
+# NetWeaver RFC SDK) cannot be installed on a hosted runner, so the modules
+# that import them are skipped rather than failed. That is deliberate: a
+# partial suite that runs on every push is worth more than a complete suite
+# that runs on nobody's machine. The T-code actions themselves still need a
+# real SAP GUI session and are exercised by the live sweep, not here.
+
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install the dependencies that work off-Windows
+        run: |
+          python -m pip install --upgrade pip
+          # Installed individually: pyrfc and pyodbc need host libraries that
+          # a runner does not have, and a single failure in a combined
+          # install would take the working packages down with it.
+          pip install pytest pyyaml openpyxl reportlab pillow requests \
+                      fastapi starlette uvicorn pydantic httpx pandas \
+                      python-dotenv paramiko
+
+      - name: Compile every module
+        # Catches syntax errors in files no test imports -- which is most of
+        # the T-code actions.
+        run: |
+          python -m compileall -q \
+            collectors core evaluation notifications reporting sap_gui utils \
+            dashboard main.py
+
+      - name: Run the suite
+        # --ignore the modules needing Windows/SAP host libraries. Listed
+        # explicitly rather than with a broad pattern so that a NEW test
+        # file is never silently skipped.
+        run: |
+          python -m pytest tests -q \
+            --ignore=tests/test_connection_only.py \
+            --ignore=tests/test_launch_only.py \
+            --ignore=tests/test_sap_login.py \
+            --ignore=tests/test_gui_scripting_connect.py \
+            --ignore=tests/test_gui_scripting_inspect.py \
+            --ignore=tests/test_inspect_controls.py \
+            --ignore=tests/test_inspect_sm12_results.py \
+            --ignore=tests/test_debug_sm12_rowcount.py \
+            --ignore=tests/test_debug_sm12_statusbar.py \
+            --ignore=tests/test_sap_gui_collector.py \
+            --ignore=tests/test_tcode_screenshot.py
+
+      - name: Check config files parse
+        run: |
+          python - <<'PY'
+          import yaml, pathlib, sys
+          bad = []
+          for p in sorted(pathlib.Path("config").rglob("*.yaml")):
+              try:
+                  yaml.safe_load(p.read_text(encoding="utf-8"))
+              except Exception as exc:
+                  bad.append(f"{p}: {exc}")
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          print("all config YAML parses")
+          PY

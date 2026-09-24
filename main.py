@@ -320,6 +320,36 @@ def _run_with_watchdog(system_config: dict) -> tuple:
     return True, result_box.get("value", True)
 
 
+def _rca_from_sweep(name, system_config, gui_results) -> None:
+    """Start a performance RCA when the sweep's worst SMLG instance is over the band."""
+    from core.rca_trigger import TriggerConfig, mark_fired_on_disk, sweep_decision
+    from evaluation.rca_pipeline import load_rca_config, rca_enabled, run_rca
+
+    cfg = load_rca_config()
+    if not rca_enabled(cfg):
+        return
+    worst, instance = None, ""
+    for metric in gui_results or []:
+        for entry in (getattr(metric, "extra_data", {}) or {}).get("instances") or []:
+            try:
+                value = float(entry.get("response_time_ms"))
+            except (TypeError, ValueError):
+                continue
+            if worst is None or value > worst:
+                worst, instance = value, str(entry.get("instance") or "")
+    if worst is None:
+        return
+
+    trigger_cfg = TriggerConfig.from_yaml(cfg)
+    fire, reason = sweep_decision(name, worst, instance, trigger_cfg)
+    log.info(f"{name}: RCA sweep trigger -- SMLG worst {worst:.0f} ms: {reason}")
+    if not fire:
+        return
+    mark_fired_on_disk(name, reason)
+    log.warning(f"{name}: starting performance RCA ({reason})")
+    run_rca(system_config, reason, cfg)
+
+
 def run_pipeline_for_system(system_config: dict) -> bool:
     system_template = system_template_path(system_config.get("name", "UNKNOWN"))
 
@@ -613,8 +643,27 @@ def _run_pipeline_for_system_once(system_config: dict) -> bool:
 
     # Per-system alerting: a PRD alert should not land in a sandbox inbox
     # just because both use the same mail server.
+    # The sweep's own SMLG reading is a trigger source, not only the
+    # dashboard's live poll.
+    try:
+        _rca_from_sweep(name, system_config, gui_results)
+    except Exception as exc:   # noqa: BLE001 -- never fail a sweep over this
+        log.warning(f"{name}: RCA trigger from sweep skipped: {type(exc).__name__}: {exc}")
+
     heartbeat.beat(f"{name}:final-email")
-    if IBO_EMAIL_ENABLED:
+    # Nothing measured: no SAP GUI session and no RFC metrics. The 14:07 PS4
+    # run emailed a full "report" with 0 metrics and stale screens carried
+    # forward from an earlier run. Send the short failure notice instead.
+    nothing_collected = not gui_available and not result.metrics
+    if IBO_EMAIL_ENABLED and nothing_collected:
+        reason = "; ".join(str(e) for e in result.errors) or "SAP GUI unavailable, no RFC metrics"
+        log.warning(f"{name}: no data collected this cycle; sending a failure notice, not the report.")
+        try:
+            send_failure_alert(name, f"No monitoring data collected: {reason}", 1, 1,
+                               get_smtp_config(system_config))
+        except Exception as e:
+            log.error(f"{name}: failure notice could not be sent: {e}")
+    elif IBO_EMAIL_ENABLED:
         smtp_config = get_smtp_config(system_config)
         send_final_report(result, smtp_config, pdf_path, metrobrands_path)
     else:

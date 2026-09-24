@@ -152,6 +152,58 @@ _CHECK_LABELS = {
     "sap.sqlm.top_program_total_s":     ("SQLM", "Top program SQL time"),
 }
 
+# What actually threatens a productive system, worst first. The wall shows
+# these before anything else; counters not listed here are informational and
+# are folded away (risk=False), so the checklist reads as "what could hurt
+# this system" rather than an alphabetical dump of counters.
+_RISK_RANK = {
+    "sap.sm50.priv_mode_wp": 1,                 # PRIV mode = that instance is out of memory
+    "sap.sm66.wp_saturation_pct": 2,            # no free work process = the system stops taking work
+    "sap.sm66.max_instance_saturation_pct": 2,
+    "sap.sm50.long_running_wp": 3,
+    "sap.sm13.failed_updates": 4,               # a failed update loses business data
+    "sap.st22.dumps": 5,
+    "sap.sm12.oldest_lock_minutes": 6,          # a stale lock blocks a business process
+    "sap.sm12.lock_count": 7,
+    "sap.sm12.locks_per_user_max": 7,
+    "sap.sm12.users_with_many_locks": 8,
+    "sap.st03.dialog_resp_ms": 9,               # what users feel
+    "sap.st03.max_instance_resp_ms": 9,
+    "sap.st03.db_time_pct": 10,
+    "sap.sm37.cancelled_jobs": 11,
+    "sap.sm58.stuck_entries": 12,               # interfaces: orders and IDocs stop moving
+    "sap.sm58.sysfail_backlog": 12,
+    "sap.smq1.entries": 13,
+    "sap.smq2.entries": 13,
+    "sap.we02.failed_idocs": 13,
+    "sap.db12.last_backup": 14,                 # no recent backup = no recovery
+    "sap.sm21.errors": 15,
+    "sap.st03.top_report_db_ms": 16,            # who is causing the load
+    "sap.st03.top_user_memory_mb": 16,
+    "sap.sqlm.top_program_total_s": 17,
+    "sap.sqlm.expensive_programs": 17,
+}
+
+# 23.09.2026, on request: the wall grid shows these five and nothing else.
+# Everything else is still collected, graded, alerted on and written to the
+# reports -- this is only what the operations wall puts in front of a person.
+_WALL_GRID_METRICS = {
+    "sap.st22.dumps",             # transactions failing now
+    "sap.sm37.cancelled_jobs",    # jobs that did not finish
+    "sap.sm50.long_running_wp",   # with the user and program holding the process
+    "sap.sm58.stuck_entries",     # interfaces stopped moving
+    "sap.sm12.lock_count",        # blocked business processes
+    # Round 32: not drawn in the grid (wall.html keeps it out via inWpBlock).
+    # It has to reach the payload so the WORK PROCESSES block can show its
+    # "PRIV mode (SM50)" line -- round 31's whitelist had removed it.
+    "sap.sm50.priv_mode_wp",
+}
+
+# Counted, but nothing to act on: they say how busy the system is, not
+# whether it is in trouble.
+_INFORMATIONAL_CHECKS = {"sap.al08.user_logons", "sap.sm37.active_jobs",
+                         "sap.su01.locked_users", "sap.sm50.total_dia_wp"}
+
 # Shown as tiles at the top of a card; excluded from the checklist grid so
 # nothing appears twice.
 _TILE_METRICS = {"cpu", "memory", "memory.total_gb", "load_1m",
@@ -196,23 +248,57 @@ _MS_VALUED_CHECKS = {
 # per instance in the instances table already, where it carries the statistic
 # label and the readable duration; repeating it here as a bare ms figure was
 # both redundant and the least readable tile on the wall.
+# Kept out of the grid only where the same thing is already on the card:
+# the per-instance response and saturation appear in the instance table, and
+# locked users say nothing about system health.
+#
+# 23.09.2026: the counters dropped here on 16.09 are back, on request -- the
+# wall is meant to show what can hurt a productive system, and stuck tRFC, a
+# stale lock, WP saturation, DB share of response and backup age are exactly
+# that. The busy-ness counters (user sessions, running jobs) are what gets
+# folded away now instead, via risk=False.
 _CHECK_GRID_EXCLUDE = {
-    "sap.st03.dialog_resp_ms",
-    "sap.st03.top_report_db_ms",
-    "sap.sm12.oldest_lock_minutes",
     "sap.sm66.max_instance_saturation_pct",
     "sap.st03.max_instance_resp_ms",
     "sap.su01.locked_users",
-    # Dropped from the wall grid on request (16 Sep 2026). All are still
-    # collected, graded and written to rfc_metrics and the reports.
-    "sap.sm12.lock_count",
-    "sap.sm66.wp_saturation_pct",
-    "sap.sm58.stuck_entries",
-    "sap.st03.db_time_pct",
-    "sap.sm12.locks_per_user_max",
-    "sap.sm12.users_with_many_locks",
-    "sap.db12.last_backup",
 }
+
+
+def _first_detail_entry(metric) -> str:
+    """
+    The first entry of a "; "-separated detail, without the instance name:
+    "vhrrnps4ci_PS4_00 64014 ZRP_SD_SALES_REGISER 1885s" reads better on a
+    card as "64014 ZRP_SD_SALES_REGISER 1885s".
+    """
+    try:
+        if not metric.value:
+            return ""
+    except (TypeError, AttributeError):
+        return ""
+    first = str(getattr(metric, "detail", "") or "").split(";")[0].strip()
+    parts = first.split()
+    if len(parts) > 3 and ("_" in parts[0] and any(ch.isdigit() for ch in parts[0])):
+        parts = parts[1:]                      # drop the instance name
+    return " ".join(parts)[:60]
+
+
+def _check_sub(metric) -> str:
+    """
+    The small line under a check on the wall.
+
+    Long-running WPs name who holds the process. A check that could not be
+    read says why (round 32): "Not measured" alone sends someone to the logs,
+    "SNAP not readable: ... NOT_AUTHORIZED" tells them what to fix.
+    """
+    if metric.name == "sap.sm50.long_running_wp":
+        return _first_detail_entry(metric)
+    extra = getattr(metric, "extra_data", None) or {}
+    if extra.get("read_failed"):
+        return str(getattr(metric, "detail", "") or "")[:110]
+    # Round 33: dumps say which runtime errors, e.g. "TIME_OUT 6, SYNTAX_ERROR 4".
+    if metric.name == "sap.st22.dumps" and extra.get("top_errors"):
+        return str(extra["top_errors"])[:110]
+    return ""
 
 
 def _checks_from_metrics(metrics) -> list[dict]:
@@ -229,7 +315,7 @@ def _checks_from_metrics(metrics) -> list[dict]:
     for m in metrics:
         if m.name in _TILE_METRICS:
             continue
-        if m.name in _CHECK_GRID_EXCLUDE:
+        if m.name not in _WALL_GRID_METRICS:
             continue
         tcode, label = _CHECK_LABELS.get(m.name, (m.tcode or "—", m.name))
         value = m.display_value
@@ -244,9 +330,14 @@ def _checks_from_metrics(metrics) -> list[dict]:
             "value": value,
             "status": m.status.value,
             "detail": (m.detail or "")[:160],
+            "rank": _RISK_RANK.get(m.name, 40),
+            "risk": m.name not in _INFORMATIONAL_CHECKS,
+            # Who is holding the work process: "0 count" needs no name, but
+            # "3 count" is useless without one.
+            "sub": _check_sub(m),
         })
     rows.sort(key=lambda r: ({"CRITICAL": 0, "WARNING": 1, "NORMAL": 2,
-                              "UNKNOWN": 3}.get(r["status"], 4), r["tcode"]))
+                              "UNKNOWN": 3}.get(r["status"], 4), r["rank"], r["tcode"]))
     return rows
 
 
@@ -784,6 +875,11 @@ def _smon(session: SapSession, system: str) -> dict:
         "memory_excl_cache": memory_strict_pct,
         "memory_incl_cache": memory_inc_pct,
         "memory_basis": memory_basis,
+        # False when the only figure available counts reclaimable page cache
+        # as used. On Linux/AIX that sits near 100% on a healthy box, so it
+        # must not colour a tile red: CENTOR_QAS, PRD and CARFOUR QAS all
+        # showed 88-100% because /SDF/SMON returned no FREE_MEM_MB_INC_FS.
+        "memory_trusted": memory_basis == "excl. reclaimable cache",
         "load_1m": total("load"),
         "free_mem_mb": free_total,
         "free_mem_mb_inc_fs": free_fs_total,
@@ -1153,6 +1249,17 @@ _capability_lock = threading.Lock()
 _capabilities: dict[tuple[str, str], list[str]] = {}
 
 
+class _ProbeFailed(Exception):
+    """A field probe whose read came back empty-handed (read_table -> None)."""
+
+
+def _transient_failure(reason: str) -> bool:
+    """True when a failed read is about the connection, not the table."""
+    r = (reason or "").upper()
+    return ("COMMUNICATION" in r or "NO RFC SESSION" in r or "TIMEOUT" in r
+            or "CLOSED" in r or "CANCELED" in r or "CANCELLED" in r)
+
+
 def _supported_fields(session: SapSession, system: str, table: str,
                       required: list[str], optional: list[str]) -> list[str] | None:
     """
@@ -1177,7 +1284,13 @@ def _supported_fields(session: SapSession, system: str, table: str,
 
     while remaining:
         try:
-            session.read_table(table, remaining, "", rows=1)
+            # Round 32: SapSession.read_table() never raises -- it returns
+            # None on failure. This probe only reacted to exceptions, so every
+            # table "passed" with every optional field, and the real read then
+            # failed on a column the release does not have (SNAP's program
+            # columns, for one). A None result is a failed probe now.
+            if session.read_table(table, remaining, "", rows=1) is None:
+                raise _ProbeFailed(str(getattr(session, "last_error", "") or "no result"))
             with _capability_lock:
                 _capabilities[key] = remaining
             dropped = [f for f in fields if f not in remaining]
@@ -1186,12 +1299,17 @@ def _supported_fields(session: SapSession, system: str, table: str,
                          f"-- those columns are omitted from now on.")
             return remaining
         except Exception as exc:
+            if isinstance(exc, _ProbeFailed) and _transient_failure(str(exc)):
+                # Connection trouble says nothing about the table. Do not
+                # remember it as unreadable; the next poll asks again.
+                return None
             droppable = next((f for f in optional if f in remaining), None)
             if droppable is None:
                 # Required fields missing: remember the failure so the read is
                 # never attempted again this process.
+                why = str(exc)[:200] if isinstance(exc, _ProbeFailed) else type(exc).__name__
                 log.warning(f"{system}: {table} is not readable "
-                            f"({type(exc).__name__}). Skipping it for this run "
+                            f"({why}). Skipping it for this run "
                             f"rather than retrying every poll.")
                 with _capability_lock:
                     _capabilities[key] = []
@@ -1470,6 +1588,17 @@ def _dumps(session: SapSession, system: str, zfm_metric=None) -> dict:
     today = datetime.now().strftime("%Y%m%d")
     out = {"count": 0, "by_user": [], "by_host": [], "by_program": [], "recent": [],
            "program_source": None, "note": None}
+
+    # Round 33: /SDF/GET_DUMP_LOG gives user, host, runtime error AND program
+    # in one call, on systems where RFC_READ_TABLE refuses SNAP. SNAP below
+    # stays as the fallback for systems without ST-PI.
+    try:
+        from collectors.rfc_collector import read_dump_log, DUMP_LOG_FM
+        log_rows = read_dump_log(session, today) if getattr(session, "ok", False) else None
+    except Exception:
+        log_rows = None
+    if log_rows is not None:
+        return _dumps_from_log(session, system, log_rows, DUMP_LOG_FM, out)
     # session.read_table() swallows the RFC exception by design (a failed
     # read must not crash the cycle); for this specific table it is worth
     # knowing WHY, because "not readable" covers three different causes an
@@ -1590,6 +1719,43 @@ def _dumps(session: SapSession, system: str, zfm_metric=None) -> dict:
 
     out["by_user"] = [{"user": u, "name": names.get(u.upper()), "count": n,
                        "share_pct": round(n / max(len(heads), 1) * 100),
+                       "email": emails.get(u.upper())}
+                      for u, n in by_user.most_common(6)]
+    return out
+
+
+def _dumps_from_log(session, system: str, rows: list, source: str, out: dict) -> dict:
+    """The dump breakdown built from /SDF/GET_DUMP_LOG rows (round 33)."""
+    from collections import Counter
+    by_user = Counter(r["user"] or "?" for r in rows)
+    by_host = Counter(r["host"] or "?" for r in rows)
+    prog = Counter(r["program"].upper() for r in rows if r["program"])
+    errs = Counter(r["error"].upper() for r in rows if r["error"])
+    out["count"] = len(rows)
+    out["program_source"] = source
+    out["by_host"] = [{"host": h, "count": n} for h, n in by_host.most_common(6)]
+    out["by_program"] = [{"program": p, "count": n} for p, n in prog.most_common(6)]
+    out["by_error"] = [{"error": e, "count": n} for e, n in errs.most_common(6)]
+    ordered = sorted(rows, key=lambda r: r["time"], reverse=True)
+
+    def hhmmss(v):
+        v = str(v or "").replace(":", "")
+        return f"{v[:2]}:{v[2:4]}:{v[4:6]}" if len(v) >= 6 else v
+
+    out["recent"] = [{"time": hhmmss(r["time"]), "user": r["user"], "host": r["host"],
+                      "client": r["client"], "error": r["error"] or None,
+                      "program": r["program"] or None, "component": r["component"] or None}
+                     for r in ordered[:8]]
+    try:
+        emails = _user_emails(session, system, list(by_user)) if by_user else {}
+    except Exception:
+        emails = {}
+    try:
+        names = _user_display_names(session, system, list(by_user)) if by_user else {}
+    except Exception:
+        names = {}
+    out["by_user"] = [{"user": u, "name": names.get(u.upper()), "count": n,
+                       "share_pct": round(n / max(len(rows), 1) * 100),
                        "email": emails.get(u.upper())}
                       for u, n in by_user.most_common(6)]
     return out

@@ -55,6 +55,16 @@ _METRIC_DEFINITIONS: dict[str, list[tuple[str, str, str, str, str]]] = {
     ],
 
     "SM13": [
+        # Errors + Initial past the stale limit. The raw record count
+        # (below) is the fallback for results from older collectors; it
+        # counted updates still being processed as failed.
+        (
+            "failed_update_count",
+            "sap.sm13.failed_updates",
+            "Failed updates",
+            "count",
+            "updates",
+        ),
         (
             "update_count",
             "sap.sm13.failed_updates",

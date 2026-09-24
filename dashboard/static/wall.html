@@ -177,9 +177,22 @@ function srcNote(s, field) {
 function gradeCpu(v)  { if (v === null) return "unknown"; return v >= 90 ? "critical" : v >= 80 ? "warning" : "normal"; }
 function gradeWp(v)   { if (v === null) return "unknown"; return v >= 90 ? "critical" : v >= 75 ? "warning" : "normal"; }
 
+// Memory is graded only when the figure excludes reclaimable page cache.
+// With cache counted as used, Linux and AIX sit near 100% on a healthy box,
+// so the number is reported but never colours a tile or the card.
+function memoryTrusted(s) {
+  const smon = s.smon || {};
+  if (smon.memory_trusted === true) return true;
+  if (smon.memory_trusted === false) return false;
+  return !(smon.memory_basis || "").toLowerCase().includes("incl. cache");
+}
+function gradeMemory(s) {
+  return memoryTrusted(s) ? gradeCpu(s.memory) : "unknown";
+}
+
 function overall(s) {
   if (!s.connected) return "unknown";
-  const g = [gradeCpu(s.cpu), gradeCpu(s.memory),
+  const g = [gradeCpu(s.cpu), gradeMemory(s),
              gradeWp(s.work_processes && s.work_processes.utilization_pct)];
   // The T-code counters carry the same weight as the OS tiles: 7 ABAP dumps
   // matters more than CPU at 40%, and a card that ignored them would be
@@ -206,23 +219,36 @@ function checks(list, source, err) {
             or Z_GET_OBSERVABILITY_DATA is not installed and the fallback queries
             found nothing.</div></div>`;
   }
-  const bad = list.filter(c => c.status === "CRITICAL" || c.status === "WARNING").length;
+  // Shown beside the work processes already; repeating them here pushes the
+  // rest of the risk list out of view.
+  const inWpBlock = new Set(["sap.sm50.priv_mode_wp"]);
+  const shown = list.filter(c => !inWpBlock.has(c.metric));
+  // Risk first: counters that say the system is in trouble. The rest (user
+  // sessions, running jobs) say how busy it is, not whether it is healthy,
+  // so they go on one muted line at the end.
+  const risky = shown.filter(c => c.risk !== false);
+  const info = shown.filter(c => c.risk === false);
+  // Round 32: count what the grid draws. PRIV mode travels in the same list
+  // for the WORK PROCESSES block and must not inflate "N checks".
+  const bad = shown.filter(c => c.status === "CRITICAL" || c.status === "WARNING").length;
+  const infoLine = "";   // busy-ness counters are off the wall, on request
   return `<div class="checks">
       <div class="checks-head">
-        <span>T-code checks · ${IB.esc(source || "RFC")}</span>
+        <span>Risk checks · ${IB.esc(source || "RFC")}</span>
         <span class="mono">${bad ? bad + " need attention" : "all within threshold"}
-              · ${list.length} checks</span>
+              · ${shown.length} checks</span>
       </div>
       <div class="check-grid">
-        ${list.map(c => `<div class="chk s-${c.status.toLowerCase()}"
+        ${risky.map(c => `<div class="chk s-${c.status.toLowerCase()}"
              title="${IB.esc(c.metric)}${c.detail ? " — " + IB.esc(c.detail) : ""}">
             <span class="txt">
               <span class="lb">${IB.esc(c.label)}</span>
-              <span class="tc">${IB.esc(c.tcode)}</span>
+              <span class="tc">${IB.esc(c.tcode)}${c.sub ? " · " + IB.esc(c.sub) : ""}</span>
             </span>
             <span class="vl">${IB.esc(c.value)}</span>
           </div>`).join("")}
       </div>
+      ${infoLine}
     </div>`;
 }
 
@@ -273,7 +299,7 @@ function smonPanel(sm) {
     </div>`;
 }
 
-function workProcesses(wp) {
+function workProcesses(wp, list) {
   if (!wp || !wp.available) {
     return `<div class="wp"><div class="wp-head"><span>Work processes</span>
             <span>no data</span></div>
@@ -294,6 +320,13 @@ function workProcesses(wp) {
   const lr = wp.longest_running
     ? `<div class="longest">Longest running: ${lrParts.join(" · ")}</div>` : "";
 
+  // PRIV mode belongs next to the work processes: a WP stuck in PRIV is an
+  // instance out of memory. (ABAP dumps moved back to the grid in round 31.)
+  const priv = (list || []).find(c => c.metric === "sap.sm50.priv_mode_wp");
+  const risk = [];
+  if (priv)  risk.push(`PRIV mode (SM50): <b class="v-${priv.status.toLowerCase()}">${IB.esc(priv.value)}</b>`);
+  const riskLine = risk.length ? `<div class="longest">${risk.join(" · ")}</div>` : "";
+
   return `<div class="wp">
       <div class="wp-head">
         <span>Work processes</span>
@@ -301,6 +334,7 @@ function workProcesses(wp) {
       </div>
       <div class="bar"><i class="${IB.barClass(pct)}" style="width:${pct || 0}%"></i></div>
       <div class="wp-types">${types}</div>
+      ${riskLine}
       ${lr}
     </div>`;
 }
@@ -419,8 +453,16 @@ function card(s) {
         const freeStr = s.ccms && s.ccms.mem_free_display;
         if (s.memory !== null && s.memory !== undefined) {
           const label = s.memory_is_sap_internal ? "SAP memory" : "Memory";
-          return tile(label, IB.val(s.memory, "%", 0), gradeCpu(s.memory),
-                      basis ? basis : srcNote(s, "memory"));
+          const graded = memoryTrusted(s);
+          // SMON does not export total RAM, so a cache-inclusive percentage
+          // cannot be derived from it. Where the cache-inclusive FREE figure
+          // is known, show that instead: "3.9 GB free incl. cache" says
+          // something, "100%" does not.
+          const freeInc = s.smon && s.smon.free_mem_mb_inc_fs;
+          const note = graded ? (basis || srcNote(s, "memory"))
+                     : (freeInc ? IB.val(freeInc / 1024, " GB", 1) + " free incl. cache"
+                                : (basis ? basis + " — not graded" : srcNote(s, "memory")));
+          return tile(label, IB.val(s.memory, "%", 0), gradeMemory(s), note);
         }
         if (freeStr) {
           // No denominator, but a real free figure. Show it, grade neutral --
@@ -452,7 +494,7 @@ function card(s) {
                s.server_time_source ? IB.esc(s.server_time_source) : "")}
     </div>
 
-    ${workProcesses(wp)}
+    ${workProcesses(wp, s.checks)}
     ${instances(s.instances)}
 
     <div style="text-align:center;margin:6px 0">

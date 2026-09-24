@@ -155,7 +155,7 @@ def build_rca_pdf(path: str, *, system: str, client: str, started: datetime,
         line = (f"Live at capture: dialog response {resp:.0f} ms" if isinstance(resp, (int, float)) else "Live at capture:") + (
             " (" + ", ".join(f"{k} {v} ms" for k, v in by_inst.items()) + ")" if by_inst else "") + (
             f"; CPU {rfc['cpu']}%" if rfc.get("cpu") is not None else "") + (
-            f"; memory {rfc['memory']}%" if rfc.get("memory") is not None else "")
+            f"; host memory {rfc['memory']}%" if rfc.get("memory") is not None else "")
         story.append(Paragraph(line, body))
     if analysis.get("summary") and str(analysis.get("source", "rules")) != "rules":
         story.append(Paragraph(_esc(analysis["summary"]), body))

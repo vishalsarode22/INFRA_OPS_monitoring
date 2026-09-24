@@ -27,6 +27,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -210,6 +211,56 @@ RCA_SCHEMA = {
     "confidence_reason": "what would raise it",
     "not_supported": ["hypotheses the evidence does not support, to stop people chasing them"],
 }
+
+
+# A single step this long owns a work process for that whole time.
+RCA_LONG_STEP_CRITICAL_S = 600
+
+# Programs IBOPS itself runs while collecting.
+RCA_MONITOR_PROGRAMS = ("CL_SERVER_INFO",)
+
+# Findings measured over the window (STAD) come before a point-in-time
+# snapshot (SM50/SM66): PS4's 3-hour step was listed fifth, below a work
+# process that happened to be busy at capture time.
+_CULPRIT_ORDER = {"STAD": 0, "SM12": 1, "ST03N": 2, "SM50": 3, "SM66": 3}
+
+
+def _culprit_rank(entry: dict) -> int:
+    token = re.split(r"[ :]", str(entry.get("evidence") or "").strip(), maxsplit=1)[0].upper()
+    return _CULPRIT_ORDER.get(token, 9)
+
+
+def _rules_verdict(facts_by_screen: dict, culprits: list) -> tuple:
+    """
+    Severity, a root-cause sentence and the first action, from the measured
+    screens. The fallback used to read "Rules-based: see culprits", grade
+    every finding WARNING, and leave the heaviest program out of the actions.
+    """
+    from sap_gui.rca_actions import _ms_h
+
+    stad = facts_by_screen.get("STAD") or facts_by_screen.get("stad") or {}
+    top = (stad.get("top_by_response") or [{}])[0]
+    user = str(top.get("user") or "")
+    programs = ", ".join(top.get("programs") or []) if isinstance(top.get("programs"), (list, tuple, set)) else str(top.get("programs") or "")
+    worst_ms = float(top.get("worst_ms") or top.get("resp_ms") or 0)
+    cpu_ms, db_ms = float(top.get("cpu_ms") or 0), float(top.get("db_ms") or 0)
+    # PRIV mode stays WARNING here, as it is in the SM66 monitoring row.
+    severity = "CRITICAL" if worst_ms >= RCA_LONG_STEP_CRITICAL_S * 1000 else (
+        "WARNING" if culprits else "NORMAL")
+    if not user or worst_ms <= 0:
+        return severity, "Rules-based: see the culprits below; model analysis unavailable.", None
+
+    share = "CPU-bound" if cpu_ms > db_ms else "database-bound"
+    root_cause = (f"{user} ran {programs or 'a program'} as a single step of {_ms_h(worst_ms)} "
+                  f"({_ms_h(cpu_ms)} CPU, {_ms_h(db_ms)} database), which held a work process for "
+                  f"that time and dominates the window. The step is {share}.")
+    lead = {"step": (f"{programs or 'the top program'}: single step of {_ms_h(worst_ms)} by {user}, {share}. "
+                     + ("Profile the ABAP (SAT) -- CPU time this high is loop or internal-table work, not the database."
+                        if cpu_ms > db_ms else
+                        "Trace the SQL (ST05 / SQLM) and check the indexes it uses.")
+                     + " A step this long belongs in the background, not in a dialog work process."),
+            "tcode": "STAD / SAT"}
+    return severity, root_cause, lead
 
 
 def build_prompt(system: str, trigger_reason: str, evidence: list[dict], rfc: dict) -> str:
@@ -396,6 +447,8 @@ def rules_based_analysis(evidence: list[dict], rfc: dict) -> dict:
     What the report says when the model is off or fails. Never invents:
     every line traces to an extracted field.
     """
+    from sap_gui.rca_actions import _ms_h
+
     culprits, actions = [], []
     facts = {e["tcode"]: e["facts"] for e in evidence}
 
@@ -405,6 +458,10 @@ def rules_based_analysis(evidence: list[dict], rfc: dict) -> dict:
                              "evidence": f"{tag}: PRIV mode, {p.get('program','')}, elapsed {p.get('elapsed','')}s",
                              "impact": "holds a dialog work process exclusively; other users queue"})
         for r in (f.get("long_running") or [])[:3]:
+            # IBOPS's own collection runs in a dialog work process under the
+            # monitoring user; it was listed as the top culprit on PS4.
+            if str(r.get("program", "")).upper().startswith(RCA_MONITOR_PROGRAMS):
+                continue
             if _secs(r.get("elapsed")) >= 300 and str(r.get("type", "")).upper().startswith("DIA"):
                 culprits.append({"type": "user", "name": f"{r.get('user')} ({r.get('program')})",
                                  "evidence": f"{tag} long-running: WP {r.get('wp')} DIA {r.get('elapsed')}s on current step, {r.get('action','')}".strip(),
@@ -471,12 +528,14 @@ def rules_based_analysis(evidence: list[dict], rfc: dict) -> dict:
     comp = stad.get("components") or {}
     for u in (stad.get("top_by_response") or [])[:2]:
         culprits.append({"type": "user", "name": u.get("user"),
-                         "evidence": f"STAD {stad.get('lookback_minutes', '?')} min: {u.get('steps')} steps, total {u.get('total_resp_ms', 0):.0f} ms, "
-                                     f"worst {u.get('worst_ms', 0):.0f} ms, {', '.join(u.get('programs', []))}",
+                         "evidence": f"STAD {stad.get('lookback_minutes', '?')} min: {u.get('steps')} steps, "
+                                     f"total {_ms_h(u.get('total_resp_ms', 0))}, worst {_ms_h(u.get('worst_ms', 0))}, "
+                                     f"{', '.join(u.get('programs', []))}",
                          "impact": "highest total response time in the window"})
     for pgm in (stad.get("top_programs") or [])[:1]:
         culprits.append({"type": "report", "name": pgm.get("program"),
-                         "evidence": f"STAD: {pgm.get('steps')} steps, total {pgm.get('total_resp_ms', 0):.0f} ms, DB {pgm.get('db_ms', 0):.0f} ms, CPU {pgm.get('cpu_ms', 0):.0f} ms",
+                         "evidence": f"STAD: {pgm.get('steps')} steps, total {_ms_h(pgm.get('total_resp_ms', 0))}, "
+                                     f"DB {_ms_h(pgm.get('db_ms', 0))}, CPU {_ms_h(pgm.get('cpu_ms', 0))}",
                          "impact": "top program by response time in the window"})
     for u in (stad.get("top_by_memory") or [])[:1]:
         if u.get("max_memory"):
@@ -493,8 +552,12 @@ def rules_based_analysis(evidence: list[dict], rfc: dict) -> dict:
         else "No single cause stands out in the captured screens; see the evidence.")
     per_screen = human_per_screen(facts, rfc)
     summary = " ".join(per_screen.values())
-    return {"severity": "WARNING" if culprits else "NORMAL", "headline": headline, "summary": summary, "per_screen": per_screen,
-            "culprits": culprits, "root_cause": "Rules-based: see culprits; model analysis unavailable.",
+    culprits.sort(key=_culprit_rank)
+    severity, root_cause, lead = _rules_verdict(facts, culprits)
+    if lead:
+        actions.insert(0, lead)
+    return {"severity": severity, "headline": headline, "summary": summary, "per_screen": per_screen,
+            "culprits": culprits, "root_cause": root_cause,
             "contributing": [], "actions_now": actions, "actions_later": [],
             "confidence": "low", "confidence_reason": "rules only; model analysis was off or failed",
             "not_supported": [], "source": "rules"}

@@ -144,6 +144,153 @@ def _get_data(metric: MetricResult) -> dict:
     return {}
 
 
+# A successful backup older than this is overdue (daily backups on PS4 finish
+# around 14:45; 26 h leaves room for a run that starts a little late).
+DB12_MAX_BACKUP_AGE_HOURS = 26
+
+# SM21 errors after routine and dump messages are set aside: 1-4 is WARNING,
+# from this many CRITICAL. One lost RFC conversation (R49 CONV_ID_NOT_FOUND on
+# PS4, 22.09.2026) had made SM21 CRITICAL on its own.
+SM21_ERRORS_CRITICAL = 5
+
+# Checks whose figure is also published as a metric graded by
+# config/thresholds.yaml. The row takes the worse of its own rule and the
+# threshold, so one number cannot be WARNING in the sheet and CRITICAL in
+# the findings (PS4: 680 locks and 6 dumps were both).
+_THRESHOLD_GRADED = {
+    # tcode: (evidence key, metric name in thresholds.yaml -- as core/tcode_metrics.py names it)
+    "SM12": (("lock_count",), "sap.sm12.lock_count"),
+    "ST22": (("dump_count",), "sap.st22.dump_count"),
+    # failed = in error + Initial past the stale limit; older payloads only
+    # carry the raw record count.
+    "SM13": (("failed_update_count", "update_count"), "sap.sm13.failed_updates"),
+}
+
+
+def _threshold_limits(tcode: str):
+    """(warning, critical) from thresholds.yaml for this check's figure."""
+    spec = _THRESHOLD_GRADED.get(tcode)
+    if not spec:
+        return None
+    try:
+        from core.config_loader import get_thresholds
+
+        table = get_thresholds() or {}
+        table = table.get("thresholds", table)
+        limits = table.get(spec[1])
+    except Exception:
+        return None
+    if not isinstance(limits, dict):
+        return None
+    return _number(limits.get("warning")), _number(limits.get("critical"))
+
+
+def _threshold_status(tcode: str, data: dict):
+    limits = _threshold_limits(tcode)
+    keys = (_THRESHOLD_GRADED.get(tcode) or ((),))[0]
+    value = next((v for v in (_number(data.get(k)) for k in keys) if v is not None), None)
+    if not limits or value is None:
+        return None
+    warning, critical = limits
+    # Exclusive (value > limit), the same boundary the metric engine uses:
+    # 5 dumps against critical=5 graded WARNING as a metric and CRITICAL in
+    # the sheet on PS4, 23.09.2026.
+    if critical is not None and value > critical:
+        return "CRITICAL"
+    if warning is not None and value > warning:
+        return "WARNING"
+    return "OK"
+
+
+def _backup_age_hours(data: dict):
+    latest = data.get("latest_backup") or {}
+    try:
+        ended = datetime.strptime(_clean(latest.get("end_time"))[:19], "%d.%m.%Y %H:%M:%S")
+        taken = datetime.strptime(_clean(data.get("finished_at"))[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return None
+    return (taken - ended).total_seconds() / 3600
+
+
+def _short_program(name) -> str:
+    """CL_ABAP_TYPEDESCR=============CP -> CL_ABAP_TYPEDESCR"""
+    return re.sub(r"=+\w*$", "", _clean(name))
+
+
+def _not_measured(reason: str) -> str:
+    return f"Not measured: {reason}. See the screenshot for what was displayed."
+
+
+def _sm21_zero_contradicted(data: dict) -> bool:
+    """
+    An SM21 read that found no rows while OCR of the same screen counted
+    syslog rows. PS4 reported "0 entries, OK" beside 30+ visible messages;
+    that must read as unverified, not as a clean log.
+    """
+    return (_number(data.get("log_count")) == 0
+            and (_number(data.get("syslog_rows_count")) or 0) > 0)
+
+
+def _sm37_zero_contradicted(data: dict) -> bool:
+    """SM37 counted 0 active jobs from rows whose status column read blank."""
+    jobs = [j for j in (data.get("jobs") or []) if isinstance(j, dict)]
+    return (_number(data.get("active_job_count")) == 0
+            and (_number(data.get("records_passed")) or 0) > 0
+            and bool(jobs)
+            and not any(str(j.get("status") or "").strip() for j in jobs))
+
+
+def _usage(item) -> dict:
+    """Re-derive a DB02 usage reading from its raw text (locale-safe)."""
+    from utils.sap_numbers import parse_usage_ratio
+
+    if not isinstance(item, dict):
+        return {}
+    raw = _clean(item.get("raw"))
+    parsed = parse_usage_ratio(raw) if raw else {}
+    if parsed.get("usage_percent") is not None:
+        return parsed
+    return item
+
+
+def _fmt2(value) -> str:
+    try:
+        return f"{float(value):,.2f}"
+    except (TypeError, ValueError):
+        return _clean(value)
+
+
+_DB02_ITEMS = (
+    ("Memory MDC", "memory", "mdc"),
+    ("Memory Tenant", "memory", "tenant"),
+    ("Storage Data", "storage", "data"),
+    ("Storage Log", "storage", "log"),
+    ("Storage Trace", "storage", "trace"),
+)
+
+
+def _capture_time(metric: MetricResult):
+    """(dd.mm.yyyy, HH:MM:SS) of this check's own capture, if recorded."""
+    stamp = _clean(_get_data(metric).get("finished_at"))
+    try:
+        when = datetime.strptime(stamp[:19], "%Y-%m-%dT%H:%M:%S")
+        return when.strftime("%d.%m.%Y"), when.strftime("%H:%M:%S")
+    except ValueError:
+        return None
+
+
+def _system_config(name: str) -> dict:
+    try:
+        from core.config_loader import get_systems
+
+        for system in get_systems() or []:
+            if _clean(system.get("name")).upper() == _clean(name).upper():
+                return system
+    except Exception:
+        pass
+    return {}
+
+
 # ---------------------------------------------------------------------------
 # Status evaluation
 # ---------------------------------------------------------------------------
@@ -196,7 +343,7 @@ def _status_from_smlg(data: dict) -> str:
     return "OK" if grade["status"].value == "NORMAL" else grade["status"].value
 
 
-def _status_for_metric(metric: MetricResult) -> str:
+def _rule_status_for_metric(metric: MetricResult) -> str:
     """
     Determine deterministic Excel monitoring status.
 
@@ -208,6 +355,16 @@ def _status_for_metric(metric: MetricResult) -> str:
 
     tcode = _clean(getattr(metric, "tcode", "")).upper()
     data = _get_data(metric)
+
+    # ---------------------------------------------------------------
+    # A check whose extraction failed was not measured, whatever else is
+    # in its data. Without this, a T-code with no specific rule fell back
+    # to the metric's own status -- and SM13 was graded OK beside the words
+    # "SM13 structured extraction failed" because its failure path had
+    # reported zero pending updates.
+    # ---------------------------------------------------------------
+    if data.get("extraction_failed"):
+        return "UNKNOWN"
 
     # ---------------------------------------------------------------
     # SMLG - response time
@@ -288,6 +445,9 @@ def _status_for_metric(metric: MetricResult) -> str:
         if latest_status in {"failed", "error", "cancelled", "canceled"}:
             return "CRITICAL"
         if latest_status == "successful":
+            age = _backup_age_hours(data)
+            if age is not None and age > DB12_MAX_BACKUP_AGE_HOURS:
+                return "WARNING"
             return "OK"
 
         # Backward-compatible fallback for older payloads.
@@ -304,6 +464,17 @@ def _status_for_metric(metric: MetricResult) -> str:
     # SCOT - SAPconnect / SMTP
     # ---------------------------------------------------------------
     if tcode == "SCOT":
+        # A listed mail port -- any number -- is the health signal for this
+        # check, so it decides first. The rules below it read smtp_status,
+        # active_nodes and node_count, which the current SCOT action never
+        # produces; they are kept for results from older collectors.
+        if _number(data.get("mail_port")) is not None:
+            return "OK"
+
+        if "mail_port_raw" in data and not data.get("extraction_failed"):
+            # The screen was read and no port number was listed.
+            return "WARNING"
+
         smtp_status = _clean(data.get("smtp_status")).lower()
         active_nodes = _number(data.get("active_nodes"))
         node_count = _number(data.get("node_count"))
@@ -339,10 +510,6 @@ def _status_for_metric(metric: MetricResult) -> str:
         if active_nodes is not None and active_nodes > 0:
             return "OK"
 
-        # A readable SMTP mail port is the requested health signal.
-        if _number(data.get("mail_port")) is not None and _number(data.get("mail_port")) > 0:
-            return "OK"
-
         if node_count is not None and node_count > 0:
             return "WARNING"
 
@@ -350,12 +517,18 @@ def _status_for_metric(metric: MetricResult) -> str:
     # SM21 - System Log
     # ---------------------------------------------------------------
     if tcode == "SM21":
+        if _sm21_zero_contradicted(data):
+            return "UNKNOWN"
+
         errors = _number(data.get("error_count"))
         warnings = _number(data.get("warning_count"))
         logs = _number(data.get("log_count"))
 
-        if errors is not None and errors > 0:
+        if errors is not None and errors >= SM21_ERRORS_CRITICAL:
             return "CRITICAL"
+
+        if errors is not None and errors > 0:
+            return "WARNING"
 
         if warnings is not None and warnings > 0:
             return "WARNING"
@@ -370,6 +543,8 @@ def _status_for_metric(metric: MetricResult) -> str:
     # structured counts. Do not interpret a non-zero count as unhealthy
     # by itself (e.g. active jobs and active application servers are normal).
     if tcode in {"SM37", "SM37_CANCELLED", "SM51"}:
+        if tcode == "SM37" and _sm37_zero_contradicted(data):
+            return "UNKNOWN"
         explicit_status = _clean(data.get("status")).upper()
         if explicit_status in {"OK", "WARNING", "CRITICAL", "UNKNOWN"}:
             return explicit_status
@@ -417,14 +592,25 @@ def _status_for_metric(metric: MetricResult) -> str:
         count = _number(data.get("lock_count"))
 
         if count is not None:
-            # A small number of lock entries is normal. Raise WARNING
-            # only when the configured operational threshold is exceeded.
+            # Follow thresholds.yaml (500/2000 since 22.09.2026). The fixed
+            # "over 50" rule below is the fallback when no limit is
+            # configured; it used to flag every productive system.
+            graded = _threshold_status("SM12", data)
+            if graded:
+                return graded
             return "WARNING" if count > 50 else "OK"
 
     # ---------------------------------------------------------------
     # SM13
     # ---------------------------------------------------------------
     if tcode == "SM13":
+        if _number(data.get("error_update_count")):
+            return "CRITICAL"
+
+        failed = _number(data.get("failed_update_count"))
+        if failed is not None:
+            return "WARNING" if failed else "OK"
+
         count = _number(data.get("update_count"))
 
         if count is not None:
@@ -442,12 +628,12 @@ def _status_for_metric(metric: MetricResult) -> str:
         # The two states worth acting on. A screen with neither is healthy,
         # not unknown -- this check fell through to UNKNOWN whenever
         # failed_processes was absent, which is every OCR-fallback capture.
-        for key in ("priv_mode_processes", "long_running_processes"):
+        for key in ("priv_mode_processes",):
             value = _number(data.get(key))
             if value is not None and value > 0:
                 return "WARNING"
 
-        for key in ("running_processes", "visible_process_rows",
+        for key in ("active_processes", "running_processes", "visible_process_rows",
                     "process_count", "failed_processes"):
             if _number(data.get(key)) is not None:
                 return "OK"
@@ -506,6 +692,8 @@ def _status_for_metric(metric: MetricResult) -> str:
         if requests is not None:
             return "OK"
 
+        return "UNKNOWN"
+
     # ---------------------------------------------------------------
     # ST22
     # ---------------------------------------------------------------
@@ -562,11 +750,40 @@ def _status_for_metric(metric: MetricResult) -> str:
 
     return "UNKNOWN"
 
+_STATUS_RANK = {"UNKNOWN": 0, "OK": 0, "WARNING": 1, "CRITICAL": 2}
+
+
+def _status_for_metric(metric: MetricResult) -> str:
+    """The check's rule, raised to the thresholds.yaml grade where one applies."""
+    status = _rule_status_for_metric(metric)
+    if status == "UNKNOWN":
+        return status
+    tcode = _clean(getattr(metric, "tcode", "")).upper()
+    graded = _threshold_status(tcode, _get_data(metric))
+    if graded and _STATUS_RANK[graded] > _STATUS_RANK.get(status, 0):
+        return graded
+    return status
+
+
 # ---------------------------------------------------------------------------
 # Actual Result
 # ---------------------------------------------------------------------------
 
 def _build_actual_result(metric: MetricResult) -> str:
+    text = _build_actual_result_base(metric)
+    data = _get_data(metric)
+    if (_clean(getattr(metric, "tcode", "")).upper() == "SM21" and text
+            and not text.startswith(("Not measured", "Not verified"))):
+        routine = _number(data.get("routine_count"))
+        echoes = _number(data.get("dump_echo_count"))
+        if routine:
+            text += f"; routine: {_format_number(routine)}"
+        if echoes:
+            text += f"; dump messages: {_format_number(echoes)} (see ST22)"
+    return text
+
+
+def _build_actual_result_base(metric: MetricResult) -> str:
     """
     Build the Excel Actual Result from structured SAP GUI evidence.
     """
@@ -576,6 +793,28 @@ def _build_actual_result(metric: MetricResult) -> str:
 
     if not data:
         return NO_DATA_TEXT
+
+    # Say that the check was not measured, and why -- rather than printing
+    # a count the tool never read.
+    if data.get("extraction_failed"):
+        reason = _clean(data.get("error"))
+        if len(reason) > 140:
+            reason = reason[:137] + "..."
+        return (
+            "Not measured: the screen was opened but its values could not "
+            "be read" + (f" ({reason})" if reason else "") + ". "
+            "See the screenshot for what was displayed."
+        )
+
+    if tcode == "SM21" and _sm21_zero_contradicted(data):
+        return ("Not verified: the log grid read as empty while the screen "
+                f"lists about {_format_number(data.get('syslog_rows_count'))} "
+                "entries. See the screenshot.")
+
+    if tcode == "SM37" and _sm37_zero_contradicted(data):
+        return (f"Not verified: {_format_number(data.get('records_passed'))} jobs "
+                "listed (Ready/Active), but the status column could not be read. "
+                "See the screenshot.")
 
     # ---------------------------------------------------------------
     # AL08 - Logged-On Users
@@ -630,12 +869,12 @@ def _build_actual_result(metric: MetricResult) -> str:
 
         if user_logons is not None:
             parts.append(
-                f"{_format_number(user_logons)} users logged on"
+                f"{_format_number(user_logons)} user sessions"
             )
 
         if back_end_sessions is not None:
             parts.append(
-                f"{_format_number(back_end_sessions)} back-end sessions"
+                f"{_format_number(back_end_sessions)} ABAP sessions"
             )
 
         if parts:
@@ -690,35 +929,17 @@ def _build_actual_result(metric: MetricResult) -> str:
     # DB02
     # ---------------------------------------------------------------
     if tcode == "DB02":
-        memory = data.get("memory") or {}
-        storage = data.get("storage") or {}
         parts = []
-
-        def usage_text(label, item):
-            if not isinstance(item, dict):
-                return ""
-            raw = _clean(item.get("raw"))
-            used = item.get("used")
-            limit = item.get("limit")
-            unit = _clean(item.get("unit"))
-            limit_unit = _clean(item.get("limit_unit")) or unit
+        for label, group, key in _DB02_ITEMS:
+            item = _usage((data.get(group) or {}).get(key))
             pct = item.get("usage_percent")
-            if raw:
-                value = raw
-            elif used is not None and limit is not None:
-                value = f"{_format_number(used)} {unit} / {_format_number(limit)} {limit_unit}"
-            else:
-                return ""
+            if item.get("used") is None or item.get("limit") is None:
+                continue
+            text = (f"{label}: {_fmt2(item['used'])} {item.get('unit', '')} of "
+                    f"{_fmt2(item['limit'])} {item.get('limit_unit') or item.get('unit', '')}")
             if pct is not None:
-                value += f" ({_format_number(pct)}%)"
-            return f"{label}: {value}"
-
-        for label, item in (("Memory MDC", memory.get("mdc")), ("Memory Tenant", memory.get("tenant")),
-                            ("Storage Data", storage.get("data")), ("Storage Log", storage.get("log")),
-                            ("Storage Trace", storage.get("trace"))):
-            text = usage_text(label, item)
-            if text:
-                parts.append(text)
+                text += f" ({float(pct):.1f}%)"
+            parts.append(text)
 
         if parts:
             return "; ".join(parts)
@@ -728,17 +949,35 @@ def _build_actual_result(metric: MetricResult) -> str:
     # ---------------------------------------------------------------
     if tcode == "DB12":
         latest = data.get("latest_backup") or {}
-        end_time = _clean(latest.get("end_time"))
+        end_time = _clean(latest.get("end_time")) or _clean(data.get("last_backup_end_time"))
         if end_time:
-            return f"Last Backup: {end_time}"
-        end_time = _clean(data.get("last_backup_end_time"))
-        if end_time:
-            return f"Last Backup: {end_time}"
+            state = _clean(latest.get("status")).lower()
+            text = (f"Last successful backup: {end_time}" if state in ("", "successful")
+                    else f"Last backup: {end_time} ({state})")
+            running = data.get("running_backup") or {}
+            if _clean(running.get("start_time")):
+                text += f"; backup running since {_clean(running.get('start_time'))}"
+            return text
 
     # ---------------------------------------------------------------
     # SCOT
     # ---------------------------------------------------------------
     if tcode == "SCOT":
+        # Show the port that was read. This branch only knew the older
+        # smtp_status/node_count keys, so a successfully captured port fell
+        # through to the raw extra_data dump and never appeared on its own.
+        port = data.get("mail_port")
+        if _number(port) is not None:
+            return f"SMTP Mail Port: {int(_number(port))}"
+
+        raw_port = _clean(data.get("mail_port_raw"))
+        if "mail_port_raw" in data and not data.get("extraction_failed"):
+            if _number(data.get("smtp_nodes_configured")) == 0:
+                return ("No SMTP node configured: the SMTP Nodes list in SCOT "
+                        "is empty, so outbound mail cannot be sent")
+            return (f"SMTP Mail Port field shows {raw_port!r}, not a port number"
+                    if raw_port else "No SMTP Mail Port listed")
+
         smtp_status = data.get("smtp_status")
         nodes = _number(data.get("node_count"))
         active = _number(data.get("active_nodes"))
@@ -822,27 +1061,42 @@ def _build_actual_result(metric: MetricResult) -> str:
     # SM37 active
     # ---------------------------------------------------------------
     if tcode == "SM37":
-        count = data.get("active_job_count")
-        if count is None:
-            count = data.get("active_jobs") if isinstance(data.get("active_jobs"), (int, float, str)) else None
+        active = _number(data.get("active_job_count"))
+        ready = _number(data.get("ready_job_count"))
+        total = _number(data.get("job_count"))
+        if active is None and isinstance(data.get("active_jobs"), (int, float, str)):
+            active = _number(data.get("active_jobs"))
 
-        if count is not None:
-            return (
-                f"{_format_number(count)} active background jobs"
-            )
+        if active is not None:
+            text = f"{_format_number(active)} active background jobs"
+            if ready:
+                text += f"; {_format_number(ready)} ready"
+            longest = data.get("longest_running_job") or {}
+            if longest.get("job_name") and _number(longest.get("duration_seconds")):
+                text += (f"; longest running {longest['job_name']} "
+                         f"({_format_number(longest['duration_seconds'])} s)")
+            return text
 
-    # ---------------------------------------------------------------
-    # SM37 cancelled
-    # ---------------------------------------------------------------
+        if total is not None:
+            return (f"{_format_number(total)} jobs in Ready/Active status "
+                    "(per-job status not readable)")
+
     if tcode == "SM37_CANCELLED":
-        count = data.get("cancelled_job_count")
+        count = _number(data.get("cancelled_job_count"))
         if count is None:
-            count = data.get("cancelled_jobs") if isinstance(data.get("cancelled_jobs"), (int, float, str)) else None
+            count = _number(data.get("records_passed"))
+        since = _clean((data.get("date_filter") or {}).get("from_date"))
 
         if count is not None:
-            return (
-                f"{_format_number(count)} cancelled background jobs"
-            )
+            text = f"{_format_number(count)} cancelled background jobs"
+            if since:
+                text += f" since {since}"
+            names = data.get("cancelled_job_names") or []
+            if count and names:
+                text += ": " + ", ".join(names[:5])
+            return text
+
+        return _not_measured("the cancelled-job count could not be read")
 
     # ---------------------------------------------------------------
     # SM51
@@ -908,55 +1162,25 @@ def _build_actual_result(metric: MetricResult) -> str:
     # SMLG
     # ---------------------------------------------------------------
     if tcode == "SMLG":
-        instances = data.get("instances") or []
-
-        valid_instances = []
-
-        for instance in instances:
-            response = _number(
-                instance.get("response_time_ms")
-            )
-
-            if response is not None:
-                valid_instances.append(
-                    (
-                        _clean(instance.get("instance")),
-                        response,
-                    )
-                )
-
-        if valid_instances:
-            worst = max(
-                response
-                for _, response in valid_instances
-            )
-
-            details = ", ".join(
-                f"{name}: {_format_number(response)} ms"
-                for name, response in valid_instances
-            )
-
-            return (
-                f"Instance Count: {len(valid_instances)}; "
-                f"Max Response Time: {_format_number(worst)} ms; "
-                f"{details}"
-            )
-
-        # The OCR path reports a single flat figure rather than a list of
-        # instances. Without this the cell fell through to the raw dump and
-        # SMLG -- a check whose entire purpose is the response time -- never
-        # showed a response time.
-        #
-        # parse_response_ms, not _number: SMLG prints 1265 ms as "1.265",
-        # and _number reads that as 1.265. The sheet said "Response Time:
-        # 1.265 ms" for a system answering in just over a second -- a
-        # thousandfold understatement, and one no threshold could fire on.
         from sap_gui.smlg_analyzer import parse_response_ms
+
+        readings = []
+        for instance in data.get("instances") or []:
+            response = parse_response_ms(instance.get("response_time_ms"))
+            if response is not None:
+                readings.append((_clean(instance.get("instance")), response))
+
+        if readings:
+            readings.sort(key=lambda item: item[1], reverse=True)
+            return "; ".join(f"{name}: {_format_number(ms)} ms" for name, ms in readings)
 
         for key in ("response_time_ms", "avg_response_time_ms"):
             response = parse_response_ms(data.get(key))
             if response is not None:
-                return f"Response Time: {_format_number(response)} ms"
+                return f"Response time: {_format_number(response)} ms"
+
+        # Never fall through to the raw extra_data dump for this check.
+        return _not_measured("no instance response time could be read from SMLG")
 
     # ---------------------------------------------------------------
     # SM66 - Work processes (global)
@@ -967,50 +1191,22 @@ def _build_actual_result(metric: MetricResult) -> str:
     # PRIV mode or have been running too long.
     # ---------------------------------------------------------------
     if tcode == "SM66":
-        running = data.get("running_processes")
-        displayed = data.get("visible_process_rows")
-        if displayed is None:
-            displayed = data.get("process_count")
-        priv = data.get("priv_mode_processes")
-        long_running = data.get("long_running_processes")
-        failed = data.get("failed_processes")
-        users = _clean(data.get("running_users_list"))
+        running = _number(data.get("running_processes"))
+        on_hold = _number(data.get("on_hold_processes"))
+        waiting = _number(data.get("waiting_processes"))
+        priv = _number(data.get("priv_mode_processes"))
+        active = _number(data.get("active_processes"))
+        if active is None and running is not None and on_hold is not None:
+            active = running + on_hold
 
-        parts = []
+        def figure(value):
+            return _format_number(value) if value is not None else "not read"
 
-        if running is not None:
-            parts.append(
-                f"Active Work Processes: {_format_number(running)}"
-            )
-
-        if displayed is not None:
-            parts.append(
-                f"Displayed: {_format_number(displayed)}"
-            )
-
-        # Report these two whenever they were measured, including when they
-        # are zero -- "Long-Running: 0" is the reassurance the check exists
-        # to give, and its absence would read as "not checked".
-        if priv is not None:
-            parts.append(
-                f"PRIV Mode: {_format_number(priv)}"
-            )
-
-        if long_running is not None:
-            parts.append(
-                f"Long-Running: {_format_number(long_running)}"
-            )
-
-        if failed is not None and _number(failed) and _number(failed) > 0:
-            parts.append(
-                f"Failed: {_format_number(failed)}"
-            )
-
-        if users and running is not None and _number(running):
-            parts.append(f"Users: {users}")
-
-        if parts:
-            return "; ".join(parts)
+        if active is not None or running is not None:
+            head = (f"Active: {figure(active)} (Running {figure(running)}, "
+                    f"On Hold {figure(on_hold)})" if active is not None
+                    else f"Running: {figure(running)}")
+            return f"{head}; Waiting: {figure(waiting)}; PRIV mode: {figure(priv)}"
 
     # ---------------------------------------------------------------
     # SMQ1 / SMQ2
@@ -1076,21 +1272,21 @@ def _build_actual_result(metric: MetricResult) -> str:
         errors = _number(data.get("spool_errors"))
         without_output = _number(data.get("spool_without_output_request"))
 
-        parts = []
+        if requests is None:
+            at_least = _number(data.get("spool_requests_at_least"))
+            if at_least:
+                return _not_measured(f"list only partly read (at least {_format_number(at_least)} requests)")
+            return _not_measured("the spool list could not be read")
 
-        if requests is not None:
-            parts.append(f"Spool Requests: {_format_number(requests)}")
-
+        text = f"{_format_number(requests)} spool requests"
+        selection = data.get("selection") or {}
+        if selection.get("created_by") == "*":
+            text += " (created today, all users)"
         if without_output is not None:
-            parts.append(
-                f"Without Output Request: {_format_number(without_output)}"
-            )
-
+            text += f"; {_format_number(without_output)} without output request"
         if errors is not None:
-            parts.append(f"Spool Errors: {_format_number(errors)}")
-
-        if parts:
-            return "; ".join(parts)
+            text += f"; {_format_number(errors)} in error"
+        return text
 
     # ---------------------------------------------------------------
     # ST22
@@ -1193,7 +1389,202 @@ def _build_actual_result(metric: MetricResult) -> str:
 
 # ---------------------------------------------------------------------------
 # Observation
+#
+# The Observation column says what a reading MEANS -- impact or next step --
+# rather than repeating the Actual Result beside it. The PDF prints both
+# columns side by side, and a row reading "SMTP Mail Port: 25 | SMTP Mail
+# Port: 25" is what made the report look unfinished.
 # ---------------------------------------------------------------------------
+
+def _observation_override(tcode: str, data: dict, status: str):
+    if data.get("extraction_failed") or status == "UNKNOWN":
+        return ("Compare with the screenshot. If it shows data, re-run the sweep; "
+                "if this repeats, the screen reader needs updating for this system.")
+
+    if tcode == "AL08":
+        return "System-wide logon snapshot; no user-load threshold is configured."
+
+    if tcode == "DB02":
+        worst = None
+        for label, group, key in _DB02_ITEMS:
+            pct = _usage((data.get(group) or {}).get(key)).get("usage_percent")
+            if pct is not None and (worst is None or pct > worst[1]):
+                worst = (label, float(pct))
+        state = _clean(data.get("operational_state"))
+        alerts = [a for a in (data.get("alerts") or []) if "no alert" not in str(a).lower()]
+        parts = []
+        if state:
+            parts.append(f"{state}.")
+        if worst:
+            parts.append(f"Highest utilisation: {worst[0]} at {worst[1]:.1f}%.")
+        parts.append(f"{len(alerts)} database alert(s) open." if alerts else "No database alerts.")
+        return " ".join(parts)
+
+    if tcode == "DB12":
+        hours = _backup_age_hours(data)
+        running = _clean((data.get("running_backup") or {}).get("start_time"))
+        if hours is not None and hours >= 0:
+            age = f"{hours * 60:.0f} min" if hours < 2 else f"{hours:.0f} h"
+            text = (f"Last successful backup is {age} old"
+                    + (f", over the {DB12_MAX_BACKUP_AGE_HOURS} h limit." if hours > DB12_MAX_BACKUP_AGE_HOURS
+                       else "; within the daily cycle."))
+            if running:
+                text += f" Today's backup is in progress (started {running[-8:]})."
+            return text
+
+    if tcode == "SCOT":
+        if status == "OK":
+            return "SMTP node is configured, so outbound mail has a route out of the system."
+        return ("Outbound mail cannot leave the system while no SMTP node is configured; "
+                "SOST send requests stay queued. Create and activate a node in SCOT.")
+
+    if tcode == "SM12":
+        count = _number(data.get("lock_count"))
+        limits = _threshold_limits("SM12")
+        if count is not None and limits and None not in limits:
+            warning, critical = limits
+            if count >= critical:
+                return (f"Above the {_format_number(critical)}-entry critical level; look for "
+                        "long-held locks and terminated sessions still holding entries.")
+            if count >= warning:
+                return f"Above the {_format_number(warning)}-entry warning level."
+            return f"Below the {_format_number(warning)}-entry warning level."
+
+    if tcode == "SM21":
+        logs = _number(data.get("log_count"))
+        errors = _number(data.get("error_count")) or 0
+        warnings = _number(data.get("warning_count")) or 0
+        if logs is not None:
+            if errors:
+                text = f"{_format_number(errors)} error-level entr{'y' if errors == 1 else 'ies'}"
+                first = next((e for e in (data.get("error_entries") or []) if isinstance(e, dict)), None)
+                if first:
+                    when = " ".join(x for x in (_clean(first.get("id")),
+                                                f"at {_clean(first.get('time'))}" if first.get("time") else "",
+                                                f"user {_clean(first.get('user'))}" if first.get("user") else "") if x)
+                    text += f": {when} — {_clean(first.get('text'))}" if when else f": {_clean(first.get('text'))}"
+                    if errors > 1:
+                        text += f" (+{_format_number(errors - 1)} more)"
+                return text + ". Review in SM21 and correlate with ST22 at the same times."
+            if warnings:
+                return (f"{_format_number(warnings)} of {_format_number(logs)} entries are "
+                        "warning-level; no error-level entries.")
+            routine = _number(data.get("routine_count")) or 0
+            echoes = _number(data.get("dump_echo_count")) or 0
+            if routine or echoes:
+                return ("No error- or warning-level entries. Routine entries (client "
+                        "disconnects, soft-cancels, work-process restarts) and dump "
+                        "messages (graded in ST22) are counted but do not alert.")
+            return "No error- or warning-level entries."
+
+    if tcode == "SM13" and _number(data.get("failed_update_count")) is not None:
+        errors = _number(data.get("error_update_count")) or 0
+        stale = _number(data.get("stale_initial_count")) or 0
+        pending = _number(data.get("pending_update_count")) or 0
+        if errors:
+            return (f"{_format_number(errors)} update(s) in error: display the error in SM13, "
+                    "fix the cause, then repeat or delete the update.")
+        if stale:
+            return ("Update(s) waiting in Initial for more than 10 minutes: check the "
+                    "update work processes (SM50, type UPD) and SM13 > Administration.")
+        if pending:
+            return "Updates in progress; normal unless they are still Initial on the next run."
+        return "No pending or failed update requests."
+
+    if tcode == "SM37":
+        if _number(data.get("active_job_count")) is not None or _number(data.get("job_count")) is not None:
+            return "Active jobs are expected; this check lists them for context and does not alert."
+
+    if tcode == "SM37_CANCELLED":
+        count = _number(data.get("cancelled_job_count"))
+        if count == 0:
+            return "No background job was cancelled in the selection window."
+        if count:
+            return "Open each job log (SM37 > Job log) and check ST22 for a dump at the cancel time."
+
+    if tcode == "SMLG":
+        from sap_gui.smlg_analyzer import parse_response_ms
+
+        values = [parse_response_ms(i.get("response_time_ms")) for i in (data.get("instances") or [])]
+        values = [v for v in values if v is not None]
+        if values:
+            worst = max(values)
+            if worst > 2500:
+                return f"Worst instance at {_format_number(worst)} ms is above the 2,500 ms emergency band; investigate now."
+            if worst > 2000:
+                return f"Worst instance at {_format_number(worst)} ms is above the 2,000 ms critical band."
+            if worst > 1500:
+                return (f"Worst instance at {_format_number(worst)} ms is above the 1,500 ms warning band; "
+                        "check work-process load (SM50/SM66) and ST03N.")
+            return "All instances within the 1,500 ms response-time target."
+
+    if tcode == "SOST":
+        send = _number(data.get("send_requests"))
+        sent = _number(data.get("sent"))
+        errors = _number(data.get("errors")) or 0
+        if send == 0:
+            return "No outbound send requests in the period."
+        if send and sent == 0:
+            return ("Requests are queued but none were sent; check the SMTP node in SCOT "
+                    "and the SAPconnect send job (RSCONN01).")
+        if errors:
+            return f"{_format_number(errors)} send request(s) in error; review them in SOST."
+
+    if tcode == "SP01":
+        errors = _number(data.get("spool_errors")) or 0
+        if _number(data.get("spool_requests")) is not None:
+            if errors:
+                return f"{_format_number(errors)} spool request(s) in error; check the output devices (SPAD)."
+            return "No spool requests in error."
+
+    if tcode == "ST22":
+        dumps = [d for d in (data.get("dumps") or []) if isinstance(d, dict)]
+        if dumps:
+            groups = {}
+            for d in dumps:
+                g = groups.setdefault(_clean(d.get("runtime_error")) or "Runtime error",
+                                      {"n": 0, "programs": set(), "users": set()})
+                g["n"] += 1
+                if d.get("program"):
+                    g["programs"].add(_short_program(d.get("program")))
+                if d.get("user"):
+                    g["users"].add(_clean(d.get("user")))
+            parts = []
+            for name, g in sorted(groups.items(), key=lambda kv: -kv[1]["n"])[:4]:
+                detail = ", ".join(sorted(g["programs"])[:2])
+                if g["users"]:
+                    detail += (", " if detail else "") + "user " + ", ".join(sorted(g["users"])[:2])
+                parts.append(f"{name} ×{g['n']}" + (f" ({detail})" if detail else ""))
+            return "; ".join(parts) + "."
+
+    if tcode == "SM58":
+        texts = [x for x in (data.get("status_texts") or []) if isinstance(x, dict)]
+        failed = _number((data.get("information") or {}).get("failed_entries", data.get("failed_entries")))
+        if texts:
+            modules = sorted({_clean(r.get("function_module")) for r in (data.get("trfc_rows") or [])
+                              if isinstance(r, dict) and r.get("function_module")})
+            text = "; ".join(f"{x['count']}× {x['text']}" for x in texts[:2])
+            if modules:
+                text += f" ({', '.join(modules[:2])})"
+            if failed:
+                text += ". Fix the cause, then re-process the entries in SM58."
+            return text
+
+    if tcode == "SM66":
+        priv = _number(data.get("priv_mode_processes"))
+        waiting = _number(data.get("waiting_processes"))
+        if priv:
+            return (f"{_format_number(priv)} work process(es) in PRIV mode: a user context has left "
+                    "shared memory; check the program and user in SM66 and memory in ST02.")
+        if priv is not None:
+            text = "No work processes in PRIV mode."
+            if waiting == 0:
+                text += " No Waiting (free) work processes at capture time."
+            return text
+
+    return None
+
+
 def _build_observation(
     metric: MetricResult,
     status: str,
@@ -1207,6 +1598,10 @@ def _build_observation(
     ).upper()
 
     data = _get_data(metric)
+
+    override = _observation_override(tcode, data, status)
+    if override:
+        return override
 
     # ---------------------------------------------------------------
     # DB01
@@ -1956,7 +2351,12 @@ def fill_metrobrands_template(
             if sid:
                 break
 
-    ws["A1"] = f"{system_name} | {sid}" if sid else system_name
+    config = _system_config(system_name)
+    sid = sid or _clean(config.get("sap_system_id"))
+    environment = environment or _clean(config.get("environment"))
+
+    title = system_name if not sid or sid == system_name else f"{system_name} | {sid}"
+    ws["A1"] = f"{title} — SAP BASIS Monitoring"
     ws["A2"] = f"Monitoring checklist — {len(TCODE_ROW_MAP)} SAP T-codes"
 
     # ---------------------------------------------------------------
@@ -1967,19 +2367,22 @@ def fill_metrobrands_template(
 
         metric = by_tcode.get(tcode)
 
-        # Basic template fields
+        # Date and time of THIS check's capture. The sheet used to stamp
+        # every row with the moment the workbook was written, several
+        # minutes after the screens were read.
+        stamp = _capture_time(metric) if metric is not None else None
+        row_date, row_time = stamp or (report_date, datetime.now().strftime("%H:%M:%S"))
+
         ws.cell(
             row=row,
             column=1,
-            value=report_date,
+            value=row_date,
         )
 
         ws.cell(
             row=row,
             column=2,
-            value=datetime.now().strftime(
-                "%H:%M:%S"
-            ),
+            value=row_time,
         )
 
         ws.cell(
@@ -2003,7 +2406,7 @@ def fill_metrobrands_template(
         ws.cell(
             row=row,
             column=6,
-            value=environment,
+            value=environment or "—",
         )
 
         ws.cell(
@@ -2187,6 +2590,18 @@ def fill_metrobrands_template(
     # ---------------------------------------------------------------
 
     ws.freeze_panes = "A4"
+
+    # The guide must use the sheet's own vocabulary: rows say OK, the guide
+    # said HEALTHY.
+    if "Status Guide" in wb.sheetnames:
+        guide = wb["Status Guide"]
+        for guide_row in guide.iter_rows(min_row=2):
+            cell = guide_row[0]
+            if _clean(cell.value).upper() == "HEALTHY":
+                cell.value = "OK"
+            fill = status_fills.get(_clean(cell.value).upper())
+            if fill is not None:
+                cell.fill = fill
 
     # ---------------------------------------------------------------
     # Auto-filter

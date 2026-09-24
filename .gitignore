@@ -45,3 +45,12 @@ logs/
 
 reports/
 
+
+# --- runtime state, added 2026-09-24 ---
+dashboard/events/
+dashboard/incidents/
+dashboard/intelligence_state/
+dashboard/history/
+dashboard/run_history.json
+dashboard/latest_status.json
+

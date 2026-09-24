@@ -17,6 +17,190 @@ from utils.logger import get_logger
 log = get_logger(__name__, "application")
 
 
+# ---------------------------------------------------------------------------
+# Classic ABAP list reading (round 18)
+#
+# SM37, SMLG and SP01 render their results as classic lists: one GuiLabel
+# per cell, addressed by screen position (lbl[col,row]). The readers used to
+# hard-code those positions as recorded on CARFOUR. PS4's lists have
+# different columns (SM37 adds "Spool" and "Job doc"; SMLG prints longer
+# instance names on consecutive rows), so every fixed position missed and
+# the checks reported 0 or UNKNOWN beside screens full of data.
+#
+# These helpers find the header row by its caption and map each cell to the
+# header whose column it falls under, so the layout can move without the
+# reader breaking. GUI scripting only exposes the rows currently on screen,
+# so lists longer than one page are read page by page.
+# ---------------------------------------------------------------------------
+
+_LIST_CELL_ID = re.compile(r"/(lbl|txt|ctxt|chk)\[(\d+),(\d+)\]$")
+
+
+def _norm_caption(text):
+    """'Resp.time(ms)' -> 'resptimems', 'Job CreatedB' -> 'jobcreatedb'."""
+    return re.sub(r"[^a-z0-9]", "", str(text or "").lower())
+
+
+def _list_cells(session, area_id="wnd[0]/usr"):
+    """{(col, row): text} for every positioned text cell of a classic list."""
+    cells = {}
+    try:
+        usr = session.findById(area_id)
+        count = int(usr.Children.Count)
+    except Exception:
+        return cells
+    for index in range(count):
+        try:
+            obj = usr.Children(index)
+            match = _LIST_CELL_ID.search(str(obj.Id))
+            if not match or match.group(1) == "chk":
+                continue  # selection checkboxes carry no data
+            text = str(getattr(obj, "Text", "") or "").strip()
+            if text and set(text) <= {"|"}:
+                continue  # drawn column separators
+            cells[(int(match.group(2)), int(match.group(3)))] = text
+        except Exception:
+            continue
+    return cells
+
+
+def _map_list_rows(cells, headers, after_row):
+    """Map every row below `after_row` onto `headers` ([(col, key)])."""
+    if not headers:
+        return []
+    by_row = {}
+    for (col, row), text in cells.items():
+        if row > after_row and text:
+            by_row.setdefault(row, []).append((col, text))
+
+    first_key = headers[0][1]
+    rows = []
+    for row in sorted(by_row):
+        mapped = {}
+        for col, text in sorted(by_row[row]):
+            key = headers[0][1]
+            for header_col, header_key in headers:
+                # +1: some list headers render one character right of
+                # their column's first data character.
+                if header_col <= col + 1:
+                    key = header_key
+                else:
+                    break
+            mapped[key] = f"{mapped[key]} {text}" if key in mapped else text
+        leading = sorted(by_row[row])[0][1].lstrip()
+        if leading.startswith("*"):
+            break  # "*Summary" / "* Summary" closes the table
+        if _norm_caption(mapped.get(first_key)) == first_key:
+            continue  # page header repeated inside the body
+        rows.append(mapped)
+    return rows
+
+
+def _list_table(cells, first_header):
+    """
+    Find the header row containing `first_header` and return
+    (headers, rows): headers is [(col, normalised_caption)] in column
+    order, rows a list of {caption: text}. Duplicate captions (SMLG has two
+    "Thrshd" columns) get a numeric suffix.
+    """
+    want = _norm_caption(first_header)
+    header_row = None
+    for (col, row), text in sorted(cells.items(), key=lambda kv: (kv[0][1], kv[0][0])):
+        if _norm_caption(text) == want:
+            header_row = row
+            break
+    if header_row is None:
+        return [], []
+
+    headers, seen = [], {}
+    for (col, row), text in sorted(cells.items()):
+        if row != header_row or not text:
+            continue
+        key = _norm_caption(text) or f"col{col}"
+        seen[key] = seen.get(key, 0) + 1
+        if seen[key] > 1:
+            key = f"{key}_{seen[key]}"
+        headers.append((col, key))
+    headers.sort()
+    return headers, _map_list_rows(cells, headers, header_row)
+
+
+def _read_paged_list(session, first_header, max_pages=40):
+    """
+    Read a classic list across all its pages.
+
+    Pages with PageDown (VKey 82) until the screen stops changing, then
+    returns to the first page (VKey 80). Returns
+    (headers, rows, pages_read, complete, all_texts); `complete` is False
+    when the page cap was hit or paging failed after page one.
+    """
+    headers, rows, texts = [], [], []
+    previous = None
+    pages = 0
+    complete = False
+    for _ in range(max_pages):
+        cells = _list_cells(session)
+        signature = tuple(sorted(cells.items()))
+        if signature == previous:
+            complete = True
+            break
+        previous = signature
+        page_headers, page_rows = _list_table(cells, first_header)
+        if page_headers:
+            headers = page_headers
+        elif headers:
+            page_rows = _map_list_rows(cells, headers, -1)
+        rows.extend(page_rows)
+        texts.extend(t for t in cells.values() if t)
+        pages += 1
+        try:
+            session.findById("wnd[0]").sendVKey(82)
+            time.sleep(0.4)
+        except Exception:
+            complete = pages == 1 and bool(headers)
+            break
+    if pages > 1:
+        try:
+            session.findById("wnd[0]").sendVKey(80)
+            time.sleep(0.3)
+        except Exception:
+            pass
+    return headers, rows, pages, complete, texts
+
+
+def _first_value(row, *prefixes):
+    """First non-empty cell whose caption starts with one of `prefixes`."""
+    for prefix in prefixes:
+        for key, value in row.items():
+            if key.startswith(prefix) and str(value or "").strip():
+                return str(value).strip()
+    return ""
+
+
+def _int_digits(text):
+    digits = re.sub(r"[^\d]", "", str(text or ""))
+    return int(digits) if digits else None
+
+
+def _status_bar(session):
+    """(text, message_type) of the main window's status bar."""
+    try:
+        sbar = session.findById("wnd[0]/sbar")
+        return (str(getattr(sbar, "Text", "") or "").strip(),
+                str(getattr(sbar, "MessageType", "") or "").strip())
+    except Exception:
+        return "", ""
+
+
+def _is_no_job_message(text):
+    """SM37 stays on its selection screen and says so when nothing matches."""
+    lowered = str(text or "").lower()
+    return any(phrase in lowered for phrase in (
+        "no job matches", "no jobs match", "no job found", "no jobs found",
+        "kein job entspricht", "keine jobs",
+    ))
+
+
 def _read_list_status_records_passed(session, open_if_needed: bool = True):
     """
     Read the authoritative row count from SAP's "List Status" popup (Shift+F7).
@@ -1020,19 +1204,11 @@ def action_db02(session, capture_screenshot):
     #   3.26 TB /3.90 TB
     # -------------------------------------------------------------
     def parse_usage(raw):
-        parsed = {
-            "raw": str(raw or "").strip(),
-            "used": None,
-            "limit": None,
-            "unit": "",
-            "limit_unit": "",
-            "usage_percent": None,
-        }
-
-        text = str(raw or "").strip()
-
-        if not text:
-            return parsed
+        # Locale-safe. PS4 prints "795,52 GB /1,13 TB": comma decimals and
+        # mixed units. Stripping the comma divided 79552 GB by 113 TB and
+        # reported 70,400 % used.
+        from utils.sap_numbers import parse_usage_ratio
+        return parse_usage_ratio(raw)
 
         try:
             match = re.search(
@@ -1724,6 +1900,15 @@ def action_db12(session, capture_screenshot):
                 ),
             }
 
+        # A backup still in progress has no end time, so it sorts last and
+        # is never "latest". Record it so the report can say it is running.
+        running = [b for b in backups if str(b.get("status", "")).lower() == "running"]
+        if running:
+            result["running_backup"] = {
+                "start_time": running[0].get("start_time", ""),
+                "entry_type": running[0].get("entry_type", ""),
+            }
+
         # =========================================================
         # 11. Final status
         # =========================================================
@@ -1823,6 +2008,8 @@ def action_scot(session, capture_screenshot):
         # ---------------------------------------------------------
         # 1. Open SCOT
         # ---------------------------------------------------------
+        step = "opening SCOT"
+        screenshot = None
         session.findById("wnd[0]/tbar[0]/okcd").text = "/NSCOT"
         session.findById("wnd[0]").sendVKey(0)
         time.sleep(2)
@@ -1837,50 +2024,91 @@ def action_scot(session, capture_screenshot):
             "shellcont/shell"
         )
 
-        tree = session.findById(tree_id)
-
-        # ---------------------------------------------------------
-        # 3. Select SMTP -> Mail_Port
-        # ---------------------------------------------------------
-        tree.selectItem("SMTP", "Mail_Port")
-        tree.ensureVisibleHorizontalItem("SMTP", "Mail_Port")
-        time.sleep(0.5)
-
-        # ---------------------------------------------------------
-        # 4. Structured extraction
-        # ---------------------------------------------------------
-        raw_mail_port = tree.GetItemText(
-            "SMTP",
-            "Mail_Port"
-        )
-
-        mail_port = str(raw_mail_port or "").strip()
-
-        # Convert numeric port to integer where possible
-        try:
-            mail_port_value = int(mail_port)
-        except (TypeError, ValueError):
-            mail_port_value = mail_port
-
-        # ---------------------------------------------------------
-        # 5. Screenshot evidence
-        # ---------------------------------------------------------
-        screenshot = None
-
+        # Capture FIRST. The screenshot used to be taken only after a
+        # successful extraction, so whenever extraction failed the check was
+        # left with no evidence at all -- the one artefact that would show
+        # what SCOT was displaying was discarded exactly when it mattered.
         try:
             screenshot = capture_screenshot(session, "SCOT")
         except Exception as exc:
-            print(f"SCOT: screenshot failed: {exc}")
+            log.warning("SCOT: screenshot failed: %s", exc)
+
+        step = "locating the SMTP node tree"
+        tree = session.findById(tree_id)
 
         # ---------------------------------------------------------
-        # 6. Status
+        # 3. Find the SMTP node and its port column
+        #
+        # selectItem/GetItemText take an internal NODE KEY, not the text
+        # shown on screen. This passed the literal "SMTP", which only works
+        # where SAP happened to key the node that way; elsewhere the call
+        # raises a COM exception with an empty description -- the
+        # "(-2147352567, 'Exception occurred.', (0, 'SAP Frontend Server',
+        # '', ...))" seen on CARFOUR QAS, which names no cause at all.
+        #
+        # So: try the literal key, and if it is not there, find the node
+        # whose displayed text is "SMTP" and the column titled "...Port".
         # ---------------------------------------------------------
-        if mail_port:
+        step = "finding the mail port column"
+        port_column = _scot_find_column(tree, "Mail_Port", "port")
+
+        # ---------------------------------------------------------
+        # 3. Read the Mail Port of every SMTP node that is listed
+        #
+        # Every row of the SMTP Nodes table is read, rather than one node
+        # looked up by the literal key "SMTP". Node names are whatever the
+        # administrator chose, and on CARFOUR QAS the literal lookup did not
+        # fail when that node was absent -- the table was EMPTY, the lookup
+        # returned quietly, and reading the non-existent row is what raised.
+        # An empty table is a real finding (no SMTP node configured), not a
+        # failure to read the screen.
+        # ---------------------------------------------------------
+        step = "listing the SMTP nodes"
+        nodes = _scot_list_nodes(tree)
+
+        step = "reading the mail port of each SMTP node"
+        read = []
+        for key, name in nodes:
+            try:
+                port_text = str(tree.GetItemText(key, port_column) or "").strip()
+            except Exception as exc:
+                log.debug("SCOT: node %r has no readable port: %s", name, exc)
+                port_text = ""
+            read.append({"node": name, "mail_port_raw": port_text})
+
+        log.info(
+            "SCOT: %d SMTP node(s) listed%s", len(read),
+            (": " + ", ".join(f"{r['node']}={r['mail_port_raw'] or '-'}" for r in read))
+            if read else " -- the SMTP Nodes table is empty",
+        )
+
+        # ---------------------------------------------------------
+        # 4. Status
+        #
+        # The rule: if a mail port is listed, the check passes and the port
+        # is recorded -- whatever the number. Sites use 25, 587, 465, 2525
+        # and others, so no particular value is "right". What must be true
+        # is that it IS a number.
+        # ---------------------------------------------------------
+        listed = [r for r in read if re.fullmatch(r"\d+", r["mail_port_raw"])]
+
+        if listed:
+            mail_port = listed[0]["mail_port_raw"]
             status = "OK"
-            summary = f"SCOT SMTP Mail Port is {mail_port}."
-        else:
+            summary = f"SCOT SMTP Mail Port is {mail_port} (node {listed[0]['node']})."
+        elif read:
+            mail_port = read[0]["mail_port_raw"]
             status = "WARNING"
-            summary = "SCOT SMTP Mail Port could not be read."
+            summary = ("SMTP node(s) " + ", ".join(r["node"] for r in read)
+                       + " configured in SCOT, but no mail port is listed.")
+        else:
+            mail_port = ""
+            status = "WARNING"
+            summary = ("No SMTP node is configured in SCOT: the SMTP Nodes list "
+                       "is empty, so outbound mail cannot leave the system.")
+
+        port_listed = bool(listed)
+        mail_port_value = int(mail_port) if port_listed else None
 
         return {
             "status": status,
@@ -1888,6 +2116,10 @@ def action_scot(session, capture_screenshot):
 
             "mail_port": mail_port_value,
             "mail_port_raw": mail_port,
+            "mail_port_listed": port_listed,
+
+            "smtp_nodes_configured": len(read),
+            "smtp_nodes": read,
 
             "smtp": {
                 "mail_port": mail_port_value,
@@ -1900,11 +2132,20 @@ def action_scot(session, capture_screenshot):
         }
 
     except Exception as exc:
-        print(f"SCOT extraction failed: {exc}")
+        # Name the step that failed. The COM exception from this tree
+        # carries no description of its own, so without the step the log
+        # line says nothing about which call went wrong.
+        log.warning("SCOT extraction failed while %s: %s", step, exc)
 
+        # A failed read is UNKNOWN, not CRITICAL. This returned CRITICAL,
+        # an alarm that could only ever fire when the tool had failed --
+        # never because SAP mail was actually broken. The screenshot is now
+        # kept too; it was hard-coded to None here.
         return {
-            "status": "CRITICAL",
-            "summary": f"SCOT extraction failed: {exc}",
+            "status": "ERROR",
+            "summary": f"SCOT extraction failed while {step}: {exc}",
+            "error": f"failed while {step}: {exc}",
+            "extraction_failed": True,
 
             "mail_port": None,
             "mail_port_raw": "",
@@ -1916,8 +2157,75 @@ def action_scot(session, capture_screenshot):
 
             "extraction_method": "sap_gui_tabletree",
 
-            "screenshot": None,
+            "screenshot": screenshot,
         }
+
+
+def _scot_list_nodes(tree):
+    """
+    Return [(node_key, node_name)] for every row of the SMTP Nodes table.
+
+    An empty table returns [] -- that is a finding (no SMTP node is
+    configured) and must be reported as one, not as a failed read. Only an
+    error raised by the tree itself counts as failing to read the screen.
+    GetAllNodeKeys returns no collection at all for an empty tree on some
+    GUI releases, which pywin32 surfaces as None.
+    """
+    try:
+        keys = tree.GetAllNodeKeys()
+    except Exception as exc:
+        raise RuntimeError(f"node keys could not be listed: {exc}") from exc
+
+    if keys is None:
+        return []
+
+    try:
+        count = int(keys.Count)
+    except Exception as exc:
+        raise RuntimeError(f"node key list could not be counted: {exc}") from exc
+
+    nodes = []
+    for index in range(count):
+        try:
+            key = keys(index)
+        except Exception:
+            continue
+        try:
+            name = str(tree.GetNodeTextByKey(key) or "").strip()
+        except Exception:
+            name = ""
+        nodes.append((key, name or str(key).strip()))
+    return nodes
+
+
+def _scot_find_column(tree, wanted_name: str, title_hint: str):
+    """
+    Return the internal column name for the mail port.
+
+    Tries the known name, then any column whose header or name contains
+    `title_hint`. Column names are as release-specific as node keys.
+    """
+    try:
+        names = tree.GetColumnNames()
+        count = int(names.Count)
+        columns = [names(i) for i in range(count)]
+    except Exception:
+        return wanted_name          # cannot enumerate; use the known name
+
+    if wanted_name in columns:
+        return wanted_name
+
+    for column in columns:
+        try:
+            title = str(tree.GetColumnTitleFromName(column) or "")
+        except Exception:
+            title = ""
+        if title_hint.lower() in title.lower() or title_hint.lower() in str(column).lower():
+            return column
+
+    raise RuntimeError(
+        f"no {title_hint!r} column; columns present: {', '.join(map(str, columns))[:200]}"
+    )
 
 
 def action_sm12(session, capture):
@@ -2129,6 +2437,78 @@ def action_sm12(session, capture):
     return result
 
 
+def _find_gridview_under(node, depth: int = 0):
+    """
+    Depth-first search for the first GridView shell beneath `node`.
+
+    ALV grids sit at different depths depending on whether SAP wraps them
+    in a splitter, so a fixed path finds them on one layout and misses them
+    on another. Searching by type finds them on both.
+    """
+    if node is None or depth > 8:
+        return None
+    try:
+        if str(node.Type) == "GuiShell" and str(getattr(node, "SubType", "")) == "GridView":
+            return node
+    except Exception:
+        pass
+    try:
+        children = node.Children
+        count = int(children.Count)
+    except Exception:
+        return None
+    for index in range(count):
+        try:
+            found = _find_gridview_under(children(index), depth + 1)
+        except Exception:
+            continue
+        if found is not None:
+            return found
+    return None
+
+
+SM13_STALE_MINUTES = 10
+
+
+def _sm13_classify(update_records, now=None):
+    """
+    Count SM13 records as error / stale Initial / in-progress Initial / other.
+
+    "Initial" is an update waiting for, or being worked by, an update work
+    process: normal for seconds, a problem only if it stays. PS4 was graded
+    WARNING for two Initial updates 3 s and 73 s old while SM66 showed the
+    update work process running one of them. SAP's own error status is
+    "Err", which the old error set did not contain.
+    """
+    from datetime import datetime
+
+    now = now or datetime.now()
+    counts = {"error": 0, "stale": 0, "pending": 0, "other": 0}
+    for record in update_records or []:
+        state = str(record.get("STATUS", "") or "").strip().lower()
+        if state.startswith("err") or state in ("failed", "fail", "cancelled", "canceled", "aborted"):
+            counts["error"] += 1
+            continue
+        if not state.startswith("init"):
+            counts["other"] += 1
+            continue
+        stamp = f"{str(record.get('DATUM', '')).strip()} {str(record.get('ZEIT', '')).strip()}"
+        when = None
+        for fmt in ("%d.%m.%Y %H:%M:%S", "%m/%d/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y%m%d %H%M%S"):
+            try:
+                when = datetime.strptime(stamp, fmt)
+                break
+            except ValueError:
+                continue
+        # An update of unknown age is not known to be progressing.
+        age = None if when is None else max((now - when).total_seconds() / 60, 0)
+        if age is None or age >= SM13_STALE_MINUTES:
+            counts["stale"] += 1
+        else:
+            counts["pending"] += 1
+    return counts
+
+
 def action_sm13(session, capture_screenshot):
     """
     SM13 - Update Requests.
@@ -2222,52 +2602,65 @@ def action_sm13(session, capture_screenshot):
         #         -> shellcont[1]
         #            -> shell (GuiShell / GridView)
         # ---------------------------------------------------------
-        grid = None
+        # Search the whole GRID1 subtree for the GridView first. The walk
+        # below assumed a splitter (GRID1 -> shellcont -> splitter -> pane ->
+        # grid). On CARFOUR QAS SM13 shows a single grid with no splitter, so
+        # that walk found nothing, the exact-ID fallback (also a splitter
+        # path) failed, and an empty update list -- the HEALTHY result, zero
+        # pending updates -- was reported as "GridView could not be found".
+        grid = _find_gridview_under(grid_container)
+        if grid is not None:
+            log.info("SM13: GridView found under GRID1 (%s rows).",
+                     getattr(grid, "RowCount", "?"))
 
-        try:
-            shellcont = grid_container.Children(0)
-            splitter = shellcont.Children(0)
+        if grid is None:
+            # Fallback: the original splitter-layout walk.
+            try:
+                shellcont = grid_container.Children(0)
+                splitter = shellcont.Children(0)
 
-            for pane_index in range(splitter.Children.Count):
+                for pane_index in range(splitter.Children.Count):
 
-                pane = splitter.Children(pane_index)
+                    pane = splitter.Children(pane_index)
 
-                for child_index in range(pane.Children.Count):
+                    for child_index in range(pane.Children.Count):
 
-                    child = pane.Children(child_index)
+                        child = pane.Children(child_index)
 
-                    try:
-                        if str(child.Type) == "GuiShell":
-                            grid = child
-                            break
-                    except Exception:
-                        continue
+                        try:
+                            if str(child.Type) == "GuiShell":
+                                grid = child
+                                break
+                        except Exception:
+                            continue
 
-                if grid is not None:
-                    break
+                    if grid is not None:
+                        break
 
-        except Exception:
-            grid = None
+            except Exception:
+                grid = None
 
         # ---------------------------------------------------------
         # 5. Fallback to exact validated ID
         # ---------------------------------------------------------
         if grid is None:
 
-            exact_grid_id = (
-                "wnd[0]/usr/cntlGRID1/shellcont/shell/"
-                "shellcont[1]/shell"
+            candidate_ids = (
+                "wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell",
+                "wnd[0]/usr/cntlGRID1/shellcont/shell",   # no splitter
             )
 
             for _ in range(10):
-                try:
-                    grid = session.findById(exact_grid_id)
-
-                    if grid is not None:
-                        break
-
-                except Exception:
-                    time.sleep(0.5)
+                for exact_grid_id in candidate_ids:
+                    try:
+                        grid = session.findById(exact_grid_id)
+                        if grid is not None:
+                            break
+                    except Exception:
+                        grid = None
+                if grid is not None:
+                    break
+                time.sleep(0.5)
 
         if grid is None:
             raise RuntimeError(
@@ -2325,32 +2718,12 @@ def action_sm13(session, capture_screenshot):
             if str(record.get("STATUS", "")).strip()
         ]
 
-        error_statuses = {
-            "ERROR",
-            "FAILED",
-            "FAIL",
-            "CANCELLED",
-            "CANCELED",
-            "ABORTED",
-        }
+        classified = _sm13_classify(update_records)
 
-        warning_statuses = {
-            "WARNING",
-            "WARN",
-        }
-
-        if any(
-            value in error_statuses
-            for value in status_values
-        ):
+        if classified["error"]:
             overall_status = "CRITICAL"
-
-        elif any(
-            value in warning_statuses
-            for value in status_values
-        ):
+        elif classified["stale"]:
             overall_status = "WARNING"
-
         else:
             overall_status = "OK"
 
@@ -2360,9 +2733,17 @@ def action_sm13(session, capture_screenshot):
         if row_count == 0:
             message = "No update records found in SM13."
         else:
-            message = (
-                f"{row_count} update record(s) found in SM13."
-            )
+            parts = []
+            if classified["error"]:
+                parts.append(f"{classified['error']} in error")
+            if classified["stale"]:
+                parts.append(f"{classified['stale']} Initial for {SM13_STALE_MINUTES}+ min")
+            if classified["pending"]:
+                parts.append(f"{classified['pending']} in progress (Initial, under "
+                             f"{SM13_STALE_MINUTES} min)")
+            if classified["other"]:
+                parts.append(f"{classified['other']} other")
+            message = f"{row_count} update record(s): " + ", ".join(parts) + "."
 
         summary = {
             "update_count": row_count,
@@ -2375,6 +2756,11 @@ def action_sm13(session, capture_screenshot):
         # ---------------------------------------------------------
         return {
             "update_count": row_count,
+            "error_update_count": classified["error"],
+            "stale_initial_count": classified["stale"],
+            "pending_update_count": classified["pending"],
+            # What the sap.sm13.failed_updates metric and its thresholds grade.
+            "failed_update_count": classified["error"] + classified["stale"],
             "update_records": update_records,
 
             "updates": update_records,
@@ -2400,8 +2786,13 @@ def action_sm13(session, capture_screenshot):
         except Exception:
             screenshot = None
 
+        # A failed read must say "unknown", never "zero". This returned 0
+        # for every count, and 0 is exactly what a clean system reports --
+        # so the status rules graded a broken extraction as OK and the sheet
+        # printed a reassuring figure the tool never read. extraction_failed
+        # lets the report state plainly that this check was not measured.
         return {
-            "update_count": 0,
+            "update_count": None,
             "update_records": [],
             "updates": [],
 
@@ -2410,8 +2801,9 @@ def action_sm13(session, capture_screenshot):
             ),
 
             "extraction_method": "sap_gui_alv",
+            "extraction_failed": True,
 
-            "alv_row_count": 0,
+            "alv_row_count": None,
             "alv_column_count": 14,
             "alv_columns": columns,
 
@@ -2421,13 +2813,83 @@ def action_sm13(session, capture_screenshot):
             "error": str(exc),
 
             "summary": {
-                "update_count": 0,
+                "update_count": None,
                 "status_values": [],
                 "message": (
                     "SM13 structured extraction failed."
                 ),
             },
         }
+
+# SM21 message IDs that are routine on a busy productive system. They are
+# counted and shown, but do not make SM21 WARNING or CRITICAL.
+#   Q0I  "Operating system call recv failed (error no. 104)" -- a SAP GUI connection reset
+#   Q04  "Connection to terminal ... closed"                  -- the same disconnect
+#   R47  "Delete ABAP session ... (Softcancel) [Warning/Session]"
+#   R48  "> Reason for Soft Cancel: ..."                       -- explains the R47
+#   Q02  "Stops work process N (... Exit with status 0)"       -- a normal end/restart
+# On PS4 these made SM21 CRITICAL on every run ("recv failed" read as an error).
+SM21_ROUTINE_IDS = frozenset({"Q0I", "Q04", "R47", "R48", "Q02"})
+# The system log's own note of an ABAP dump. ST22 grades dumps; counting them
+# here as well made SM21 CRITICAL for every dump.
+SM21_DUMP_ECHO_IDS = frozenset({"AB0", "AB1"})
+_SM21_ID_VALUE = re.compile(r"^[A-Z][A-Z0-9]{2}$")
+
+
+def _sm21_id_column(rows):
+    """The grid column holding the 3-character message ID (R47, Q0I, AB0)."""
+    if not rows:
+        return None
+    columns = list(rows[0].keys())
+    named = [c for c in columns if re.search(r"MSG|MESSAGE|MNO|ID", str(c).upper())]
+    best, best_hits = None, 0
+    for column in named + [c for c in columns if c not in named]:
+        hits = sum(1 for r in rows
+                   if _SM21_ID_VALUE.match(str(r.get(column, "")).strip())
+                   and any(ch.isdigit() for ch in str(r.get(column, ""))))
+        if hits > best_hits:
+            best, best_hits = column, hits
+    return best if best_hits >= max(1, len(rows) // 2) else None
+
+
+def _sm21_tally(rows):
+    """Severity counts for SM21 rows, with routine and dump messages set apart."""
+    id_column = _sm21_id_column(rows)
+    counts = {"error_count": 0, "warning_count": 0, "routine_count": 0, "dump_echo_count": 0}
+    seen = {}
+    error_entries = []
+    for row in rows:
+        msg_id = str(row.get(id_column, "")).strip().upper() if id_column else ""
+        if not msg_id:
+            cells = {str(v).strip().upper() for v in row.values()}
+            msg_id = next((x for x in cells if x in SM21_ROUTINE_IDS or x in SM21_DUMP_ECHO_IDS), "")
+        if msg_id:
+            seen[msg_id] = seen.get(msg_id, 0) + 1
+        if msg_id in SM21_ROUTINE_IDS:
+            counts["routine_count"] += 1
+            continue
+        if msg_id in SM21_DUMP_ECHO_IDS:
+            counts["dump_echo_count"] += 1
+            continue
+        text = " ".join(str(v).strip().lower() for v in row.values())
+        if any(k in text for k in ("error", "critical", "fatal", "failed")):
+            counts["error_count"] += 1
+            if len(error_entries) < 5:
+                values = [str(v).strip() for v in row.values()]
+                user_col = next((k for k in row if re.search(r"USER|UNAME", str(k).upper())), None)
+                error_entries.append({
+                    "id": msg_id,
+                    "time": next((v for v in values if re.fullmatch(r"\d{2}:\d{2}:\d{2}", v)), ""),
+                    "user": str(row.get(user_col, "")).strip() if user_col else "",
+                    "text": max(values, key=len)[:120] if values else "",
+                })
+        elif any(k in text for k in ("warning", "warn")):
+            counts["warning_count"] += 1
+    counts["error_entries"] = error_entries
+    counts["message_ids"] = sorted(seen.items(), key=lambda kv: -kv[1])[:10]
+    counts["message_id_column"] = id_column
+    return counts
+
 
 def action_sm21(session, capture_screenshot):
     """
@@ -2493,6 +2955,18 @@ def action_sm21(session, capture_screenshot):
             except Exception:
                 continue
 
+        if grid is None:
+            # S/4HANA's SM21 puts the syslog grid inside a splitter/docking
+            # container, so none of the fixed IDs resolve. Search by control
+            # type instead -- the same fix that made SM13 readable.
+            try:
+                grid = _find_gridview_under(session.findById("wnd[0]/usr"))
+                if grid is not None:
+                    log.info("SM21: GridView found by type search (%s rows)",
+                             getattr(grid, "RowCount", "?"))
+            except Exception:
+                grid = None
+
         if grid is not None:
             rows = []
 
@@ -2517,8 +2991,21 @@ def action_sm21(session, capture_screenshot):
             except Exception:
                 pass
 
+            try:
+                visible = max(int(getattr(grid, "VisibleRowCount", 0) or 0), 1)
+            except Exception:
+                visible = 1
+
             for row_index in range(row_count):
                 row_data = {}
+
+                # ALV grids load rows lazily; bring each block into view
+                # before reading it or rows past the first screen read blank.
+                if visible > 1 and row_index % visible == 0:
+                    try:
+                        grid.firstVisibleRow = row_index
+                    except Exception:
+                        pass
 
                 for column in columns:
                     try:
@@ -2538,38 +3025,17 @@ def action_sm21(session, capture_screenshot):
                 if row_data:
                     rows.append(row_data)
 
-            result["logs"] = rows
+            result["logs"] = rows[:200]
             result["log_count"] = len(rows)
             result["extraction_method"] = "sap_gui_alv"
 
             # -----------------------------------------------------
             # Analyze severity
             # -----------------------------------------------------
-            for row in rows:
-                row_text = " ".join(
-                    str(value).strip().lower()
-                    for value in row.values()
-                )
-
-                if any(
-                    keyword in row_text
-                    for keyword in (
-                        "error",
-                        "critical",
-                        "fatal",
-                        "failed",
-                    )
-                ):
-                    result["error_count"] += 1
-
-                elif any(
-                    keyword in row_text
-                    for keyword in (
-                        "warning",
-                        "warn",
-                    )
-                ):
-                    result["warning_count"] += 1
+            result.update(_sm21_tally(rows))
+            log.info("SM21: %s entries -- errors=%s warnings=%s routine=%s dump messages=%s",
+                     result["log_count"], result["error_count"], result["warning_count"],
+                     result["routine_count"], result["dump_echo_count"])
 
             return result
 
@@ -2701,7 +3167,23 @@ def action_sm21(session, capture_screenshot):
             ):
                 result["warning_count"] += 1
 
-        result["logs"] = extracted_rows
+        if not extracted_rows:
+            # Nothing on this screen read as a syslog row, and no "no
+            # entries" message was shown. That is a failed read, not an
+            # empty log: PS4 reported "0 entries, OK" here beside a
+            # screenshot listing 30+ syslog messages.
+            result["log_count"] = None
+            result["error_count"] = None
+            result["warning_count"] = None
+            result["extraction_failed"] = True
+            result["error"] = "system-log grid not found on the SM21 screen"
+            result["extraction_method"] = "sap_gui_labels_failed"
+            if texts:
+                result["gui_text"] = texts
+            log.warning("SM21: %s", result["error"])
+            return result
+
+        result["logs"] = extracted_rows[:200]
         result["log_count"] = len(extracted_rows)
         result["extraction_method"] = "sap_gui_labels"
 
@@ -2726,15 +3208,20 @@ def action_sm37(session, capture_screenshot=None):
     """
     SM37 - Active background jobs.
 
-    Selection logic follows the recorded SAP GUI VBS:
-      - Job Name: *
-      - User Name: *
-      - Scheduled: unchecked
-      - Finished: unchecked
-      - Canceled: unchecked
+    Selection follows the recorded SAP GUI VBS:
+      - Job Name: *, User Name: *
+      - Scheduled / Finished / Canceled unchecked (so Ready + Active)
       - Execute via toolbar button
 
-    Result list is extracted from GuiLabel controls.
+    The result list is read by COLUMN HEADER. The fixed character
+    positions used before were recorded on a job overview without the
+    "Spool" and "Job doc" columns; on PS4 those columns push every field to
+    the right, the Status column read as blank, and eleven active jobs were
+    reported as "0 active background jobs".
+
+    One screenshot only. The List Status popup used to be captured too,
+    but the capture grabs the main window, so the popup never appeared in
+    it and the PDF showed the job list twice.
     """
 
     import time
@@ -2744,67 +3231,51 @@ def action_sm37(session, capture_screenshot=None):
     try:
         session.findById("wnd[0]").maximize()
 
-        # Open SM37.
-        session.findById(
-            "wnd[0]/tbar[0]/okcd"
-        ).Text = "/NSM37"
-
+        session.findById("wnd[0]/tbar[0]/okcd").Text = "/NSM37"
         session.findById("wnd[0]").sendVKey(0)
-
         time.sleep(1)
 
-        # Follow the recorded VBS exactly.
-        session.findById(
-            "wnd[0]/usr/chkBTCH2170-SCHEDUL"
-        ).Selected = False
+        session.findById("wnd[0]/usr/chkBTCH2170-SCHEDUL").Selected = False
+        session.findById("wnd[0]/usr/chkBTCH2170-FINISHED").Selected = False
+        session.findById("wnd[0]/usr/chkBTCH2170-ABORTED").Selected = False
+        session.findById("wnd[0]/usr/txtBTCH2170-USERNAME").Text = "*"
 
-        session.findById(
-            "wnd[0]/usr/chkBTCH2170-FINISHED"
-        ).Selected = False
-
-        session.findById(
-            "wnd[0]/usr/chkBTCH2170-ABORTED"
-        ).Selected = False
-
-        session.findById(
-            "wnd[0]/usr/txtBTCH2170-USERNAME"
-        ).Text = "*"
-
-        # Job name should remain the recorded/default "*".
         try:
-            session.findById(
-                "wnd[0]/usr/txtBTCH2170-JOBNAME"
-            ).Text = "*"
+            session.findById("wnd[0]/usr/txtBTCH2170-JOBNAME").Text = "*"
         except Exception:
             pass
 
-        # Focus exactly as in VBS.
-        session.findById(
-            "wnd[0]/usr/chkBTCH2170-ABORTED"
-        ).SetFocus()
-
-        # Execute exactly as recorded.
-        session.findById(
-            "wnd[0]/tbar[1]/btn[8]"
-        ).Press()
-
+        session.findById("wnd[0]/usr/chkBTCH2170-ABORTED").SetFocus()
+        session.findById("wnd[0]/tbar[1]/btn[8]").Press()
         time.sleep(1.5)
 
-        # Capture evidence after execution.
         if capture_screenshot:
             try:
                 screenshot = capture_screenshot("after_execution")
             except Exception:
                 screenshot = None
 
-        # Open SM37 List Status and capture the popup that shows the
-        # authoritative "Records passed" count. Close it before reading
-        # the underlying result list.
+        # Nothing matched: SM37 stays on the selection screen and says so.
+        status_text, _ = _status_bar(session)
+        if _is_no_job_message(status_text):
+            log.info("SM37: %s -> no Ready/Active jobs.", status_text)
+            return {
+                "status": "OK",
+                "summary": "No active or ready background jobs match the selection.",
+                "active_job_count": 0,
+                "ready_job_count": 0,
+                "records_passed": 0,
+                "job_count": 0,
+                "active_jobs": [],
+                "jobs": [],
+                "status_message": status_text,
+                "extraction_method": "sap_gui_status_bar",
+                "screenshot": screenshot,
+            }
+
         records_passed = None
         try:
             records_passed = _read_list_status_records_passed(session)
-            if capture_screenshot and records_passed is not None:
-                capture_screenshot("records_passed")
         except Exception as exc:
             log.warning("SM37: List Status read skipped: %s", exc)
         finally:
@@ -2813,141 +3284,94 @@ def action_sm37(session, capture_screenshot=None):
                 time.sleep(0.3)
             except Exception:
                 pass
+        log.info("SM37: Records passed = %s", records_passed)
 
-        if records_passed is None:
-            log.info("SM37: 'Records passed' unavailable on this screen "
-                     "(no result list to summarise); using the ALV row count.")
-        else:
-            log.info("SM37: Records passed = %s", records_passed)
-
-        usr = session.findById("wnd[0]/usr")
-
-        # Collect GuiLabel controls.
-        labels = {}
-
-        for i in range(usr.Children.Count):
-            try:
-                control = usr.Children(i)
-
-                if control.Type != "GuiLabel":
-                    continue
-
-                control_id = str(control.Id)
-
-                if "/lbl[" not in control_id:
-                    continue
-
-                coords = control_id.rsplit("/lbl[", 1)[1].rstrip("]")
-                parts = coords.split(",")
-
-                if len(parts) != 2:
-                    continue
-
-                x = int(parts[0])
-                y = int(parts[1])
-
-                labels[(x, y)] = str(
-                    getattr(control, "Text", "") or ""
-                ).strip()
-
-            except Exception:
-                continue
+        headers, rows, pages, complete, _texts = _read_paged_list(session, "JobName")
 
         jobs = []
-
-        # Result table begins at screen row 13.
-        row = 13
-
-        while row < 500:
-
-            job_name = labels.get((4, row), "").strip()
-
-            if not job_name:
-                row += 1
+        for row in rows:
+            name = _first_value(row, "jobname")
+            if not name:
                 continue
-
-            # Summary row.
-            if job_name in ("Summary", "*"):
-                break
-
             jobs.append({
-                "job_name": job_name,
-                "created_by": labels.get((46, row), "").strip(),
-                "status": labels.get((59, row), "").strip(),
-                "start_date": labels.get((75, row), "").strip(),
-                "start_time": labels.get((86, row), "").strip(),
-                "duration": labels.get((95, row), "").strip(),
-                "delay_seconds": labels.get((104, row), "").strip(),
-                "end_date": labels.get((117, row), "").strip(),
-                "end_time": labels.get((128, row), "").strip(),
-                "client": labels.get((137, row), "").strip(),
-                "reason_for_delay": labels.get((141, row), "").strip(),
+                "job_name": name,
+                "created_by": _first_value(row, "jobcreated", "createdby"),
+                "status": _first_value(row, "status"),
+                "start_date": _first_value(row, "startdate"),
+                "start_time": _first_value(row, "starttime"),
+                "duration_seconds": _int_digits(_first_value(row, "duration")),
+                "delay_seconds": _int_digits(_first_value(row, "delay")),
+                "client": _first_value(row, "cli"),
             })
 
-            row += 1
+        if not jobs and records_passed is None:
+            raise RuntimeError(
+                "SM37 result list could not be read: no 'JobName' header row "
+                "and no List Status count"
+            )
 
-        active_jobs = [
-            job for job in jobs
-            if job.get("status", "").strip().lower() == "active"
-        ]
+        total = records_passed if records_passed is not None else len(jobs)
+        read_all = bool(jobs) and (
+            len(jobs) >= records_passed if records_passed is not None else complete
+        )
+        statuses_read = any(job["status"] for job in jobs)
+
+        active = [j for j in jobs if j["status"].lower() in ("active", "running", "aktiv")]
+        ready = [j for j in jobs if j["status"].lower() in ("ready", "bereit")]
+
+        if statuses_read and read_all:
+            active_count, ready_count = len(active), len(ready)
+            summary = f"{active_count} active background job(s)" + (
+                f", {ready_count} ready to start." if ready_count else ".")
+        else:
+            active_count = ready_count = None
+            summary = (f"{total} job(s) in Ready/Active status; the per-job "
+                       f"status column could not be read for every row.")
+
+        timed = [j for j in active if j["duration_seconds"] is not None]
+        longest = max(timed, key=lambda j: j["duration_seconds"]) if timed else None
+
+        log.info("SM37: %s job rows read over %s page(s); active=%s ready=%s",
+                 len(jobs), pages, active_count, ready_count)
 
         return {
             "status": "OK",
-            "summary": (
-                f"{len(active_jobs)} active job(s) found in SM37."
-                if active_jobs
-                else "No active jobs found in SM37."
-            ),
-
-            "active_job_count": len(active_jobs),
+            "summary": summary,
+            "active_job_count": active_count,
+            "ready_job_count": ready_count,
             "records_passed": records_passed,
-            "job_count": len(jobs),
-
-            "active_jobs": active_jobs,
-            "jobs": jobs,
-
-            "extraction_method": "sap_gui_structured",
-
+            "job_count": total,
+            "rows_read": len(jobs),
+            "list_pages_read": pages,
+            "active_jobs": active[:50],
+            "jobs": jobs[:100],
+            "longest_running_job": (
+                {"job_name": longest["job_name"],
+                 "duration_seconds": longest["duration_seconds"],
+                 "start_time": longest["start_time"]}
+                if longest else None
+            ),
+            "columns": [key for _, key in headers],
+            "extraction_method": "sap_gui_list_header",
             "screenshot": screenshot,
-
-            "alv_row_count": len(jobs),
-            "alv_column_count": 11,
-
-            "columns": [
-                "JOB_NAME",
-                "CREATED_BY",
-                "STATUS",
-                "START_DATE",
-                "START_TIME",
-                "DURATION",
-                "DELAY_SECONDS",
-                "END_DATE",
-                "END_TIME",
-                "CLIENT",
-                "REASON_FOR_DELAY",
-            ],
-
-            "summary_data": {
-                "active_job_count": len(active_jobs),
-                "total_job_count": len(jobs),
-                "active_jobs": active_jobs,
-            },
         }
 
     except Exception as exc:
 
-        if capture_screenshot:
+        if capture_screenshot and screenshot is None:
             try:
                 screenshot = capture_screenshot()
             except Exception:
                 screenshot = None
 
+        # A failed read must say "unknown", never "zero".
         return {
             "status": "WARNING",
             "summary": f"SM37 structured extraction failed: {exc}",
-            "active_job_count": 0,
+            "active_job_count": None,
             "records_passed": None,
-            "job_count": 0,
+            "job_count": None,
+            "extraction_failed": True,
             "active_jobs": [],
             "jobs": [],
             "extraction_method": "sap_gui_structured_failed",
@@ -2955,50 +3379,45 @@ def action_sm37(session, capture_screenshot=None):
             "error": str(exc),
         }
 
+
 def action_sm37_cancelled(session, screenshot_fn=None):
     """
-    SM37 - Cancelled Jobs
+    SM37 - Cancelled jobs since yesterday.
 
-    Date behavior:
-      - From Date = yesterday
-      - To Date   = leave SAP's existing/default value unchanged
+    Date behaviour: From Date = yesterday; To Date left at SAP's default.
 
-    Authoritative cancelled-job count:
-      Shift+F7 (sendVKey 19) -> List Status -> Records passed
+    Count, in order of preference:
+      1. The status bar. With nothing cancelled SM37 never leaves its
+         selection screen -- it shows "No job matches the selection
+         criteria". There is no List Status popup to read then, so the old
+         code reported UNKNOWN beside a screen that plainly said zero.
+      2. Shift+F7 -> List Status -> Records passed.
+      3. The job list itself, read by column header across all pages.
 
-    No individual cancelled-job row extraction is performed.
+    One screenshot only (the popup capture duplicated the list).
     """
 
-    import re
     import time
     from datetime import datetime, timedelta
 
     screenshot = None
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%d.%m.%Y")
 
     try:
-        # ---------------------------------------------------------
-        # 1. Open SM37
-        # ---------------------------------------------------------
         session.findById("wnd[0]/tbar[0]/okcd").text = "/NSM37"
         session.findById("wnd[0]").sendVKey(0)
         time.sleep(1)
 
-        # ---------------------------------------------------------
-        # 2. Configure SM37 selection
-        # ---------------------------------------------------------
-        # Username = all users
         try:
             session.findById("wnd[0]/usr/txtBTCH2170-USERNAME").text = "*"
         except Exception:
             pass
 
-        # Cancelled / Aborted = selected
         try:
             session.findById("wnd[0]/usr/chkBTCH2170-ABORTED").selected = True
         except Exception:
             pass
 
-        # Other job statuses = unchecked
         for control_id in [
             "chkBTCH2170-SCHEDUL",
             "chkBTCH2170-FINISHED",
@@ -3011,98 +3430,87 @@ def action_sm37_cancelled(session, screenshot_fn=None):
             except Exception:
                 pass
 
-        # ---------------------------------------------------------
-        # 3. FROM DATE = YESTERDAY
-        #    TO DATE is deliberately NOT touched.
-        # ---------------------------------------------------------
-        yesterday = (datetime.now() - timedelta(days=1)).strftime("%d.%m.%Y")
-
-        # Standard SM37 date field
-        from_date_ids = [
+        from_date_set = False
+        for control_id in (
             "wnd[0]/usr/ctxtBTCH2170-FROM_DATE",
             "wnd[0]/usr/ctxtBTCH2170-STRTDATE",
             "wnd[0]/usr/ctxtBTCH2170-SDLSTRTDT",
-        ]
-
-        from_date_set = False
-
-        for control_id in from_date_ids:
+        ):
             try:
-                field = session.findById(control_id)
-                field.text = yesterday
+                session.findById(control_id).text = yesterday
                 from_date_set = True
-                print(f"SM37 cancelled: From Date set to {yesterday} ({control_id})")
+                log.info("SM37 cancelled: From Date set to %s (%s)", yesterday, control_id)
                 break
             except Exception:
                 continue
 
         if not from_date_set:
-            print(
-                "SM37 cancelled: WARNING - could not locate From Date field; "
-                "To Date was left unchanged."
+            log.warning(
+                "SM37 cancelled: could not locate the From Date field; "
+                "To Date was left unchanged, so the window may be wrong."
             )
 
-        # ---------------------------------------------------------
-        # 4. Execute
-        # ---------------------------------------------------------
         session.findById("wnd[0]").sendVKey(8)
         time.sleep(2)
 
-        # ---------------------------------------------------------
-        # 5. Capture cancelled-jobs list screenshot
-        # ---------------------------------------------------------
         if screenshot_fn:
             try:
                 screenshot = screenshot_fn()
             except Exception as exc:
-                print(f"SM37 cancelled: screenshot failed: {exc}")
+                log.warning("SM37 cancelled: screenshot failed: %s", exc)
 
-        # ---------------------------------------------------------
-        # 6. Shift+F7 -> List Status
-        #    sendVKey(19) is confirmed as Shift+F7
-        # ---------------------------------------------------------
-        records_passed = _read_list_status_records_passed(session)
+        status_text, _ = _status_bar(session)
+        cancelled = []
 
-        if records_passed is None:
-            log.warning(
-                "SM37 cancelled: 'Records passed' could not be read from the "
-                "List Status popup; reporting the count as unknown rather "
-                "than as zero."
-            )
+        if _is_no_job_message(status_text):
+            records_passed = 0
+            method = "sap_gui_status_bar"
+            log.info("SM37 cancelled: %s -> 0 cancelled jobs.", status_text)
         else:
-            log.info("SM37 cancelled: Records passed = %s", records_passed)
-
-        # Capture the List Status popup itself so the PDF contains visual
-        # evidence of the authoritative "Records passed" count.
-        if screenshot_fn:
+            method = "sap_gui_list_status"
+            records_passed = _read_list_status_records_passed(session)
             try:
-                screenshot_fn("records_passed")
+                session.findById("wnd[1]").sendVKey(12)
+                time.sleep(0.5)
+            except Exception:
+                pass
+
+            try:
+                headers, rows, _pages, complete, _texts = _read_paged_list(session, "JobName")
             except Exception as exc:
-                print(f"SM37 cancelled: records-passed popup screenshot failed: {exc}")
+                log.warning("SM37 cancelled: job list read failed: %s", exc)
+                headers, rows, complete = [], [], False
 
-        # ---------------------------------------------------------
-        # 7. Close List Status popup
-        # ---------------------------------------------------------
-        try:
-            session.findById("wnd[1]").sendVKey(12)
-            time.sleep(0.5)
-        except Exception:
-            pass
+            for row in rows:
+                name = _first_value(row, "jobname")
+                if name:
+                    cancelled.append({
+                        "job_name": name,
+                        "created_by": _first_value(row, "jobcreated", "createdby"),
+                        "status": _first_value(row, "status"),
+                        "start_date": _first_value(row, "startdate"),
+                        "start_time": _first_value(row, "starttime"),
+                    })
 
-        # ---------------------------------------------------------
-        # 8. Return structured result
-        # ---------------------------------------------------------
+            if records_passed is None and headers and complete:
+                records_passed = len(cancelled)
+                method = "sap_gui_list_header"
+
+            if records_passed is None:
+                log.warning(
+                    "SM37 cancelled: count could not be read (status bar %r, "
+                    "no List Status popup, no readable job list); reporting "
+                    "it as unknown rather than as zero.", status_text
+                )
+            else:
+                log.info("SM37 cancelled: Records passed = %s", records_passed)
+
         if records_passed is None:
             status = "UNKNOWN"
-            summary = (
-                "SM37 cancelled-job count could not be read from the "
-                "List Status popup."
-            )
+            summary = "SM37 cancelled-job count could not be read."
         elif records_passed > 0:
             status = "WARNING"
-            summary = (
-                f"{records_passed} cancelled job(s) found in SM37."
-            )
+            summary = f"{records_passed} cancelled job(s) found in SM37."
         else:
             status = "OK"
             summary = "No cancelled jobs found in SM37."
@@ -3110,19 +3518,14 @@ def action_sm37_cancelled(session, screenshot_fn=None):
         return {
             "status": status,
             "summary": summary,
-
-            # Authoritative count from Shift+F7
             "cancelled_job_count": records_passed,
             "records_passed": records_passed,
-
-            # No individual job extraction
-            "cancelled_jobs": [],
-            "jobs": [],
-
-            "extraction_method": "sap_gui_list_status",
-
+            "cancelled_jobs": cancelled[:50],
+            "jobs": cancelled[:50],
+            "cancelled_job_names": sorted({j["job_name"] for j in cancelled})[:10],
+            "status_message": status_text,
+            "extraction_method": method,
             "screenshot": screenshot,
-
             "date_filter": {
                 "from_date": yesterday,
                 "to_date": "unchanged",
@@ -3130,28 +3533,25 @@ def action_sm37_cancelled(session, screenshot_fn=None):
         }
 
     except Exception as exc:
-        # Try to close popup if an unexpected error occurred
         try:
             if session.findById("wnd[1]"):
                 session.findById("wnd[1]").sendVKey(12)
         except Exception:
             pass
 
+        # A failed read must say "unknown", never "zero".
         return {
-            "status": "CRITICAL",
+            "status": "ERROR",
             "summary": f"SM37 cancelled extraction failed: {exc}",
-            "cancelled_job_count": 0,
-            "records_passed": 0,
+            "error": str(exc),
+            "extraction_failed": True,
+            "cancelled_job_count": None,
+            "records_passed": None,
             "cancelled_jobs": [],
             "jobs": [],
             "extraction_method": "sap_gui_list_status",
             "screenshot": screenshot,
-            "date_filter": {
-                "from_date": (
-                    datetime.now() - timedelta(days=1)
-                ).strftime("%d.%m.%Y"),
-                "to_date": "unchanged",
-            },
+            "date_filter": {"from_date": yesterday, "to_date": "unchanged"},
         }
 
 def action_sm51(session, capture):
@@ -3383,6 +3783,38 @@ def action_sm58(session, capture):
         )
 
     # ---------------------------------------------------------------
+    # The entries themselves: the status text says WHY they failed
+    # (PS4: "Syntax error in program ZFI_WF_APP_DOA_CL" on all four), and
+    # date/time lets the report match them to ST22 dumps.
+    # ---------------------------------------------------------------
+    trfc_rows = []
+    try:
+        _headers, list_rows = _list_table(_list_cells(session), "Caller")
+        for row in list_rows:
+            status_text = _first_value(row, "statustext", "status")
+            module = _first_value(row, "functionmodule")
+            if not status_text and not module:
+                continue
+            trfc_rows.append({
+                "caller": _first_value(row, "caller"),
+                "function_module": module,
+                "target_system": _first_value(row, "targetsystem"),
+                "date": _first_value(row, "date"),
+                "time": _first_value(row, "time"),
+                "status_text": re.sub(r"=+\S*$", "", status_text).strip(),
+                "transaction_id": _first_value(row, "transactionid"),
+            })
+    except Exception as exc:
+        log.debug("SM58: entry list not read: %s", exc)
+
+    tally = {}
+    for row in trfc_rows:
+        if row["status_text"]:
+            tally[row["status_text"]] = tally.get(row["status_text"], 0) + 1
+    status_texts = [{"text": text, "count": count}
+                    for text, count in sorted(tally.items(), key=lambda kv: -kv[1])[:5]]
+
+    # ---------------------------------------------------------------
     # Determine monitoring status
     # ---------------------------------------------------------------
     if failed_entries > 0:
@@ -3407,6 +3839,8 @@ def action_sm58(session, capture):
             "entries_in_execution": entries_in_execution,
         },
         "extraction_method": "sap_gui_information",
+        "trfc_rows": trfc_rows[:50],
+        "status_texts": status_texts,
     }
 
     if path:
@@ -3583,364 +4017,296 @@ def action_sm50(session, capture):
 
         return result
 
+def _read_grid(grid, max_rows=2000):
+    """(columns, rows) of an ALV GridView, scrolling so lazily loaded rows are read."""
+    columns = []
+    try:
+        for index in range(int(grid.ColumnCount)):
+            try:
+                columns.append(str(grid.ColumnOrder(index)))
+            except Exception:
+                pass
+    except Exception:
+        pass
+    try:
+        row_count = min(int(grid.RowCount), max_rows)
+    except Exception:
+        row_count = 0
+    try:
+        visible = max(int(getattr(grid, "VisibleRowCount", 0) or 0), 1)
+    except Exception:
+        visible = 1
+    rows = []
+    for row_index in range(row_count):
+        if visible > 1 and row_index % visible == 0:
+            try:
+                grid.firstVisibleRow = row_index
+            except Exception:
+                pass
+        row = {}
+        for column in columns:
+            try:
+                value = grid.GetCellValue(row_index, column)
+                row[column] = "" if value is None else str(value).strip()
+            except Exception:
+                row[column] = ""
+        rows.append(row)
+    return columns, rows
+
+
+def _pick_column(columns, exact, contains=(), exclude=()):
+    """A grid column by technical name, else the first whose name contains a token."""
+    upper = {str(c).upper(): c for c in columns}
+    for name in exact:
+        if name in upper:
+            return upper[name]
+    for column in columns:
+        name = str(column).upper()
+        if any(t in name for t in contains) and not any(x in name for x in exclude):
+            return column
+    return None
+
+
 def action_sm66(session, capture):
     """
-    Collect structured SM66 global work-process data through SAP GUI
-    Scripting.
+    SM66 - global work processes.
 
-    Primary source:
-        SAPGUI.GridViewCtrl.1 ALV.
+    Four figures, as the BASIS team uses this check: active work processes
+    (Running + On Hold), how many of those are On Hold, how many are Waiting
+    (free), and how many are in PRIV mode.
 
-    Screenshot is retained as visual evidence.
-    OCR is used only as a fallback.
+    SM66 opens on the active-only view, where Waiting processes never
+    appear. The screenshot is taken on that view; the reader then switches
+    to "All Work Processes" to count the Waiting ones.
+
+    The grid is found by control type. The fixed ID below does not resolve
+    on PS4, which is why SM66 always fell back to OCR -- and the OCR counted
+    every H:MM:SS on the screen, including the "Last Update" clock, so the
+    old "Displayed" figure was always one higher than the rows shown.
     """
+    import re
+
     goto_tcode(session, "SM66")
     wait_until_not_busy(session)
 
-    # SM66 opens on the "all work processes" list, where every row on a
-    # healthy system reads "Waiting". Extracting from that screen is why
-    # running_processes has always come back 0 while visible_process_rows
-    # came back 32, and why the screenshot evidence shows a wall of idle
-    # processes rather than the work actually in flight. Press "Active Work
-    # Processes" first so both the counts and the captured screen describe
-    # the processes that are doing something. action_sm50 already does this;
-    # SM66 never got it.
     if _press_labelled_toolbar_button(session, ("active", "process")):
         wait_until_not_busy(session)
         time.sleep(0.5)
-    else:
-        log.warning(
-            "SM66: 'Active Work Processes' toolbar action not found; "
-            "capturing the default all-processes view instead."
-        )
 
-    grid_id = (
-        "wnd[0]/usr/cntlGRID1/shellcont/shell/"
-        "shellcont[1]/shell/shellcont[1]/shell"
-    )
+    fixed_id = ("wnd[0]/usr/cntlGRID1/shellcont/shell/"
+                "shellcont[1]/shell/shellcont[1]/shell")
 
-    columns = {
-        "server_name": "SERVER_NAME",
-        "wp_index": "WP_INDEX",
-        "wp_type": "WP_TYPE_DISP",
-        "pid": "PID",
-        "state": "STATE_DISP",
-        "state_info": "STATE_INFO_DISP",
-        "failures": "FAILURES",
-        "sem_locked": "SEM_LOCKED",
-        "sem_locking": "SEM_LOCKING",
-        "cpu": "CPU",
-        "elapsed_time": "ELAPSED_TIME",
-        "priority": "PRIORITY_DISP",
-        "wait_priority": "WAIT_FOR_PRIORITY_DISP",
-        "program": "WP_PROGRAM",
-        "client": "TENANT_DISP",
-        "user": "USER_NAME",
-        "current_action": "CURRENT_ACTION_DISP",
-        "action_info": "ACTION_INFO",
-    }
-
-    # ---------------------------------------------------------------
-    # PRIMARY: Direct ALV extraction
-    # ---------------------------------------------------------------
-    try:
-        grid = session.findById(grid_id)
-
-        rows = []
-
-        for row_index in range(grid.RowCount):
-            row = {}
-
-            for field, technical_column in columns.items():
-                try:
-                    value = grid.GetCellValue(
-                        row_index,
-                        technical_column,
-                    )
-                except Exception:
-                    value = ""
-
-                row[field] = (
-                    "" if value is None
-                    else str(value).strip()
-                )
-
-            rows.append(row)
-
-        running_processes = sum(
-            1
-            for row in rows
-            if row["state"].lower() == "running"
-        )
-
-        on_hold_processes = sum(
-            1
-            for row in rows
-            if row["state"].lower() == "on hold"
-        )
-
-        failed_processes = sum(
-            1
-            for row in rows
-            if row["failures"]
-        )
-
-        servers = sorted({
-            row["server_name"]
-            for row in rows
-            if row["server_name"]
-        })
-
-        # PRIV mode and long-running processes are the two states that make
-        # an SM66 screen worth acting on. Counting them here lets the report
-        # say "OK" on a screen that has neither, instead of leaving the whole
-        # check UNKNOWN for want of a rule.
-        priv_mode_processes = sum(
-            1
-            for row in rows
-            if "priv" in f"{row['state']} {row['state_info']}".lower()
-        )
-
-        def _elapsed_seconds(value):
-            parts = str(value or "").strip().split(":")
+    def read_view():
+        grid = None
+        try:
+            grid = session.findById(fixed_id)
+            int(grid.RowCount)
+        except Exception:
+            grid = None
+        if grid is None:
             try:
-                parts = [int(p) for p in parts]
-            except ValueError:
-                return 0
-            while len(parts) < 3:
-                parts.insert(0, 0)
-            return parts[-3] * 3600 + parts[-2] * 60 + parts[-1]
+                grid = _find_gridview_under(session.findById("wnd[0]/usr"))
+            except Exception:
+                grid = None
+        return None if grid is None else _read_grid(grid)
 
-        long_running_processes = sum(
-            1
-            for row in rows
-            if _elapsed_seconds(row.get("elapsed_time")) >= 600
-        )
+    def classify(view):
+        columns, rows = view
+        state_col = _pick_column(columns, ("STATE_DISP", "STATE", "WP_STATUS", "STATUS"),
+                                 ("STATE", "STATUS"), ("INFO", "REASON", "FAIL"))
+        info_col = _pick_column(columns, ("STATE_INFO_DISP", "STATE_INFO", "HOLD_REASON", "REASON"),
+                                ("INFO", "REASON", "HOLD"))
+        fail_col = _pick_column(columns, ("FAILURES", "WP_FAILURES"), ("FAIL",))
+        counts = {"running": 0, "on_hold": 0, "waiting": 0, "priv": 0, "failed": 0}
+        for row in rows:
+            state = str(row.get(state_col, "") if state_col else "").strip().lower()
+            reason = str(row.get(info_col, "") if info_col else "").strip().lower()
+            if state == "running":
+                counts["running"] += 1
+            elif "hold" in state:
+                counts["on_hold"] += 1
+            elif state.startswith("wait"):
+                counts["waiting"] += 1
+            if "priv" in f"{state} {reason}":
+                counts["priv"] += 1
+            failures = str(row.get(fail_col, "") if fail_col else "").strip()
+            if failures and failures != "0":
+                counts["failed"] += 1
+        return counts, state_col is not None
 
-        result = {
-            "process_count": len(rows),
-            "visible_process_rows": len(rows),
-            "running_processes": running_processes,
-            "on_hold_processes": on_hold_processes,
-            "failed_processes": failed_processes,
-            "priv_mode_processes": priv_mode_processes,
-            "long_running_processes": long_running_processes,
-            "servers_affected": servers,
-            "process_rows": rows,
-            "extraction_method": "sap_gui_alv",
-        }
+    first = read_view()
+    shot = capture()
 
-        log.info(
-            "SM66 structured extraction: "
-            "rows=%d running=%d on_hold=%d failed=%d servers=%d",
-            len(rows),
-            running_processes,
-            on_hold_processes,
-            failed_processes,
-            len(servers),
-        )
+    if first is not None:
+        columns, rows = first
+        counts, state_found = classify(first)
+        if state_found:
+            waiting = counts["waiting"] if counts["waiting"] else None
+            if waiting is None and _press_labelled_toolbar_button(session, ("all", "process")):
+                wait_until_not_busy(session)
+                time.sleep(0.5)
+                second = read_view()
+                if second is not None:
+                    waiting = classify(second)[0]["waiting"]
 
-        path = capture()
+            server_col = _pick_column(columns, ("SERVER_NAME",), ("SERVER", "INSTANCE"))
+            servers = sorted({row.get(server_col, "") for row in rows
+                              if server_col and row.get(server_col)})
+            active = counts["running"] + counts["on_hold"]
+            result = {
+                "active_processes": active,
+                "running_processes": counts["running"],
+                "on_hold_processes": counts["on_hold"],
+                "waiting_processes": waiting,
+                "priv_mode_processes": counts["priv"],
+                "failed_processes": counts["failed"],
+                "process_count": len(rows),
+                "visible_process_rows": len(rows),
+                "servers_affected": servers,
+                "process_rows": rows[:100],
+                "extraction_method": "sap_gui_alv",
+            }
+            if shot:
+                result["screenshot"] = shot
+            log.info("SM66: active=%s (running=%s, on hold=%s), waiting=%s, PRIV=%s",
+                     active, counts["running"], counts["on_hold"], waiting, counts["priv"])
+            return result
+        log.warning("SM66: grid found but no status column among %s", columns[:12])
 
-        if path:
-            result["screenshot"] = path
-
-        return result
-
-    except Exception as exc:
-        log.warning(
-            "SM66 direct ALV extraction failed; "
-            "using OCR fallback: %s",
-            exc,
-        )
-
-    # ---------------------------------------------------------------
-    # FALLBACK: Screenshot/OCR
-    # ---------------------------------------------------------------
+    # Fallback: OCR of the captured (active-only) screen.
     try:
-        from sap_gui.ocr_extractor import run_ocr, count_occurrences
-        import re
+        from sap_gui.ocr_extractor import run_ocr
 
-        path = capture()
-
-        if not path:
-            return {}
-
-        text = run_ocr(path)
-
-        process_rows = len(
-            re.findall(r"\d:\d{2}:\d{2}", text)
-        )
-
-        running_count = count_occurrences(
-            text,
-            "Running",
-        )
-
+        if not shot:
+            return {"extraction_failed": True,
+                    "error": "SM66 grid not found and no screenshot to read"}
+        text = run_ocr(shot)
+        body = re.sub(r"Last\s+Update[^\n]*", " ", text, flags=re.I)
+        running = len(re.findall(r"\bRunning\b", body))
+        on_hold = len(re.findall(r'(?<!["\u201c])\bOn\s*Hold\b(?!["\u201d])', body))
+        waiting = len(re.findall(r"\bWaiting\b", body))
         result = {
             "extraction_method": "ocr_fallback",
-            "running_processes": running_count,
+            "running_processes": running,
+            "on_hold_processes": on_hold,
+            "active_processes": running + on_hold,
+            # The active-only view never lists Waiting processes.
+            "waiting_processes": waiting or None,
+            "priv_mode_processes": len(re.findall(r"\bPRIV\b", body)),
+            "screenshot": shot,
         }
-
-        if process_rows:
-            result["visible_process_rows"] = process_rows
-
-        result["screenshot"] = path
-
+        rows = len(re.findall(r"\b\d{1,2}:\d{2}:\d{2}\b", body))
+        if rows:
+            result["visible_process_rows"] = rows
         return result
-
     except Exception as exc:
-        log.warning(
-            "SM66 OCR fallback failed: %s",
-            exc,
-        )
+        log.warning("SM66 OCR fallback failed: %s", exc)
 
-    return {}
-
+    return {"extraction_failed": True, "error": "SM66 work processes could not be read"}
 
 def action_smlg(session, capture):
     """
-    Collect SMLG load-distribution / instance response-time data.
+    SMLG load distribution -- per-instance dialog response time.
 
-    Primary source:
-        SAP GUI label controls.
+    Read by column header. The fixed layout used before (instance in
+    column 1, response time in column 24, instances on every second row)
+    was recorded on CARFOUR. PS4 prints longer instance names on
+    consecutive rows, so nothing matched and SMLG was filed UNKNOWN while
+    the screen showed 1149 ms and 1566 ms -- the second over the 1500 ms
+    warning band.
 
-    Screenshot:
-        Always retained for PDF evidence.
+    Response times go through parse_response_ms: SMLG prints 1566 ms as
+    "1.566", which float(raw.replace(",", ".")) read as 1.566 ms.
+
+    `response_time_ms` (the worst instance) is set so the collector emits
+    the graded sap.smlg.response_time metric; without it the SMLG bands
+    could never alert from this screen.
     """
-    import re
+    from sap_gui.smlg_analyzer import parse_response_ms
 
     goto_tcode(session, "SMLG")
     wait_until_not_busy(session)
 
     # Open Load Distribution / Overview
-    session.findById(
-        "wnd[0]/tbar[1]/btn[5]"
-    ).press()
-
+    session.findById("wnd[0]/tbar[1]/btn[5]").press()
     wait_until_not_busy(session)
 
-    user_area = session.findById("wnd[0]/usr")
-
-    labels = {}
-
-    for i in range(int(user_area.Children.Count)):
-        try:
-            obj = user_area.Children(i)
-            control_id = obj.Id
-            text = getattr(obj, "Text", "") or ""
-
-            match = re.search(
-                r"/lbl\[(\d+),(\d+)\]$",
-                control_id,
-            )
-
-            if match:
-                column = int(match.group(1))
-                row = int(match.group(2))
-                labels[(column, row)] = str(text).strip()
-
-        except Exception:
-            continue
-
+    cells = _list_cells(session)
+    # The caption differs by release: PS4 (S/4HANA) prints "Application
+    # server", CARFOUR QAS prints "Instance".
+    headers, rows = [], []
+    for caption in ("Application server", "Instance", "Appl. server", "Server"):
+        headers, rows = _list_table(cells, caption)
+        if headers:
+            break
+    method = "sap_gui_list_header"
     instances = []
 
-    # Confirmed live SMLG layout:
-    #
-    # Instance       = column 1
-    # State          = column 18
-    # Response time  = column 24
-    # Threshold      = column 38
-    # User count     = column 45
-    # User threshold = column 50
-    # Time           = column 57
-    # Quality        = column 66
-    # Dialog steps   = column 74
-    #
-    # Instance rows are 3, 5, 7, ...
-
-    for row in range(3, 100, 2):
-
-        instance = labels.get((1, row), "").strip()
-
-        if not instance:
+    for row in rows:
+        name = _first_value(row, "applicationserver", "instance", "applserver", "server")
+        if not name or name.startswith("*"):
             continue
-
-        # Ignore summary rows.
-        if instance.startswith("*"):
+        raw = _first_value(row, "resptime", "responsetime")
+        response_ms = parse_response_ms(raw)
+        if response_ms is None:
             continue
-
-        state = labels.get((18, row), "").strip()
-        response_raw = labels.get((24, row), "").strip()
-        threshold = labels.get((38, row), "").strip()
-        user_count = labels.get((45, row), "").strip()
-        user_threshold = labels.get((50, row), "").strip()
-        time_value = labels.get((57, row), "").strip()
-        quality = labels.get((66, row), "").strip()
-        dialog_steps = labels.get((74, row), "").strip()
-
-        if not response_raw:
-            continue
-
-        # Extract numeric response time.
-        match = re.search(
-            r"\d+(?:[.,]\d+)?",
-            response_raw,
-        )
-
-        if not match:
-            continue
-
-        try:
-            response_time_ms = float(
-                match.group(0).replace(",", ".")
-            )
-        except (ValueError, TypeError):
-            continue
-
         instances.append({
-            "instance": instance,
-            "state": state,
-            "response_time_ms": response_time_ms,
-            "response_time_raw": response_raw,
-            "threshold": threshold,
-            "user_count": user_count,
-            "user_threshold": user_threshold,
-            "time": time_value,
-            "quality": quality,
-            "dialog_steps": dialog_steps,
+            "instance": name,
+            "state": _first_value(row, "state"),
+            "response_time_ms": response_ms,
+            "response_time_raw": raw,
+            "user_count": _first_value(row, "user"),
+            "time": _first_value(row, "time"),
+            "quality": _first_value(row, "quality"),
+            "dialog_steps": _first_value(row, "dialogsteps"),
         })
 
-    response_times = [
-        item["response_time_ms"]
-        for item in instances
-    ]
+    if not instances:
+        # Legacy fixed layout (as recorded on CARFOUR), every row.
+        method = "sap_gui_labels"
+        for row in range(3, 100):
+            name = cells.get((1, row), "").strip()
+            if not name or name.startswith("*"):
+                continue
+            raw = cells.get((24, row), "").strip()
+            response_ms = parse_response_ms(raw)
+            if response_ms is None:
+                continue
+            instances.append({
+                "instance": name,
+                "state": cells.get((18, row), ""),
+                "response_time_ms": response_ms,
+                "response_time_raw": raw,
+                "user_count": cells.get((45, row), ""),
+                "time": cells.get((57, row), ""),
+                "quality": cells.get((66, row), ""),
+                "dialog_steps": cells.get((74, row), ""),
+            })
 
     result = {
         "instance_count": len(instances),
         "instances": instances,
-        "extraction_method": "sap_gui_labels",
+        "extraction_method": method,
     }
 
-    if response_times:
-        result["max_response_time_ms"] = max(response_times)
-        result["avg_response_time_ms"] = (
-            sum(response_times) / len(response_times)
-        )
-
-        worst = max(
-            instances,
-            key=lambda item: item["response_time_ms"],
-        )
-
+    if instances:
+        worst = max(instances, key=lambda item: item["response_time_ms"])
+        times = [item["response_time_ms"] for item in instances]
+        result["response_time_ms"] = worst["response_time_ms"]
+        result["max_response_time_ms"] = max(times)
+        result["avg_response_time_ms"] = sum(times) / len(times)
         result["worst_instance"] = {
             "instance": worst["instance"],
             "response_time_ms": worst["response_time_ms"],
         }
+        log.info("SMLG: %s instance(s) read (%s); worst %s = %.0f ms",
+                 len(instances), method, worst["instance"], worst["response_time_ms"])
+    else:
+        result["extraction_failed"] = True
+        result["error"] = "no instance row with a readable response time on the SMLG screen"
+        log.warning("SMLG: %s", result["error"])
 
-    # Always retain screenshot for PDF evidence.
     screenshot_path = capture()
-
     if screenshot_path:
         result["screenshot_captured"] = True
 
@@ -4909,72 +5275,53 @@ def action_sost(session, capture):
 
 def action_sp01(session, capture):
     """
-    SP01 - Spool Requests.
+    SP01 - Spool requests created today, all users.
 
-    Extracts spool request rows from the SAP GUI ALV where available.
-    Screenshot is always retained for PDF evidence.
+    On S/4HANA the result is a classic list, not an ALV grid, and GUI
+    scripting exposes only the rows currently on screen. The previous
+    version found no grid, fell back to OCR of the first page, and --
+    because its counters started at 0 -- reported "0 spool requests" for a
+    list several pages long. The list is now read by its column header
+    across every page. A count that cannot be established is None
+    (UNKNOWN), never 0.
     """
-    import re
-
     goto_tcode(session, "SP01")
     wait_until_not_busy(session)
 
-    # SP01 defaults its "Created By" field to the logged-on user, so
-    # executing the selection as-is reported only CAQ_ADMIN's own spool
-    # requests -- two of them -- as if that were the whole system. Widen it
-    # to "*" before executing so the check covers every user's spool.
-    # Value match first. SP01 pre-fills "Created by" with the logon user,
-    # so the field can be picked out by what it contains rather than by a
-    # technical name or a caption position -- neither of which had matched
-    # on this system.
+    # SP01 pre-fills "Created by" with the logon user; widen it to "*".
     widened = _wildcard_field_holding_logon_user(session)
-
     if not widened:
         widened = _wildcard_selection_field(
             session, "RQOWNER", "OWNER", "UNAME", "CREATOR", "ERSTELLER"
         )
-
     if not widened:
-        # Fall back to the caption. SP01's selection screen labels this
-        # field "Created by", which is stable in a way the technical name
-        # is not.
         widened = _set_field_beside_label(
             session, "*", "created by", "created on behalf", "owner"
         )
-
     if not widened:
         log.warning(
             "SP01: could not widen the 'Created by' selection field; the "
-            "spool count below covers only the logged-on user. The field "
-            "names present on the screen are logged above."
+            "spool count below covers only the logged-on user."
         )
 
-    # Capture the selection screen BEFORE executing. Only the result list
-    # was ever captured, so the evidence could not show what the list had
-    # been filtered on -- there was no way to tell a genuine two-request
-    # system from one where the user filter was still in place. This
-    # screenshot makes the filter state part of the record.
+    # The selection screen is kept on disk as evidence of the filter. The
+    # PDF shows only the result list (one screenshot per check).
     try:
         capture("selection")
     except Exception as exc:
         log.debug("SP01 selection-screen capture skipped: %s", exc)
 
-    # Log the other restriction on this screen. SP01 also defaults its
-    # "Created On" range to today, so even a system-wide owner filter still
-    # reports only today's spool requests. That is a deliberate scope
-    # choice rather than a bug, so it is reported, not silently widened.
+    created_on = ""
     try:
         for label_text, field_obj in _labelled_fields(session):
             if "created on" in label_text.lower():
-                log.info("SP01: 'Created On' restriction is %r (today only "
-                         "by default; widen it if the check should cover "
-                         "the full spool).",
-                         str(getattr(field_obj, "Text", "") or ""))
+                created_on = str(getattr(field_obj, "Text", "") or "").strip()
+                log.info("SP01: 'Created On' restriction is %r (today only by default).",
+                         created_on)
                 break
     except Exception:
         pass
 
-    # Execute using the (now system-wide) selection.
     try:
         session.findById("wnd[0]/tbar[1]/btn[8]").press()
         wait_until_not_busy(session)
@@ -4984,221 +5331,145 @@ def action_sp01(session, capture):
     screenshot = capture()
 
     result = {
-        "spool_requests": 0,
-        "spool_errors": 0,
-        "spool_without_output_request": 0,
+        "spool_requests": None,
+        "spool_errors": None,
+        "spool_without_output_request": None,
         "extraction_method": "sap_gui",
+        "selection": {
+            "created_by": "*" if widened else "logon user",
+            "created_on_from": created_on,
+        },
     }
 
-    # The SP01 result screen also displays authoritative summary lines at
-    # the bottom, e.g. "2 spool requests displayed" and
-    # "2 spool requests without output request". Read those explicitly.
     def parse_spool_summary(text):
-        if not text:
-            return None, None
-        normalized = " ".join(str(text).split())
-
-        requests = None
-        without_output = None
-
-        patterns = [
-            r"([0-9][0-9,\s]*)\s*spool\s+requests?\s+displayed",
-            r"([0-9][0-9,\s]*)\s*spool\s+requests?\b",
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, normalized, re.IGNORECASE)
-            if match:
-                digits = re.sub(r"[^0-9]", "", match.group(1))
-                if digits:
-                    requests = int(digits)
-                    break
-
-        match = re.search(
-            r"([0-9][0-9,\s]*)\s*spool\s+requests?\s+without\s+an?\s+output\s+request",
-            normalized,
-            re.IGNORECASE,
-        )
-        if not match:
-            match = re.search(
-                r"([0-9][0-9,\s]*)\s*spool\s+requests?\s+without\s+output\s+request",
-                normalized,
-                re.IGNORECASE,
-            )
+        """Only the explicit summary lines; a bare 'N spool requests'
+        pattern matched column captions and tab labels."""
+        normalized = " ".join(str(text or "").split())
+        requests = without_output = None
+        match = re.search(r"(\d[\d.,\s]*)\s*spool\s+requests?\s+displayed", normalized, re.I)
         if match:
-            digits = re.sub(r"[^0-9]", "", match.group(1))
-            if digits:
-                without_output = int(digits)
-
+            requests = _int_digits(match.group(1))
+        match = re.search(
+            r"(\d[\d.,\s]*)\s*spool\s+requests?\s+without\s+(?:an?\s+)?output\s+request",
+            normalized, re.I)
+        if match:
+            without_output = _int_digits(match.group(1))
         return requests, without_output
 
-    summary_requests = None
-    summary_without_output = None
+    # 0. Genuinely empty: SP01 says so in the status bar.
+    status_text, _ = _status_bar(session)
+    if re.search(r"no\s+spool|keine\s+spool|nothing\s+(?:was\s+)?selected", status_text, re.I):
+        result.update(spool_requests=0, spool_errors=0, spool_without_output_request=0,
+                      extraction_method="sap_gui_status_bar", status_message=status_text)
+        return result
 
-    try:
-        wnd = session.findById("wnd[0]")
-        texts = []
-        def collect_texts(obj):
-            try:
-                value = str(getattr(obj, "Text", "") or "").strip()
-                if value:
-                    texts.append(value)
-            except Exception:
-                pass
-            try:
-                for child in obj.Children:
-                    collect_texts(child)
-            except Exception:
-                pass
-        collect_texts(wnd)
-        summary_requests, summary_without_output = parse_spool_summary(" ".join(texts))
-    except Exception as e:
-        log.debug("SP01 GUI summary extraction failed: %s", e)
-
-    # ---------------------------------------------------------
-    # Structured ALV extraction
-    # ---------------------------------------------------------
-    grid_ids = [
-        "wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell",
-        "wnd[0]/usr/cntlGRID1/shellcont/shell",
-    ]
-
+    # 1. ALV grid (some releases render SP01 as a grid).
     grid = None
-
-    for grid_id in grid_ids:
+    for grid_id in ("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell",
+                    "wnd[0]/usr/cntlGRID1/shellcont/shell"):
         try:
             grid = session.findById(grid_id)
+            int(grid.RowCount)
             break
         except Exception:
-            continue
+            grid = None
 
     if grid is not None:
         try:
             row_count = int(grid.RowCount)
-        except Exception:
-            row_count = 0
-
-        rows = []
-
-        try:
-            column_count = int(grid.ColumnCount)
-
-            columns = []
-
-            for i in range(column_count):
-                try:
-                    columns.append(str(grid.ColumnOrder(i)))
-                except Exception:
-                    pass
-
+            columns = [str(grid.ColumnOrder(i)) for i in range(int(grid.ColumnCount))]
+            rows = []
             for row_index in range(row_count):
                 row = {}
-
                 for column in columns:
                     try:
-                        value = grid.GetCellValue(row_index, column)
-                        row[column] = str(value).strip()
+                        row[column] = str(grid.GetCellValue(row_index, column)).strip()
                     except Exception:
                         continue
-
                 if any(row.values()):
                     rows.append(row)
-
+            errors = sum(
+                1 for row in rows
+                if re.search(r"\b(error|failed|incorrect|problem)\b",
+                             " ".join(row.values()), re.I)
+            )
+            result.update(spool_requests=row_count, spool_errors=errors,
+                          spool_without_output_request=None,
+                          rows=rows[:100], extraction_method="sap_gui_alv")
+            return result
         except Exception as e:
             log.warning(f"SP01 ALV extraction failed: {e}")
-            rows = []
 
-        if rows:
-            error_count = 0
+    # 2. Classic list, every page.
+    try:
+        headers, rows, pages, complete, texts = _read_paged_list(session, "Spool no.")
+    except Exception as exc:
+        log.warning("SP01 list read failed: %s", exc)
+        headers, rows, pages, complete, texts = [], [], 0, False, []
 
-            for row in rows:
-                text = " ".join(
-                    str(value) for value in row.values()
-                ).lower()
+    if headers:
+        spools = {}
+        for row in rows:
+            number = _first_value(row, "spoolno", "spool")
+            if re.fullmatch(r"\d[\d.,]*", number or ""):
+                spools.setdefault(re.sub(r"[^\d]", "", number), row)
+        statuses = [_first_value(row, "status") for row in spools.values()]
+        summary_requests, summary_without = parse_spool_summary(" ".join(texts))
+        errors = sum(1 for s in statuses
+                     if s.lower().startswith(("error", "probl", "fehler")))
+        without = sum(1 for s in statuses if s == "-")
 
-                if any(
-                    keyword in text
-                    for keyword in (
-                        "error",
-                        "failed",
-                        "incorrect",
-                        "problem",
-                    )
-                ):
-                    error_count += 1
+        if summary_requests is not None:
+            count = summary_requests
+        elif complete:
+            count = len(spools)
+        else:
+            count = None
 
-            result["spool_requests"] = (
-                summary_requests if summary_requests is not None else len(rows)
+        log.info("SP01: %s spool row(s) over %s page(s); complete=%s; summary=%s",
+                 len(spools), pages, complete, summary_requests)
+
+        if count is not None:
+            result.update(
+                spool_requests=count,
+                spool_errors=errors,
+                spool_without_output_request=(
+                    summary_without if summary_without is not None else without),
+                list_pages_read=pages,
+                rows=list(spools.values())[:100],
+                extraction_method="sap_gui_list_header",
             )
-            result["spool_without_output_request"] = (
-                summary_without_output if summary_without_output is not None else 0
-            )
-            result["spool_errors"] = error_count
-            result["rows"] = rows
-            result["extraction_method"] = "sap_gui_alv"
-
             return result
+        result["spool_requests_at_least"] = len(spools)
 
-        if row_count == 0:
-            result["spool_requests"] = (
-                summary_requests if summary_requests is not None else 0
-            )
-            result["spool_without_output_request"] = (
-                summary_without_output if summary_without_output is not None else 0
-            )
-            result["spool_errors"] = 0
-            result["extraction_method"] = "sap_gui_alv"
-            return result
-
-    # ---------------------------------------------------------
-    # OCR fallback
-    # ---------------------------------------------------------
+    # 3. OCR of the captured page: only an explicit summary line counts.
     if screenshot:
         try:
-            from sap_gui.ocr_extractor import run_ocr, count_spool_rows
+            from sap_gui.ocr_extractor import run_ocr
 
             text = run_ocr(screenshot)
-
-            ocr_requests, ocr_without_output = parse_spool_summary(text)
-            if summary_requests is None:
-                summary_requests = ocr_requests
-            if summary_without_output is None:
-                summary_without_output = ocr_without_output
-
-            if summary_requests is not None:
-                result["spool_requests"] = summary_requests
-                result["spool_without_output_request"] = (
-                    summary_without_output if summary_without_output is not None else 0
-                )
-                result["extraction_method"] = "sap_gui_summary"
-
-            if re.search(
-                r"nothing\s+(selected|found)"
-                r"|no\s+spool\s+requests?"
-                r"|no\s+data",
-                text,
-                re.IGNORECASE,
-            ):
+            if re.search(r"nothing\s+(?:was\s+)?(?:selected|found)|no\s+spool\s+requests?", text, re.I):
+                result.update(spool_requests=0, spool_errors=0,
+                              spool_without_output_request=0,
+                              extraction_method="sap_gui_ocr")
                 return result
-
-            count = count_spool_rows(text)
-
-            if count is not None and summary_requests is None:
-                result["spool_requests"] = int(count)
-                result["extraction_method"] = "sap_gui_ocr"
-
-            result["spool_errors"] = len(
-                re.findall(
-                    r"\b(error|failed|incorrect|problem)\b",
-                    text,
-                    re.IGNORECASE,
-                )
-            )
-
+            requests, without_output = parse_spool_summary(text)
+            if requests is not None:
+                result.update(spool_requests=requests,
+                              spool_without_output_request=without_output,
+                              extraction_method="sap_gui_ocr_summary")
+                return result
         except Exception as e:
             log.warning(f"SP01 OCR fallback failed: {e}")
 
+    result["extraction_failed"] = True
+    result["error"] = (
+        f"spool list only partly read ({result['spool_requests_at_least']} rows, page limit reached)"
+        if result.get("spool_requests_at_least") is not None
+        else "spool list could not be read (no 'Spool no.' header row, no summary line)"
+    )
+    log.warning("SP01: %s", result["error"])
     return result
-
 
 def action_st06(session, capture):
     """

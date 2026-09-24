@@ -51,9 +51,11 @@ sap.st22.dump_count:
 # Healthy  : < 50
 # Warning  : 50 - 150
 # Critical : > 150
+# 22.09.2026: raised from 50/150. PS4 (production) ranged 27-2,211 in one
+# afternoon; 150 made a normal snapshot CRITICAL on most runs.
 sap.sm12.lock_count:
-  warning: 50
-  critical: 150
+  warning: 500
+  critical: 2000
 
 # SM50 / SM51 active Dialog + Background work-process utilization
 # Healthy  : < 70%
@@ -69,7 +71,7 @@ sap.sm13.failed_updates:
   critical: 10
 
 sap.sm37.cancelled_jobs:
-  warning: 5
+  warning: 10
   critical: 20
 
 sap.smq1.entries:
@@ -165,9 +167,11 @@ sap.st03.db_time_pct:
   critical: 70
 
 # Most locks held by any one user
+# 22.09.2026: raised from 20/50 in line with the lock-count limits (500/2000).
+# One mass-processing job routinely holds 1,000+ locks on PS4.
 sap.sm12.locks_per_user_max:
-  warning: 20
-  critical: 50
+  warning: 200
+  critical: 1000
 
 # Users holding 10 or more locks
 sap.sm12.users_with_many_locks:
@@ -175,9 +179,12 @@ sap.sm12.users_with_many_locks:
   critical: 5
 
 # Age of the oldest lock entry
+# 22.09.2026, user decision: alert only on locks held 24 h or more.
+# Standing daemon locks are excluded in collectors/rfc_perf.py
+# (LOCK_AGE_IGNORE_PREFIXES).
 sap.sm12.oldest_lock_minutes:
-  warning: 30
-  critical: 120
+  warning: 1440
+  critical: 2880
 
 # ABAP programs with >= 60s total DB time in SQL Monitor
 sap.sqlm.expensive_programs:
@@ -190,9 +197,11 @@ sap.sqlm.top_program_total_s:
   critical: 1800
 
 # Largest per-step memory (MAXBYTES) of any user in the STAT window, MB
+# 22.09.2026: raised from 1024/2048. PS4 steps of 3.9-6.5 GB were CRITICAL on
+# every run; S/4 systems routinely allow multi-GB dialog steps.
 sap.st03.top_user_memory_mb:
-  warning: 1024
-  critical: 2048
+  warning: 4096
+  critical: 8192
 
 # Total DB request time of the single heaviest report in the STAT window, ms
 sap.st03.top_report_db_ms:

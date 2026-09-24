@@ -30,14 +30,76 @@ the first breach counts from zero again.
 
 from __future__ import annotations
 
+import json
 import threading
 import time
+from datetime import datetime, timedelta
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from utils.logger import get_logger
 
 log = get_logger(__name__, "application")
+
+
+# The cooldown must hold across processes: the dashboard polls in one process
+# and a sweep runs in another, and both can decide to fire.
+RCA_STATE_PATH = Path(__file__).resolve().parents[1] / "logs" / "rca_last_fired.json"
+
+
+def _read_state() -> dict:
+    try:
+        with open(RCA_STATE_PATH, encoding="utf-8") as fh:
+            return json.load(fh) or {}
+    except (OSError, ValueError):
+        return {}
+
+
+def last_fired_at(system: str):
+    """When an RCA last ran for this system, from any process."""
+    stamp = str((_read_state().get(system) or {}).get("at") or "")
+    try:
+        return datetime.strptime(stamp[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return None
+
+
+def mark_fired_on_disk(system: str, reason: str) -> None:
+    state = _read_state()
+    state[system] = {"at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"), "reason": reason}
+    try:
+        RCA_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(RCA_STATE_PATH, "w", encoding="utf-8") as fh:
+            json.dump(state, fh, indent=1)
+    except OSError as exc:
+        log.warning(f"RCA state not written ({RCA_STATE_PATH}): {exc}")
+
+
+def sweep_decision(system: str, value_ms, instance: str, cfg: "TriggerConfig", now=None) -> tuple:
+    """
+    Whether the sweep's own SMLG reading should start an RCA.
+
+    The live-poll trigger watches ST03's short-window figure. On PS4,
+    23.09.2026, SMLG read 2,404 ms while the live figure was about 120 ms,
+    so nothing fired and the RCA had to be started by hand -- six minutes
+    later, when the spike was over.
+    """
+    if not cfg.enabled:
+        return False, "RCA disabled"
+    try:
+        value = float(value_ms)
+    except (TypeError, ValueError):
+        return False, "no SMLG reading"
+    if value < cfg.threshold_ms:
+        return False, f"{value:.0f} ms below the {cfg.threshold_ms:.0f} ms threshold"
+    last = last_fired_at(system)
+    now = now or datetime.now()
+    if last and now - last < timedelta(minutes=cfg.cooldown_minutes):
+        left = cfg.cooldown_minutes - (now - last).total_seconds() / 60
+        return False, f"{value:.0f} ms over threshold but in cooldown ({left:.0f} min left)"
+    where = f" on {instance}" if instance else ""
+    return True, f"sweep: SMLG {value:.0f} ms{where} over {cfg.threshold_ms:.0f} ms"
 
 
 @dataclass

@@ -142,6 +142,33 @@ def _to_model(rca: RCAAnalysis) -> AIAnalysis:
     )
 
 
+def _report_findings(result, gui_results) -> dict:
+    """
+    Facts the report establishes by correlating screens with metrics.
+
+    Without them the model reasoned from raw counters: it called SM58's RFC
+    figure "500 stuck calls" (500 is the read limit) and asked for an error
+    text the SM58 screen already showed, contradicting the report it sat in.
+    """
+    if not gui_results:
+        return {}
+    try:
+        from reporting.check_narratives import narrate_all, deterministic_analysis
+
+        da = deterministic_analysis(result, narrate_all(gui_results), gui_results)
+    except Exception:
+        return {}
+    if not (da.get("incidents") or da.get("conflicts")):
+        return {}
+    return {
+        "note": ("Established by correlating the SAP screens with the metrics. Build the "
+                 "root cause on these. Where a cross-check says a figure is a read limit "
+                 "or differs in scope, do not treat it as a count."),
+        "correlated_incidents": list(da.get("incidents") or [])[:5],
+        "cross_checks": list(da.get("conflicts") or [])[:5],
+    }
+
+
 def analyze(
     result: MonitoringResult,
     provider: AIProvider | None = None,
@@ -175,6 +202,10 @@ and GUI evidence are analyzed.
         # why, which report holds a work process, who drives response time.
         # Computed deterministically; the model explains, it does not invent.
         context["attribution"] = attribution
+
+    findings = _report_findings(result, gui_results)
+    if findings:
+        context["report_findings"] = findings
 
     context["ai_contract"] = {
         "authoritative_severity": authoritative,

@@ -233,10 +233,10 @@ def collect_tcode_evidence(
                             category="performance",
                             detail=(
                                 f"{grade['description']} Threshold band: "
-                                f"{grade['threshold']}. OCR of the SMLG "
-                                f"instance table; RFC has no path to this "
-                                f"figure on this system (all 5 candidate FMs "
-                                f"return FU_NOT_FOUND)."
+                                f"{grade['threshold']}. Worst instance: "
+                                f"{(extracted_data.get('worst_instance') or {}).get('instance', 'n/a')}. "
+                                f"Read from the SMLG load-distribution screen; "
+                                f"RFC has no path to this figure on this system."
                             ),
                             extra_data={
                                 "ocr_source": True,

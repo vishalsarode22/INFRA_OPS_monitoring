@@ -1,6 +1,0 @@
-{"t":"2026-09-10T13:07:48","m":"cpu","v":null,"s":"UNKNOWN","src":"RFC \u00b7 SMON"}
-{"t":"2026-09-10T13:07:48","m":"memory","v":null,"s":"UNKNOWN","src":"RFC \u00b7 SMON"}
-{"t":"2026-09-10T13:07:48","m":"load_1m","v":null,"s":"UNKNOWN","src":"RFC \u00b7 SMON CPU_CONS"}
-{"t":"2026-09-10T13:07:48","m":"sap.dispatcher.state","v":null,"s":"UNKNOWN","src":"RFC"}
-{"t":"2026-09-10T13:07:48","m":"sap.icm.state","v":null,"s":"UNKNOWN","src":"RFC"}
-{"t":"2026-09-10T13:07:48","m":"rfc.connection","v":null,"s":"UNKNOWN","src":"RFC"}

@@ -60,10 +60,10 @@ _THRESHOLDS = {
     "sap.st03.dialog_resp_ms":        (1000, 2500),
     "sap.st03.max_instance_resp_ms":  (1500, 3500),
     "sap.st03.db_time_pct":           (50, 70),
-    "sap.st03.top_user_memory_mb":    (1024, 2048),
+    "sap.st03.top_user_memory_mb":    (4096, 8192),
     "sap.st03.top_report_db_ms":      (60_000, 300_000),
-    "sap.sm12.locks_per_user_max":    (20, 50),
-    "sap.sm12.oldest_lock_minutes":   (30, 120),
+    "sap.sm12.locks_per_user_max":    (200, 1000),
+    "sap.sm12.oldest_lock_minutes":   (1440, 2880),
     "sap.sm12.users_with_many_locks": (2, 5),
     "sap.sqlm.expensive_programs":    (3, 10),
     "sap.sqlm.top_program_total_s":   (300, 1800),
@@ -89,7 +89,10 @@ LOCKS_PER_USER_MANY = 10            # "many locks" threshold per user
 # oldest-lock metric. /SDF/ is the Service Data Framework: SMON holds
 # /SDF/SMON_CALL for its entire run, Cloud ALM holds /SDF/CALM_HM_K hourly.
 # Confirmed live on PRD. They still count toward per-user totals.
-LOCK_AGE_IGNORE_PREFIXES = ("/SDF/", "BGRFC")
+# Lock objects held permanently by design; excluded from the oldest-lock age.
+# FDC_TIMERDAEMON_LOCK: SAP_WFRT's timer-daemon lock on PS4, held since
+# 02.09.2026 -- it made the oldest-lock check CRITICAL on every run.
+LOCK_AGE_IGNORE_PREFIXES = ("/SDF/", "BGRFC", "FDC_TIMERDAEMON_LOCK")
 SQLM_ROWS = 5000                    # RFC_READ_TABLE cap for SQLMD
 SQLM_LOOKBACK_DAYS = 7              # SQLMD rows with DDATE in this window
 
@@ -713,6 +716,15 @@ def system_hint(session) -> str:
     return getattr(session, "system", "?")
 
 
+def _oldest_lock_detail(ls: dict) -> str:
+    """The oldest counted lock, and which standing locks were left out."""
+    text = " ".join(ls["oldest"]) if ls.get("oldest") else "no lock entries with a timestamp"
+    standing = sorted({h.get("object", "") for h in ls.get("housekeeping_locks") or [] if h.get("object")})
+    if standing:
+        text += f" (standing locks not counted: {', '.join(standing[:3])})"
+    return text
+
+
 def lock_summary(session: SapSession, client: str, system: str = "") -> dict | None:
     res = session.call("ENQUE_READ2", GCLIENT=str(client), GUNAME="")
     if res is None:
@@ -1024,7 +1036,7 @@ def build_metrics(system: str, session: SapSession, client: str) -> list[MetricR
                          detail=", ".join(f"{u} {n}" for u, n in ls["users_with_many"][:5]),
                          extra={"threshold": LOCKS_PER_USER_MANY}))
         m.append(_metric("sap.sm12.oldest_lock_minutes", ls["oldest_minutes"], "min", "application", "SM12",
-                         detail=" ".join(ls["oldest"]) if ls["oldest"] else "",
+                         detail=_oldest_lock_detail(ls),
                          extra={"oldest": ls["oldest"], "clock_source": ls["clock_source"],
                                 "owner_clock_offset_min": ls["owner_clock_offset_min"],
                                 "housekeeping_locks": ls["housekeeping_locks"]}))

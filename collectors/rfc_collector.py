@@ -36,12 +36,19 @@ DESIGN RULES CARRIED OVER FROM THE RFC BRANCH
 
 from __future__ import annotations
 
+import json as _json
 import os as _os
+import re as _re
 import threading
 import time
 from datetime import datetime
 
 from core.models import MetricResult, Status
+from utils.logger import get_logger, LOG_DIR as _LOG_DIR
+
+# Round 32: this module called log.warning() (WHERE-clause splitter) without
+# ever defining `log` -- that path would have raised NameError, not warned.
+log = get_logger(__name__)
 
 try:
     from pyrfc import Connection
@@ -216,6 +223,9 @@ class SapSession:
         self.conn = None
         self.ok = False
         self.error: str | None = None
+        # Round 32: the reason the most recent call() failed, "" when it did
+        # not. call() still never raises; this is how a caller finds out WHY.
+        self.last_error: str = ""
 
     def __enter__(self):
         if not PYRFC_AVAILABLE:
@@ -262,13 +272,154 @@ class SapSession:
             self.conn = None
         return False
 
+    # Distinct failures already written to the log, per process. The live
+    # wall polls every minute; the same FU_NOT_FOUND on every poll would
+    # bury everything else in application.log.
+    _failures_logged: set = set()
+    _failures_lock = threading.Lock()
+
+    # Round 34: function modules a system does not have. SAP answers
+    # FU_NOT_FOUND, and that answer does not change until someone transports
+    # the FM in. Asking again on every poll cost 4-5 wasted round trips per
+    # system per minute (Z_GET_OBSERVABILITY_DATA, Z_GET_LOGON_LOAD,
+    # RZL_INTG_READALL_C, TH_(GET_)LOAD_DISTRIBUTION: ~92,000 errors in
+    # dev_rfc.log since 01.09). Remembered per (system, FM) for
+    # MISSING_FM_RECHECK_SECONDS, so an FM installed later is picked up
+    # within hours without a restart.
+    MISSING_FM_RECHECK_SECONDS = 6 * 3600
+    _missing_fms: dict = {}          # (system, FM) -> epoch seconds noted
+
+    # Round 35: shared between processes. The live wall reads systems in a
+    # pool of worker processes and the sweep runs in its own; each learned
+    # the same FU_NOT_FOUND separately. One small JSON file in logs/ lets
+    # them share it, and it survives a dashboard restart.
+    MISSING_FM_FILE = _os.path.join(_LOG_DIR, "rfc_missing_functions.json")
+    _missing_mtime: float | None = None
+
+    # Answers that mean "nothing to report", not "something is broken".
+    # Logged at DEBUG only: /SDF/GET_DUMP_LOG says NO_DATA_FOUND on every
+    # dump-free poll, TH_GET_VIRT_SERVER says NOT_FOUND on single-host setups.
+    QUIET_KEYS = frozenset({"NO_DATA_FOUND", "NOT_FOUND", "TABLE_WITHOUT_DATA"})
+
+    @classmethod
+    def _missing_load(cls) -> None:
+        """Merge the shared file into memory when it has changed. Caller holds the lock."""
+        try:
+            mtime = _os.path.getmtime(cls.MISSING_FM_FILE)
+        except OSError:
+            return
+        if mtime == cls._missing_mtime:
+            return
+        try:
+            with open(cls.MISSING_FM_FILE, encoding="utf-8") as fh:
+                data = _json.load(fh)
+            for k, v in (data or {}).items():
+                system, _, fm = str(k).partition("|")
+                if system and fm:
+                    cls._missing_fms[(system, fm)] = max(float(v), cls._missing_fms.get((system, fm), 0.0))
+            cls._missing_mtime = mtime
+        except Exception:
+            pass
+
+    @classmethod
+    def _missing_save(cls) -> None:
+        """Write the still-valid entries back. Caller holds the lock. Never raises."""
+        now = time.time()
+        data = {f"{s}|{fm}": ts for (s, fm), ts in cls._missing_fms.items()
+                if now - ts < cls.MISSING_FM_RECHECK_SECONDS}
+        tmp = f"{cls.MISSING_FM_FILE}.{_os.getpid()}.tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as fh:
+                _json.dump(data, fh, indent=1, sort_keys=True)
+            _os.replace(tmp, cls.MISSING_FM_FILE)
+            cls._missing_mtime = _os.path.getmtime(cls.MISSING_FM_FILE)
+        except Exception:
+            try:
+                _os.remove(tmp)
+            except OSError:
+                pass
+
+    @classmethod
+    def forget_missing_functions(cls, system: str | None = None) -> None:
+        """Ask SAP again: for one system, or for all of them."""
+        with cls._failures_lock:
+            cls._missing_load()
+            for key in [k for k in cls._missing_fms if system is None or k[0] == system]:
+                cls._missing_fms.pop(key, None)
+            cls._missing_save()
+
+    @staticmethod
+    def _error_key(exc: Exception) -> str:
+        """SAP's exception key (FU_NOT_FOUND, NO_DATA_FOUND, ...), or ""."""
+        key = str(getattr(exc, "key", "") or "")
+        if key:
+            return key
+        m = _re.search(r"(?i)key[=:]\s*([A-Z0-9_]+)", str(exc))
+        return m.group(1).upper() if m else ""
+
+    @classmethod
+    def _is_fu_not_found(cls, exc: Exception) -> bool:
+        return cls._error_key(exc) == "FU_NOT_FOUND" or "FU_NOT_FOUND" in str(exc)
+
     def call(self, name: str, **kwargs):
-        """Returns the RFC result, or None on failure. Never raises."""
+        """
+        Returns the RFC result, or None on failure. Never raises.
+
+        The reason is kept in self.last_error (round 32). Round 35 logging:
+          * FU_NOT_FOUND -- INFO, once, when first learned (any process);
+          * NO_DATA_FOUND / NOT_FOUND -- DEBUG: an empty answer, not a fault;
+          * anything else -- WARNING, once per process per
+            (system, function, table, SAP key).
+        """
+        self.last_error = ""
         if not self.ok:
+            self.last_error = f"no RFC session ({self.error or 'not connected'})"
+            return None
+        key = (self.system, name)
+        now = time.time()
+        with SapSession._failures_lock:
+            SapSession._missing_load()
+            noted = SapSession._missing_fms.get(key)
+            if noted is not None and now - noted >= self.MISSING_FM_RECHECK_SECONDS:
+                SapSession._missing_fms.pop(key, None)
+                noted = None
+        if noted is not None:
+            # Same wording callers already look for ("FU_NOT_FOUND").
+            self.last_error = f"{name}: FU_NOT_FOUND (not installed on {self.system}; not asked again)"
             return None
         try:
             return self.conn.call(name, **kwargs)
-        except Exception:
+        except Exception as exc:
+            err_key = self._error_key(exc)
+            what = name
+            if kwargs.get("QUERY_TABLE"):
+                what = f"{name}({kwargs['QUERY_TABLE']})"
+            self.last_error = f"{what}: {type(exc).__name__}: {str(exc).strip()[:300]}"
+
+            if self._is_fu_not_found(exc):
+                with SapSession._failures_lock:
+                    SapSession._missing_load()
+                    new = key not in SapSession._missing_fms
+                    SapSession._missing_fms[key] = time.time()
+                    SapSession._missing_save()
+                if new:
+                    log.info(f"[{self.system}] {name} is not installed (FU_NOT_FOUND); "
+                             f"not called again for {self.MISSING_FM_RECHECK_SECONDS // 3600} h")
+                return None
+
+            if err_key in self.QUIET_KEYS:
+                log.debug(f"[{self.system}] {what}: {err_key}")
+                return None
+
+            # SAP leaves message variables from an earlier call in the text,
+            # so dedupe on the key, not the whole message.
+            dedupe = (self.system, what, err_key or type(exc).__name__)
+            with SapSession._failures_lock:
+                first = dedupe not in SapSession._failures_logged
+                if first:
+                    SapSession._failures_logged.add(dedupe)
+            if first:
+                log.warning(f"[{self.system}] RFC call failed -- {self.last_error}")
             return None
 
     # RFC_READ_TABLE takes its WHERE clause as OPTIONS, a table of lines of
@@ -420,7 +571,7 @@ _FM_TABLES = {
 # Tune in config/thresholds.yaml; these are the fallback.
 _THRESHOLDS = {
     "sap.st22.dumps": (1, 5),
-    "sap.sm12.lock_count": (20, 50),
+    "sap.sm12.lock_count": (500, 2000),
     "sap.sm13.failed_updates": (1, 5),
     "sap.sm37.cancelled_jobs": (1, 5),
     "sap.sm58.stuck_entries": (1, 10),
@@ -434,6 +585,79 @@ _THRESHOLDS = {
     "cpu": (80, 90),
     "memory": (85, 95),
 }
+
+
+# How many SYSFAIL rows to read from ARFCSSTATE. The old read stopped at 500,
+# and PS4 hit that on every run. Override with IBO_SM58_READ_LIMIT.
+SM58_READ_LIMIT_DEFAULT = 20000
+
+
+def _sm58_read_limit() -> int:
+    try:
+        return max(int(_os.environ.get("IBO_SM58_READ_LIMIT", SM58_READ_LIMIT_DEFAULT)), 500)
+    except (TypeError, ValueError):
+        return SM58_READ_LIMIT_DEFAULT
+
+
+def _sap_date(raw: str) -> str:
+    """20260903 -> 03.09.2026"""
+    raw = str(raw or "").strip()
+    return f"{raw[6:8]}.{raw[4:6]}.{raw[:4]}" if len(raw) == 8 and raw.isdigit() else raw
+
+
+def _sm58_sysfail_metrics(rows, today: str, limit: int) -> list:
+    """
+    Failed (SYSFAIL) tRFC entries, split into today and older.
+
+    sap.sm58.stuck_entries now counts TODAY's failures only -- the same scope
+    as the SM58 screen's default date selection, so the two can be compared.
+    It keeps its thresholds (WARNING at 1, CRITICAL at 10).
+
+    sap.sm58.sysfail_backlog counts everything older. It is housekeeping, so
+    it is graded WARNING and never CRITICAL: the old single figure mixed the
+    two and put an old backlog at CRITICAL on every run.
+    """
+    from collections import Counter
+
+    dates = [str(r[0]).strip() if r else "" for r in rows]
+    dests = [str(r[1]).strip() if len(r) > 1 else "" for r in rows]
+    capped = len(rows) >= limit
+    today_count = sum(1 for d in dates if d == today)
+    older = sorted(d for d in dates if d and d != today)
+    top = [(d, n) for d, n in Counter(x for x in dests if x).most_common(3)]
+    top_text = ", ".join(f"{d} {n:,}" for d, n in top)
+
+    detail = "SYSFAIL tRFC entries dated today (the SM58 screen's default selection)"
+    if older:
+        detail += (f"; {len(older):,}{'+' if capped else ''} older, oldest {_sap_date(older[0])}")
+    if top_text:
+        detail += f"; top destinations: {top_text}"
+
+    warn, crit = _THRESHOLDS["sap.sm58.stuck_entries"]
+    metrics = [MetricResult(
+        name="sap.sm58.stuck_entries", value=float(today_count),
+        display_value=f"{today_count} count", status=_grade("sap.sm58.stuck_entries", today_count),
+        threshold_warning=warn, threshold_critical=crit, source="rfc_collector", tcode="SM58",
+        detail=detail, category="interface", unit="count",
+        extra_data={"collector": "RFC_TABLE", "scope": "today"},
+    )]
+    if older:
+        metrics.append(MetricResult(
+            name="sap.sm58.sysfail_backlog", value=float(len(older)),
+            display_value=f"{len(older)}{'+' if capped else ''} count",
+            status=Status.WARNING, threshold_warning=1, threshold_critical=None,
+            source="rfc_collector", tcode="SM58",
+            detail=(f"SYSFAIL tRFC entries older than today"
+                    + (f" (read limit of {limit:,} reached, so at least this many)" if capped else "")
+                    + f"; oldest {_sap_date(older[0])}"
+                    + (f"; top destinations: {top_text}" if top_text else "")
+                    + ". Housekeeping: review in SM58 with a wider date range, then "
+                      "re-process or delete."),
+            category="interface", unit="count",
+            extra_data={"collector": "RFC_TABLE", "scope": "older", "capped": capped,
+                        "oldest": older[0], "top_destinations": top},
+        ))
+    return metrics
 
 
 def _as_number(raw):
@@ -551,6 +775,168 @@ def _from_function_module(session: SapSession) -> list[MetricResult]:
     return metrics
 
 
+_SNAP_READ_LIMIT = 2000
+
+# --------------------------------------------------------------------------
+# Round 33: ABAP dumps from /SDF/GET_DUMP_LOG (ST-PI)
+# --------------------------------------------------------------------------
+#
+# RFC_READ_TABLE answers TABLE_NOT_AVAILABLE for SNAP on CARFOUR QAS and PS4,
+# so the live wall had no dump count there. /SDF/GET_DUMP_LOG is SAP's own
+# remote-enabled dump reader (function group /SDF/SMD_E2E, used by Solution
+# Manager). Checked on 23.09.2026 against ST22: CAQ 1 = 1, PS4 18 = 18, same
+# times, users and programs.
+#
+# ET_E2E_LOG (/SDF/E2E_LOG_STRUC), as filled on both systems:
+#   E2E_DATE, E2E_TIME  system date and time (match ST22's columns)
+#   E2E_USER            user and client joined: "58128_500", "IB_SATYA_800"
+#   E2E_HOST            instance, e.g. vhrrnps4ci_PS4_00
+#   FIELD1 runtime error   FIELD2 exception class   FIELD3 app. component
+#   FIELD4 program
+# A day without dumps raises NO_DATA_FOUND -- that is 0 dumps, not a failure.
+
+DUMP_LOG_FM = "/SDF/GET_DUMP_LOG"
+
+# Systems where the FM does not exist. Asked once per process, not every poll.
+_dump_log_missing: set = set()
+_dump_log_lock = threading.Lock()
+
+
+def _split_user_client(value: str) -> tuple[str, str]:
+    """"58128_500" -> ("58128", "500"); a name with no client suffix is kept whole."""
+    value = str(value or "").strip()
+    head, sep, tail = value.rpartition("_")
+    if sep and head and len(tail) == 3 and tail.isdigit():
+        return head, tail
+    return value, ""
+
+
+def read_dump_log(session, day: str):
+    """
+    Today's dumps via /SDF/GET_DUMP_LOG, as a list of dicts:
+    {date, time, user, client, host, error, exception, component, program}.
+
+    Returns [] for a day without dumps and None when the FM cannot be used
+    (not installed, not authorised, or the call failed) -- the caller then
+    falls back to SNAP. The reason is left in session.last_error.
+    """
+    system = getattr(session, "system", "") or ""
+    with _dump_log_lock:
+        if system in _dump_log_missing:
+            return None
+    res = session.call(DUMP_LOG_FM, DATE_FROM=day, TIME_FROM="000000",
+                       DATE_TO=day, TIME_TO="235959")
+    if res is None:
+        why = str(getattr(session, "last_error", "") or "")
+        if "NO_DATA_FOUND" in why:
+            return []
+        if "FU_NOT_FOUND" in why:
+            with _dump_log_lock:
+                _dump_log_missing.add(system)
+        return None
+
+    def s(row, key):
+        return str(row.get(key, "") or "").strip()
+
+    rows = []
+    for r in res.get("ET_E2E_LOG", []) or []:
+        user, client = _split_user_client(s(r, "E2E_USER"))
+        rows.append({
+            "date": s(r, "E2E_DATE"), "time": s(r, "E2E_TIME"),
+            "user": user, "client": client, "host": s(r, "E2E_HOST"),
+            "error": s(r, "FIELD1"), "exception": s(r, "FIELD2"),
+            "component": s(r, "FIELD3"), "program": s(r, "FIELD4"),
+        })
+    return rows
+
+
+def _top(values, n=3) -> str:
+    from collections import Counter
+    counts = Counter(v for v in values if v)
+    return ", ".join(f"{k} {v}" for k, v in counts.most_common(n))
+
+
+def _st22_from_snap(session, today: str, metrics: list) -> None:
+    """
+    Today's ABAP dumps from SNAP, appended to `metrics` as sap.st22.dumps.
+
+    Round 32, two fixes:
+
+    * COUNT DUMPS, NOT ROWS. SNAP stores each dump as several rows -- SEQNO
+      000 is the first, the rest carry the dump data. Counting every row for
+      today overstated the dump count. The read now asks for SEQNO '000'.
+      Some kernels number differently; if that finds nothing but today has
+      SNAP rows at all, the rows are read and de-duplicated on (time, host,
+      work process), the same rule the dump breakdown uses.
+
+    * A FAILED READ IS SHOWN, NOT DROPPED. It used to add nothing, so the
+      check disappeared from the wall. It is now UNKNOWN ("Not measured")
+      with SAP's reason in the detail, which the wall prints under the check.
+    """
+    # Round 33: SAP's dump reader first; SNAP only where it is unavailable.
+    warn, crit = _THRESHOLDS.get("sap.st22.dumps", (None, None))
+    log_rows = read_dump_log(session, today)
+    if log_rows is not None:
+        top_errors = _top(r["error"] for r in log_rows)
+        metrics.append(MetricResult(
+            name="sap.st22.dumps", value=float(len(log_rows)),
+            display_value=f"{len(log_rows)} count",
+            status=_grade("sap.st22.dumps", len(log_rows)),
+            threshold_warning=warn, threshold_critical=crit,
+            source="rfc_collector", tcode="ST22",
+            detail=(f"{top_errors} -- via {DUMP_LOG_FM}" if top_errors
+                    else f"no dumps today -- via {DUMP_LOG_FM}"),
+            category="application", unit="count",
+            extra_data={"collector": "RFC_TABLE", "dump_source": DUMP_LOG_FM,
+                        "top_errors": top_errors,
+                        "top_programs": _top(r["program"] for r in log_rows)},
+        ))
+        return
+    fm_error = str(getattr(session, "last_error", "") or "")
+
+    rows = session.read_table("SNAP", ["DATUM"],
+                              f"DATUM = '{today}' AND SEQNO = '000'", _SNAP_READ_LIMIT)
+    note = "one row per dump (SEQNO 000)"
+    if rows is not None and not rows:
+        # Nothing numbered 000 -- a quiet day, or a kernel that numbers
+        # differently. One row answers which.
+        probe = session.read_table("SNAP", ["DATUM"], f"DATUM = '{today}'", 1)
+        if probe:
+            wide = session.read_table("SNAP", ["UZEIT", "AHOST", "MODNO"],
+                                      f"DATUM = '{today}'", _SNAP_READ_LIMIT * 5)
+            if wide is not None:
+                rows = list({tuple(c.strip() for c in r) for r in wide})
+                note = "de-duplicated on time, host and work process"
+            else:
+                rows = None
+
+    if rows is None:
+        reason = str(getattr(session, "last_error", "") or "").strip() or "no reason returned"
+        if fm_error and "FU_NOT_FOUND" not in fm_error:
+            reason += f"; {DUMP_LOG_FM}: {fm_error}"
+        metrics.append(MetricResult(
+            name="sap.st22.dumps", value=None, display_value="Not measured",
+            status=Status.UNKNOWN, threshold_warning=warn, threshold_critical=crit,
+            source="rfc_collector", tcode="ST22",
+            detail=f"SNAP not readable: {reason}"[:300],
+            category="application", unit="count",
+            extra_data={"collector": "RFC_TABLE", "read_failed": True},
+        ))
+        return
+
+    count = len(rows)
+    capped = count >= _SNAP_READ_LIMIT
+    metrics.append(MetricResult(
+        name="sap.st22.dumps", value=float(count),
+        display_value=f"{count}+ count" if capped else f"{count} count",
+        status=_grade("sap.st22.dumps", count), threshold_warning=warn, threshold_critical=crit,
+        source="rfc_collector", tcode="ST22",
+        detail=note + (f"; read limit {_SNAP_READ_LIMIT} reached, so at least that many" if capped else ""),
+        category="application", unit="count",
+        extra_data={"collector": "RFC_TABLE"},
+    ))
+
+
 def _from_standard_modules(session: SapSession) -> list[MetricResult]:
     """
     Fallback for systems without Z_GET_OBSERVABILITY_DATA.
@@ -571,13 +957,16 @@ def _from_standard_modules(session: SapSession) -> list[MetricResult]:
             extra_data={"collector": "RFC_TABLE"},
         ))
 
-    dumps = session.read_table("SNAP", ["DATUM"], f"DATUM = '{today}'", 2000)
-    add("sap.st22.dumps", "ST22", None if dumps is None else len(dumps))
+    _st22_from_snap(session, today, metrics)
 
     cancelled = session.read_table("TBTCO", ["JOBNAME"], f"STATUS = 'A' AND SDLSTRTDT = '{today}'")
     add("sap.sm37.cancelled_jobs", "SM37", None if cancelled is None else len(cancelled),
         category="jobs",
         detail="" if not cancelled else ", ".join(r[0].strip() for r in cancelled[:8]))
+    if metrics and metrics[-1].name == "sap.sm37.cancelled_jobs":
+        # TBTCO is read for jobs scheduled TODAY; the SM37 screen covers
+        # since yesterday, so the screen legitimately sees more.
+        metrics[-1].extra_data = {**(metrics[-1].extra_data or {}), "scope": "today"}
 
     locks = session.call("ENQUE_READ2", GCLIENT=str(session.cfg.get("client", "000")), GUNAME="")
     if locks is not None:
@@ -585,9 +974,23 @@ def _from_standard_modules(session: SapSession) -> list[MetricResult]:
         add("sap.sm12.lock_count", "SM12", len(enq),
             detail=", ".join(str(e.get("GUNAME", "")).strip() for e in enq[:8]))
 
-    trfc = session.read_table("ARFCSSTATE", ["ARFCIPID"], "ARFCSTATE = 'SYSFAIL'", 500)
-    add("sap.sm58.stuck_entries", "SM58", None if trfc is None else len(trfc),
-        category="interface")
+    # Failed tRFC, split into today (comparable with the SM58 screen) and the
+    # older backlog. Date and destination are read so the report can say how
+    # old the backlog is and where it points.
+    limit = _sm58_read_limit()
+    trfc = session.read_table("ARFCSSTATE", ["ARFCDATUM", "ARFCDEST"],
+                              "ARFCSTATE = 'SYSFAIL'", limit)
+    if trfc is not None:
+        metrics.extend(_sm58_sysfail_metrics(trfc, today, limit))
+    else:
+        # Field list rejected on this release: fall back to the old count,
+        # all dates, and say what it is.
+        trfc = session.read_table("ARFCSSTATE", ["ARFCIPID"], "ARFCSTATE = 'SYSFAIL'", 500)
+        trfc_capped = trfc is not None and len(trfc) >= 500
+        add("sap.sm58.stuck_entries", "SM58", None if trfc is None else len(trfc),
+            detail=("SYSFAIL tRFC entries, all dates"
+                    + ("; read limit of 500 reached, so at least 500" if trfc_capped else "")),
+            category="interface")
 
     users = session.call("TH_USER_LIST")
     if users is not None:

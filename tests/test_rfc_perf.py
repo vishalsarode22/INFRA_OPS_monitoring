@@ -178,7 +178,7 @@ def test_response_time_from_real_all_statrecs_shape():
     assert m["sap.st03.max_instance_resp_ms"].value == 2400
     assert m["sap.st03.db_time_pct"].value == 25.0
     mem = m["sap.st03.top_user_memory_mb"]
-    assert mem.value == 2200.0 and mem.status == Status.CRITICAL
+    assert mem.value == 2200.0 and mem.status == Status.NORMAL  # limits 4096/8192 since 22.09.2026
     assert mem.detail.startswith("U3 2200.0MB on sapprd02_PRD_00")
     assert mem.extra_data["priv_mode_steps"] == 1
 
@@ -236,7 +236,7 @@ def test_lock_aggregation_users_dups_and_age():
     assert m["sap.sm12.locks_per_user_max"].value == 12
     assert m["sap.sm12.users_with_many_locks"].value == 1
     assert m["sap.sm12.oldest_lock_minutes"].value in (94, 95, 96)
-    assert m["sap.sm12.oldest_lock_minutes"].status == Status.WARNING
+    assert m["sap.sm12.oldest_lock_minutes"].status == Status.NORMAL  # under the 24 h limit since 22.09.2026
     dups = m["sap.sm12.locks_per_user_max"].extra_data["same_object_dups"]
     assert dups[0] == (("AKUMAR", "EMMARAE", "X"), 3)
 
@@ -323,7 +323,7 @@ def test_lock_age_parsed_from_owner_id_when_no_gtdate():
     s = FakeSession({"ENQUE_READ2": {"ENQ": enq}})
     m = _by_key(s)
     assert m["sap.sm12.oldest_lock_minutes"].value in (44, 45, 46)
-    assert m["sap.sm12.oldest_lock_minutes"].status == Status.WARNING
+    assert m["sap.sm12.oldest_lock_minutes"].status == Status.NORMAL  # under the 24 h limit since 22.09.2026
 
 
 def test_st03n_aggregate_used_when_stat_returns_nothing():

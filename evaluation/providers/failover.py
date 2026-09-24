@@ -69,7 +69,12 @@ def _looks_like_quota(exc: Exception) -> bool:
     text = str(exc).lower()
     markers = ("429", "quota", "rate limit", "rate_limit", "exhausted",
                "resource_exhausted", "insufficient", "billing",
-               "401", "403", "permission_denied", "api key not valid")
+               "401", "403", "permission_denied", "api key not valid",
+               # xAI answers a wrong key with HTTP 400 "Incorrect API key
+               # provided". Treated as transient, the three Grok keys were
+               # retried on every AI call of every run.
+               "incorrect api key", "invalid api key", "invalid x-api-key",
+               "api_key_invalid")
     return any(m in text for m in markers)
 
 

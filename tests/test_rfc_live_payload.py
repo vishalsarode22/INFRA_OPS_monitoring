@@ -108,14 +108,73 @@ def test_perf_read_uses_same_session_and_is_cached(monkeypatch):
 
 
 def test_perf_cache_expires_on_its_own_clock(monkeypatch):
+    """
+    An expired entry is re-read rather than served forever.
+
+    _PERF_SWR is pinned off here, and that matters for more than the
+    assertion. With stale-while-revalidate on (the default), an expired
+    entry is served immediately and refreshed on a background thread --
+    and _perf_refresh_background does NOT go through the monkeypatched
+    _perf_build_metrics. It calls get_systems() and opens a real SapSession,
+    so this test was making a LIVE RFC CONNECTION TO PRD on every run. That
+    is what produced the "[PRD] 98 STAT records" and "perf block refreshed
+    in background" lines in the test output, and the "I/O operation on
+    closed file" logging errors after pytest tore its streams down.
+
+    A unit test must not touch a production system. The SWR path is covered
+    separately below, with the background worker stubbed.
+    """
     n = {"calls": 0}
     monkeypatch.setattr(rl, "_perf_build_metrics",
                         lambda *a: n.__setitem__("calls", n["calls"] + 1) or [_m("a", 1)])
     monkeypatch.setattr(rl, "_PERF_TTL_SECONDS", 0.01)
+    monkeypatch.setattr(rl, "_PERF_SWR", False)
+    rl.reset_perf_cache("PRD")
+
     rl._perf_metrics(FakeSession(), "PRD", "100")
+    assert n["calls"] == 1
+
     time.sleep(0.02)
     rl._perf_metrics(FakeSession(), "PRD", "100")
     assert n["calls"] == 2
+
+
+def test_expired_entry_is_served_stale_while_a_refresh_runs_behind_it(monkeypatch):
+    """
+    With SWR on, an expired read returns immediately and schedules a refresh.
+
+    The caller must not block, and the background worker must be asked to
+    run exactly once no matter how many callers arrive while it is in
+    flight. The worker itself is stubbed -- it opens its own SAP session in
+    production and has no business doing that from a test.
+    """
+    n = {"calls": 0, "spawned": 0}
+    monkeypatch.setattr(rl, "_perf_build_metrics",
+                        lambda *a: n.__setitem__("calls", n["calls"] + 1) or [_m("a", 1)])
+    monkeypatch.setattr(rl, "_PERF_TTL_SECONDS", 0.01)
+    monkeypatch.setattr(rl, "_PERF_SWR", True)
+
+    def fake_thread(target=None, args=(), **kw):
+        class T:
+            def start(_self):
+                n["spawned"] += 1
+                rl._perf_refreshing.discard(args[0])
+        return T()
+
+    monkeypatch.setattr(rl.threading, "Thread", fake_thread)
+    rl.reset_perf_cache("PRD")
+
+    first, _, _, _ = rl._perf_metrics(FakeSession(), "PRD", "100")
+    assert n["calls"] == 1 and n["spawned"] == 0
+
+    time.sleep(0.02)
+    served, err, age, _ = rl._perf_metrics(FakeSession(), "PRD", "100")
+
+    assert served is first          # the stale value, served without waiting
+    assert err is None
+    assert age > 0                  # and honestly reported as stale
+    assert n["calls"] == 1          # the caller did not re-read
+    assert n["spawned"] == 1        # the refresh was handed to the background
 
 
 def test_perf_read_failure_is_an_error_not_an_exception(monkeypatch):
@@ -184,24 +243,21 @@ def test_read_live_exposes_full_record_and_merged_checklist(monkeypatch):
     assert p["perf"]["metrics"][0]["extra"]["owner_clock_offset_min"] == 330
     # checklist: merged, sorted by severity, tiles excluded.
     #
-    # Several metrics are deliberately NOT in the compact grid
-    # (rfc_live._CHECK_GRID_EXCLUDE) because each is rendered somewhere better:
-    # sap.st03.dialog_resp_ms per instance in the instances table with a
-    # readable duration, and sap.sm12.oldest_lock_minutes on its own tile.
-    # Repeating either here as a bare number was redundant. Excluded from the
-    # grid is NOT the same as dropped -- both must still appear in the full
-    # record and in the perf block, which is what the assertions below check.
+    # 23.09.2026, on request: the wall grid carries five counters only
+    # (rfc_live._WALL_GRID_METRICS). Off the grid is NOT dropped -- everything
+    # still appears in the full record and the perf block, which is what the
+    # assertions below check.
     checklist = [(c["metric"], c["status"]) for c in p["checks"]]
     assert checklist == [("sap.st22.dumps", "WARNING")]
-    for excluded in ("sap.st03.dialog_resp_ms", "sap.sm12.oldest_lock_minutes"):
-        assert excluded in names
-        assert excluded in [r["metric"] for r in p["perf"]["metrics"]]
-        assert excluded not in [c["metric"] for c in p["checks"]]
+    for off_grid in ("sap.st03.dialog_resp_ms", "sap.sm12.oldest_lock_minutes"):
+        assert off_grid in names
+        assert off_grid in [r["metric"] for r in p["perf"]["metrics"]]
+        assert off_grid not in [c["metric"] for c in p["checks"]]
     assert p["checks"][0]["label"] == "ABAP dumps today"
 
 
 def test_read_live_perf_failure_keeps_checks(monkeypatch):
-    checks = [_m("sap.sm21.errors", 6, Status.WARNING, "SM21")]
+    checks = [_m("sap.st22.dumps", 6, Status.WARNING, "ST22")]
     _wire_read_live(monkeypatch, checks, [])
 
     def boom(*a):
@@ -210,6 +266,6 @@ def test_read_live_perf_failure_keeps_checks(monkeypatch):
 
     p = rl.read_live("PRD", {"rfc": {"client": "100"}}, use_cache=False)
     assert p["connected"] is True
-    assert [c["metric"] for c in p["checks"]] == ["sap.sm21.errors"]
+    assert [c["metric"] for c in p["checks"]] == ["sap.st22.dumps"]
     assert p["perf"]["metrics"] == [] and "timed out" in p["perf"]["error"]
-    assert [r["metric"] for r in p["rfc_metrics"]] == ["sap.sm21.errors"]
+    assert [r["metric"] for r in p["rfc_metrics"]] == ["sap.st22.dumps"]

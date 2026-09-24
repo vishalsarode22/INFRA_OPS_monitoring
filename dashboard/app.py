@@ -103,6 +103,27 @@ def _get_rfc_pool():
         return _rfc_pool
 
 
+def _running_under_pytest() -> bool:
+    """
+    True while pytest is driving this process.
+
+    A test that boots the app through TestClient runs the REAL lifespan,
+    which starts the scheduler and the live refresher. With
+    IBO_LIVE_AUTO_REFRESH=1 set in .env that meant every `pytest` run
+    opened RFC connections to every configured system -- PRD included --
+    and read from them. Live readings appeared in test output, runs took as
+    long as the SAP round trips, and the daemon threads kept logging after
+    pytest had closed its streams, which is the "ValueError: I/O operation
+    on closed file" traceback at the end of a run.
+
+    A test suite must never touch a production system as a side effect of
+    importing the app. Background work is therefore skipped under pytest;
+    everything the tests actually assert -- routes, auth, contracts -- runs
+    exactly as before.
+    """
+    return "PYTEST_CURRENT_TEST" in os.environ
+
+
 def _refresh_one_live(cfg: dict) -> None:
     name = cfg.get("name", "?")
     try:
@@ -175,6 +196,12 @@ def _live_refresh_loop():
 def start_live_refresher():
     global _live_refresher_started
     if _live_refresher_started:
+        return
+    if _running_under_pytest():
+        # See _running_under_pytest: this thread polls every configured
+        # system over RFC, which a test run has no business doing.
+        log.info("Live refresher not started: running under pytest.")
+        _live_refresher_started = True
         return
     # ON-DEMAND BY DEFAULT. The timer-driven refresher is what read every
     # system every 60s -- including the unreachable ones -- whether anyone
@@ -2211,6 +2238,9 @@ def _scheduler_loop():
 
 
 def start_scheduler():
+    if _running_under_pytest():
+        log.info("Scheduler not started: running under pytest.")
+        return
     thread = threading.Thread(target=_scheduler_loop, daemon=True)
     thread.start()
     log.info("Scheduler started -- runs only what the Profiles page schedules.")
@@ -2293,6 +2323,12 @@ def _rca_start(system_name: str, reason: str, manual: bool) -> dict:
                            "started_at": datetime.now().isoformat(timespec="seconds")})
     if manual:
         _rca_trigger.mark_fired(system_name, reason)
+        try:
+            from core.rca_trigger import mark_fired_on_disk
+
+            mark_fired_on_disk(system_name, reason)   # shared with sweep-triggered runs
+        except Exception as exc:   # noqa: BLE001
+            log.debug(f"RCA state not shared: {exc}")
     t = threading.Thread(target=_run_rca_background, args=(system_name, reason), daemon=True)
     t.start()
     return {"started": True, "system": system_name, "reason": reason}
