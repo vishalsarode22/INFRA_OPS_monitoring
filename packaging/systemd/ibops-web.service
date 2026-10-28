@@ -1,0 +1,19 @@
+[Unit]
+Description=InfraBeatOps web (dashboard UI, IBO_ROLE=ui)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ibops
+WorkingDirectory=/home/ibops/app
+Environment=IBO_ROLE=ui
+ExecStart=/home/ibops/app/.venv/bin/python -m services.web
+Restart=always
+RestartSec=5
+# A hung process gets killed and restarted rather than sitting forever.
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

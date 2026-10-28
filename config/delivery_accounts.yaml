@@ -1,0 +1,9 @@
+# Sender accounts. Edited from the Profiles page.
+#
+# Settings live here; passwords and tokens live in .env under
+# SMTP_PASSWORD__<ID> and WHATSAPP_TOKEN__<ID>. This file holds no
+# credential and no pointer to one beyond the account name, so
+# leaking it exposes which mailboxes exist, not how to use them.
+
+email: []
+whatsapp: []

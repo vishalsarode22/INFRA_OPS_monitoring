@@ -1,0 +1,15 @@
+# Show systems collected by another IBOPS dashboard on this one.
+# Copy to config/remote_sources.yaml. Without that file the feature is off.
+#
+# url is the other dashboard as seen from THIS machine. The dashboards listen
+# on 127.0.0.1 only, so reach the Ubuntu one through an SSH tunnel, for example
+#   ssh -N -L 8001:127.0.0.1:8000 ibops@10.1.0.37
+# and use http://127.0.0.1:8001 here.
+sources:
+  - name: ubuntu
+    label: Ubuntu collector
+    url: http://127.0.0.1:8001
+    # To let "Monitor this system" on a remote card start the sweep on that
+    # collector, paste the collector's IBO_API_TOKEN (from its .env) here.
+    # Reading data needs no token; leave it out and the button is disabled.
+    token: ""

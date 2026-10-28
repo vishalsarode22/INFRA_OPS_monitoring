@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Live Wall</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  /* Sized for a wall monitor: fewer, larger cards; readable across a room. */
+  .wall{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(430px,1fr))}
+  .sys{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+       overflow:hidden;box-shadow:var(--shadow)}
+  .sys.s-normal{border-top:3px solid var(--green)}
+  .sys.s-warning{border-top:3px solid var(--amber)}
+  .sys.s-critical{border-top:3px solid var(--red)}
+  .sys.s-unknown{border-top:3px solid var(--gray)}
+  /* Round 38: a card in trouble must be found from across the room. CRITICAL
+     gets a full red frame, a halo and a tinted header; WARNING a quieter
+     amber frame. Static -- no blinking on an operations wall. */
+  .sys.s-critical{border:2px solid var(--red);border-top-width:4px;
+       box-shadow:0 0 0 4px var(--red-bg),var(--shadow)}
+  .sys.s-critical .sh{background:var(--red-bg)}
+  .sys.s-warning{border:1px solid var(--amber-br);border-top:3px solid var(--amber)}
+  .sys.s-warning .sh{background:var(--amber-bg)}
+  /* Why the card has that colour, in one line under the header. */
+  .why{display:flex;flex-wrap:wrap;gap:6px 14px;padding:7px 16px;font-size:11px;
+       font-weight:700;border-bottom:1px solid var(--border)}
+  .why.s-critical{color:var(--red);background:var(--red-bg)}
+  .why.s-warning{color:var(--amber);background:var(--amber-bg)}
+  .why .lead{letter-spacing:.05em;text-transform:uppercase;font-size:10px}
+  .why .item{font-family:var(--mono);font-weight:600}
+
+  .sh{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
+  .sh h3{font-size:17px;font-weight:800}
+  .sh .sid{font-family:var(--mono);font-size:11px;color:var(--muted-dim)}
+  .sh .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)}
+  .t{background:var(--card);padding:11px 13px}
+  .t .k{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+        color:var(--muted-dim);margin-bottom:5px;white-space:nowrap}
+  .t .v{font-size:19px;font-weight:800;font-family:var(--mono);line-height:1.15}
+  .t .m{font-size:9.5px;color:var(--muted-dim);margin-top:3px;overflow-wrap:anywhere}
+  .v-normal{color:var(--green)} .v-warning{color:var(--amber)}
+  .v-critical{color:var(--red)} .v-unknown{color:var(--muted-dim)}
+  /* Round 38: uptime row = uptime (2 columns) + ABAP dumps + cancelled jobs. */
+  .t.span2{grid-column:span 2}
+  .t.t-warning{background:var(--amber-bg)}
+  .t.t-critical{background:var(--red-bg)}
+  .t .lim{font-size:9px;color:var(--muted-dim);margin-top:3px;font-family:var(--mono);white-space:nowrap}
+  .t .v .unit{font-size:11px;font-weight:600;color:var(--muted-dim);margin-left:3px}
+
+  .wp{padding:12px 16px;border-top:1px solid var(--border)}
+  .wp-head{display:flex;justify-content:space-between;font-size:10px;font-weight:700;
+        letter-spacing:.05em;text-transform:uppercase;color:var(--muted-dim);margin-bottom:7px}
+  .wp-types{display:flex;gap:14px;flex-wrap:wrap;margin-top:9px;font-size:11px;
+        font-family:var(--mono);color:var(--muted)}
+  .wp-types b{color:var(--text)}
+  .longest{margin-top:9px;font-size:11px;color:var(--amber);font-family:var(--mono)}
+
+  /* Workload from /SDF/SMON_HEADER. Dialog queue leads CPU and memory: it
+     rises while users are already waiting and the OS tiles still look fine. */
+  .smon{padding:11px 16px;border-top:1px solid var(--border)}
+  .smon-head{display:flex;justify-content:space-between;font-size:10px;font-weight:700;
+        letter-spacing:.05em;text-transform:uppercase;color:var(--muted-dim);margin-bottom:8px}
+  .smon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px 12px}
+  .smon-grid div{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .smon-grid .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;
+        color:var(--muted-dim)}
+  .smon-grid .v{font-family:var(--mono);font-size:12.5px;font-weight:700}
+  .smon-srv{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);
+        display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 12px}
+  .smon-srv .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;
+        color:var(--muted-dim);display:block}
+  .smon-srv .v{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+  /* T-code checklist. Compact grid so 14 counters fit without scrolling,
+     sorted worst-first so the eye lands on a problem immediately. */
+  .checks{padding:11px 16px;border-top:1px solid var(--border)}
+  .checks-head{display:flex;justify-content:space-between;font-size:10px;font-weight:700;
+        letter-spacing:.05em;text-transform:uppercase;color:var(--muted-dim);margin-bottom:8px}
+  .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:1px;
+        background:var(--border);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  /* The metric name leads; the transaction code is provenance, not the
+     headline. The previous layout reserved 38px for the T-code and let the
+     label ellipsis away to "Lo..." -- which told a viewer nothing about what
+     375 was counting. */
+  .chk{background:var(--card);padding:7px 9px;display:flex;align-items:center;
+        justify-content:space-between;gap:9px;min-width:0}
+  .chk .txt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+  .chk .lb{font-size:11px;color:var(--muted);overflow:hidden;
+        text-overflow:ellipsis;white-space:nowrap}
+  .chk .tc{font-family:var(--mono);font-size:9px;font-weight:700;
+        letter-spacing:.04em;color:var(--muted-dim)}
+  .chk .vl{font-family:var(--mono);font-size:12px;font-weight:800;white-space:nowrap}
+  .gchk{border-top:1px solid var(--border);padding:6px 2px}
+  .gchk summary{display:flex;gap:8px;align-items:baseline;cursor:pointer;list-style:none}
+  .gchk summary::-webkit-details-marker{display:none}
+  .gchk .tc{font-family:var(--mono);font-size:11px;font-weight:800;min-width:52px}
+  .gchk .sm{font-size:11px;color:var(--muted);flex:1;min-width:0}
+  .gchk .st{font-family:var(--mono);font-size:9.5px;font-weight:800;white-space:nowrap}
+  .gchk .st.s-critical{color:var(--red)} .gchk .st.s-warning{color:var(--amber)}
+  .gchk .st.s-ok{color:var(--green)} .gchk .st.s-unknown{color:var(--muted-dim)}
+  .gchk table{width:100%;border-collapse:collapse;margin:6px 0 2px;font-size:10.5px}
+  .gchk td{padding:2px 4px;border-bottom:1px solid var(--border);vertical-align:top}
+  .gchk td:first-child{color:var(--muted);width:42%}
+  .gchk .ob{font-size:10.5px;color:var(--amber);margin:4px 0 0}
+  .chk.s-critical{background:var(--red-bg)}
+  .chk.s-warning{background:var(--amber-bg)}
+  .chk.s-unknown .vl{color:var(--muted-dim);font-style:italic;font-weight:600;font-size:10.5px}
+  .chk.s-critical .vl{color:var(--red)}
+  .chk.s-warning .vl{color:var(--amber)}
+  .chk.s-normal .vl{color:var(--green)}
+
+  .inst{padding:11px 16px;border-top:1px solid var(--border)}
+  .inst table{font-size:11.5px}
+  .inst th,.inst td{padding:6px 8px}
+
+  .err{padding:13px 16px;font-size:11.5px;font-family:var(--mono);color:var(--red);
+       border-top:1px solid var(--border);white-space:pre-wrap;max-height:110px;overflow:auto}
+  .foot{display:flex;gap:10px;padding:10px 16px;border-top:1px solid var(--border);
+        font-size:10.5px;color:var(--muted-dim);font-family:var(--mono)}
+
+  /* ======================================================================
+     Live wall, glassmorphism (v6): each system is a pane of deep frost over
+     the colour fields; tiles and check cells are see-through, divided by
+     light hairlines instead of solid slabs. Trouble tints the glass and
+     glows -- static, readable across a room.
+     ====================================================================== */
+  .pg-wall .sys{background:var(--gl-sheen),var(--gl-bg);border:1px solid var(--gl-edge);border-radius:22px;
+    backdrop-filter:var(--gl-blur);-webkit-backdrop-filter:var(--gl-blur);
+    box-shadow:var(--gl-shadow),var(--gl-inner)}
+  .pg-wall .sys.s-normal,.pg-wall .sys.s-unknown{border-top:1px solid var(--gl-edge)}
+  .pg-wall .sh{border-bottom:1px solid var(--gl-line);padding:15px 18px}
+  .pg-wall .sh h3{font-family:var(--display);font-weight:300;font-size:22px;letter-spacing:-.01em}
+  /* status lamp before the name: the small touch */
+  .pg-wall .sh h3::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:10px;
+    vertical-align:middle;position:relative;top:-2px;background:var(--gray)}
+  .pg-wall .s-normal .sh h3::before{background:var(--green);box-shadow:0 0 10px var(--green)}
+  .pg-wall .s-warning .sh h3::before{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+  .pg-wall .s-critical .sh h3::before{background:var(--red);box-shadow:0 0 12px var(--red)}
+  .pg-wall .sys.s-warning{border:1px solid var(--amber-br);box-shadow:var(--gl-shadow),0 0 0 1px var(--amber-br),0 0 28px rgba(240,170,60,.25),inset 0 1px 0 var(--gl-edge)}
+  .pg-wall .sys.s-critical{border:1px solid var(--red);box-shadow:var(--gl-shadow),0 0 0 2px var(--red-br),0 0 34px rgba(220,70,60,.30),inset 0 1px 0 var(--gl-edge)}
+  .pg-wall .sys.s-critical .sh,.pg-wall .why.s-critical{background:var(--red-bg)}
+  .pg-wall .sys.s-warning .sh,.pg-wall .why.s-warning{background:var(--amber-bg)}
+  .pg-wall .why{border-bottom:1px solid var(--gl-line)}
+  .pg-wall .tiles{background:none;gap:0;border-bottom:1px solid var(--gl-line)}
+  .pg-wall .t{background:transparent;box-shadow:inset -1px 0 0 var(--gl-line),inset 0 -1px 0 var(--gl-line);padding:13px 15px}
+  .pg-wall .t .k{font-weight:600;letter-spacing:.03em;text-transform:none;font-size:10.5px}
+  .pg-wall .t .v{display:inline-block;font-family:var(--display);font-weight:400;font-size:23px;letter-spacing:-.02em;white-space:nowrap;padding-right:.18em;
+    background:var(--val-neutral);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+  .pg-wall .t .v.v-normal{background-image:var(--val-ok)} .pg-wall .t .v.v-warning{background-image:var(--val-warn)}
+  .pg-wall .t .v.v-critical{background-image:var(--val-crit)} .pg-wall .t .v.v-unknown{background-image:var(--val-unk)}
+  .pg-wall .chk .vl{font-family:var(--display);font-weight:400;font-size:14px}
+  .pg-wall .sh .sid{color:var(--muted)}
+  .pg-wall .t.t-warning{background:var(--amber-bg)} .pg-wall .t.t-critical{background:var(--red-bg)}
+  .pg-wall .wp,.pg-wall .smon,.pg-wall .checks,.pg-wall .inst,.pg-wall .err,.pg-wall .foot,.pg-wall .gchk,
+  .pg-wall .smon-srv{border-color:var(--gl-line)}
+  .pg-wall .check-grid{background:none;gap:6px;border:0;border-radius:0}
+  .pg-wall .chk{background:var(--gl-bg-2);border:1px solid var(--gl-edge);border-radius:10px}
+  .pg-wall .chk.s-critical{background:var(--red-bg);border-color:var(--red-br)}
+  .pg-wall .chk.s-warning{background:var(--amber-bg);border-color:var(--amber-br)}
+  .pg-wall .gchk td{border-bottom:1px solid var(--gl-line)}
+  .pg-wall .foot{background:var(--gl-bg-2)}
+  /* Phones: one card per row, two tiles per row, footer buttons wrap. */
+  @media (max-width:640px){
+    .wall{grid-template-columns:1fr}
+    .tiles{grid-template-columns:repeat(2,1fr)}
+    .t.span2{grid-column:span 2}
+    .foot{flex-wrap:wrap}
+    .sh{flex-wrap:wrap}
+    .ops-menu .m{right:auto;left:0}
+  }
+</style>
+</head>
+<body class="pg-wall">
+<main>
+  <div class="topbar">
+    <div>
+      <h2>Live operations wall</h2>
+      <div class="sub">Direct RFC reads · <span id="every">manual</span> — click Read live to refresh</div>
+    </div>
+    <div class="top-actions">
+      <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
+      <span class="chip" id="nextrun-chip" title="Next automatic monitoring run (Scheduler page / Profiles)">next run –</span>
+      <span class="chip c-live"><span class="pulse"></span> <span id="livecount">–</span> live</span>
+      <button class="btn btn-primary" id="readlive">↻ Read live</button>
+      <select class="input" id="rate" title="Auto-refresh interval (manual = only when Read live is clicked)">
+        <option value="0" selected>manual</option>
+        <option value="10000">every 10s</option>
+        <option value="30000">every 30s</option>
+        <option value="60000">every 60s</option>
+      </select>
+      <span id="run-ctl"></span>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="projbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px"></div>
+    <div id="banner"></div>
+    <div class="wall" id="wall"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Reading live RFC…</span></div></div>
+    <div style="margin-top:14px;font-size:11px;color:var(--muted-dim)">
+      Last read <span id="gen" class="mono">–</span>. Values marked
+      <span class="src src-rfc">RFC LIVE</span> come straight from the application
+      server. Values marked <span class="src src-gui">SAP GUI</span> or
+      <span class="src src-stale">stale</span> come from the last monitoring sweep
+      on the dedicated collector machine.
+    </div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=ds6"></script>
+<script src="/static/ops.js?v=ops1"></script>
+<script>
+/* Every page here depends on shell.js for the sidebar, theme and helpers.
+   If it fails to load the page renders bare with only a console error, which
+   looks like the app is broken rather than one asset being missing. Say so
+   on screen instead. */
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
+    '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
+    '<p style="color:#666;line-height:1.6">This page needs ' +
+    '<code>/static/shell.js?v=ds6</code> and <code>/static/shell.css?v=ds6</code>. ' +
+    'They are missing or the static mount is not serving them.</p>' +
+    '<p style="color:#666;line-height:1.6">Check that ' +
+    '<code>dashboard/static/shell.js?v=ds6</code> exists, then restart the server. ' +
+    'If you are seeing this inside a preview pane rather than at ' +
+    '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
+    'behind a preview.</p></div>';
+}
+</script>
+<script>
+IB.mountShell("wall");
+IB.mountSchedulerControl("sched-ctl");
+IB.mountRunControl("run-ctl");
+IB.themeToggle(document.getElementById("theme"));
+
+let timer = null;
+
+function tile(label, value, status, meta, cls) {
+  const st = String(status || "unknown").toLowerCase();
+  return `<div class="t${cls ? " " + cls : ""}">
+      <div class="k">${IB.esc(label)}</div>
+      <div class="v v-${st}">${value}</div>
+      ${meta ? `<div class="m">${meta}</div>` : ""}
+    </div>`;
+}
+
+/* A tile filled from the last sweep rather than the live RFC read must say
+   so. Showing a 45-minute-old value under an "RFC LIVE" badge would be a
+   quiet lie. */
+function srcNote(s, field) {
+  const f = (s.fallback_sources || {})[field];
+  if (!f) return "";
+  const age = (f.age_minutes !== null && f.age_minutes !== undefined)
+    ? ` · ${f.age_minutes}m old` : "";
+  return `${IB.esc(f.source)}${age}`;
+}
+
+/* Grades come from the server (core/wall_grades.py) with THIS system's own
+   limits from the Thresholds page. The fixed numbers below are only a
+   fallback for a card from a dashboard that does not send grades yet. */
+function gs(s, field, fallback) {
+  const g = s && s.grades && s.grades[field];
+  return g && g.status ? String(g.status).toLowerCase() : fallback;
+}
+function limText(g, unit) {
+  if (!g) return "";
+  unit = unit || "";
+  if (g.direction === "state") return g.severity && g.severity !== "off" ? `not running = ${g.severity}` : "";
+  const lo = g.direction === "low", parts = [];
+  if (g.warning !== null && g.warning !== undefined) parts.push(`${lo ? "≤" : "≥"}${g.warning}${unit} warn`);
+  if (g.critical !== null && g.critical !== undefined) parts.push(`${lo ? "≤" : "≥"}${g.critical}${unit} crit`);
+  if (g.enabled === false) return "limit switched off";
+  return parts.join(" · ");
+}
+function gradeCpu(v)  { if (v === null) return "unknown"; return v >= 90 ? "critical" : v >= 80 ? "warning" : "normal"; }
+function gradeWp(v)   { if (v === null) return "unknown"; return v >= 90 ? "critical" : v >= 75 ? "warning" : "normal"; }
+
+// Memory is graded only when the figure excludes reclaimable page cache.
+// With cache counted as used, Linux and AIX sit near 100% on a healthy box,
+// so the number is reported but never colours a tile or the card.
+function memoryTrusted(s) {
+  const smon = s.smon || {};
+  if (smon.memory_trusted === true) return true;
+  if (smon.memory_trusted === false) return false;
+  return !(smon.memory_basis || "").toLowerCase().includes("incl. cache");
+}
+function gradeMemory(s) {
+  return memoryTrusted(s) ? gradeCpu(s.memory) : "unknown";
+}
+
+/* Round 38: ABAP dumps and cancelled jobs sit in the uptime row as tiles,
+   graded by the company standard (5 = warning, 10 = critical), with the
+   runtime errors / job names underneath and the limits stated. */
+/* Round 39: human durations. 575 s -> "9m 35s", 3900 s -> "1h 05m". */
+function fmtDuration(sec) {
+  sec = Math.max(0, Math.round(Number(sec) || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  if (h) return `${h}h ${String(m).padStart(2, "0")}m`;
+  if (m) return s ? `${m}m ${String(s).padStart(2, "0")}s` : `${m}m`;
+  return `${s}s`;
+}
+/* 13143 minutes -> "9d 3h", 95 -> "1h 35m", 42 -> "42m". */
+function fmtAgeMinutes(min) {
+  min = Math.max(0, Math.round(Number(min) || 0));
+  const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60;
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${String(m).padStart(2, "0")}m`;
+  return `${m}m`;
+}
+
+function counterTile(list, metric, label) {
+  const c = (list || []).find(x => x.metric === metric);
+  if (!c) return tile(label, "—", "unknown", "not read on this system");
+  const st = String(c.status || "UNKNOWN").toLowerCase();
+  const raw = String(c.value == null ? "" : c.value);
+  const num = raw.replace(/\s*count$/i, "");
+  const measured = st !== "unknown" && /^[0-9][0-9,+]*$/.test(num);
+  const value = measured ? `${IB.esc(num)}<span class="unit">today</span>` : IB.esc(raw || "Not measured");
+  const lim = (c.warning != null && c.critical != null)
+    ? `<div class="lim">≥${IB.esc(String(c.warning))} warn · ≥${IB.esc(String(c.critical))} crit · ${IB.esc(c.tcode || "")}</div>`
+    : `<div class="lim">${IB.esc(c.tcode || "")}</div>`;
+  const note = (c.sub ? IB.esc(c.sub) : (measured && num === "0" ? "none today" : "")) + lim;
+  return tile(label, value, st, note, st === "critical" || st === "warning" ? "t-" + st : "");
+}
+
+/* One line saying WHY a card is amber or red: the counters and tiles that
+   put it there, worst first. */
+function whyLine(s, st) {
+  if (st !== "critical" && st !== "warning") return "";
+  if (Array.isArray(s.grade_reasons)) {
+    const rs = s.grade_reasons.filter(r => r.status === "CRITICAL" || r.status === "WARNING");
+    if (!rs.length) return "";
+    return `<div class="why s-${st}"><span class="lead">${st === "critical" ? "Critical" : "Warning"}</span>
+      ${rs.slice(0, 4).map(r => `<span class="item">${IB.esc(r.text)}</span>`).join("")}</div>`;
+  }
+  const items = [];
+  const add = (sev, text) => items.push({ sev, text });
+  for (const c of (s.checks || [])) {
+    const cs = String(c.status || "").toLowerCase();
+    if (cs === "critical" || cs === "warning")
+      add(cs, `${c.label} ${String(c.value).replace(/\s*count$/i, "")}`);
+  }
+  const cpu = gradeCpu(s.cpu), mem = gradeMemory(s),
+        wpg = gradeWp(s.work_processes && s.work_processes.utilization_pct);
+  if (cpu === "critical" || cpu === "warning") add(cpu, `CPU ${Math.round(s.cpu)}%`);
+  if (mem === "critical" || mem === "warning") add(mem, `Memory ${Math.round(s.memory)}%`);
+  if (wpg === "critical" || wpg === "warning")
+    add(wpg, `Work processes ${Math.round(s.work_processes.utilization_pct)}% in use`);
+  if (!items.length) return "";
+  items.sort((a, b) => (a.sev === "critical" ? 0 : 1) - (b.sev === "critical" ? 0 : 1));
+  return `<div class="why s-${st}"><span class="lead">${st === "critical" ? "Critical" : "Warning"}</span>
+    ${items.slice(0, 4).map(i => `<span class="item">${IB.esc(i.text)}</span>`).join("")}</div>`;
+}
+
+function overall(s) {
+  if (!s.connected) return "unknown";
+  if (s.overall) return String(s.overall).toLowerCase();
+  const g = [gradeCpu(s.cpu), gradeMemory(s),
+             gradeWp(s.work_processes && s.work_processes.utilization_pct)];
+  // The T-code counters carry the same weight as the OS tiles: 7 ABAP dumps
+  // matters more than CPU at 40%, and a card that ignored them would be
+  // green while the system was failing transactions.
+  for (const c of (s.checks || [])) {
+    if (c.status === "CRITICAL") g.push("critical");
+    else if (c.status === "WARNING") g.push("warning");
+  }
+  if (g.includes("critical")) return "critical";
+  if (g.includes("warning")) return "warning";
+  return "normal";
+}
+
+/* ST03N workload, SMICM, ST02, ST04, ST05, STMS, STRUST as read by the last
+   sweep (collectors/rfc_live.gui_checks_from_snapshot). Not live: each line
+   says when it was read. Click a line for the figures. */
+const _gchkOpen = new Set();
+function gchkToggle(el) {
+  if (el.open) _gchkOpen.add(el.dataset.key); else _gchkOpen.delete(el.dataset.key);
+}
+function guiChecks(system, list) {
+  if (!list || !list.length) return "";
+  const cls = st => "s-" + String(st || "unknown").toLowerCase().replace(/[^a-z]/g, "");
+  const bad = list.filter(c => c.status === "CRITICAL" || c.status === "WARNING").length;
+  const unread = list.filter(c => !["OK", "CRITICAL", "WARNING", "NOT APPLICABLE"].includes(c.status)).length;
+  const head = [bad ? bad + " need attention" : "", unread ? unread + " not read" : ""].filter(Boolean).join(" · ")
+               || "all within threshold";
+  return `<div class="checks">
+      <div class="checks-head"><span>Screen checks · last sweep</span>
+        <span class="mono">${head} · ${list.length} checks</span></div>
+      ${list.map(c => {
+        const key = system + "|" + c.tcode;
+        return `<details class="gchk" ${_gchkOpen.has(key) ? "open" : ""} data-key="${IB.esc(key)}"
+            ontoggle="gchkToggle(this)">
+          <summary><span class="tc">${IB.esc(c.tcode)}</span>
+            <span class="sm">${IB.esc(c.summary || "")}</span>
+            <span class="st ${cls(c.status)}">${IB.esc(c.status)}</span></summary>
+          ${c.observation && c.status !== "OK" ? `<div class="ob">${IB.esc(c.observation)}</div>` : ""}
+          ${c.rows && c.rows.length ? `<table>${c.rows.map(r =>
+              `<tr><td>${IB.esc(r[0])}</td><td>${IB.esc(r[1])}</td></tr>`).join("")}</table>` : ""}
+          <div class="ob" style="color:var(--muted-dim)">read ${IB.esc(String(c.read_at || "").replace("T", " ").slice(0, 16))}${
+            c.stale ? " · last sweep had no SAP GUI; this is the one before" : ""}</div>
+        </details>`; }).join("")}
+    </div>`;
+}
+
+function checks(list, source, err) {
+  if (err) {
+    return `<div class="checks"><div class="checks-head"><span>T-code checks</span>
+            <span>error</span></div>
+            <div class="no-data">${IB.esc(err)}</div></div>`;
+  }
+  if (!list || !list.length) {
+    return `<div class="checks"><div class="checks-head"><span>T-code checks</span>
+            <span>no data</span></div>
+            <div class="no-data">No counters returned — the system is not reachable,
+            or Z_GET_OBSERVABILITY_DATA is not installed and the fallback queries
+            found nothing.</div></div>`;
+  }
+  // Shown beside the work processes already; repeating them here pushes the
+  // rest of the risk list out of view.
+  // Round 38: ABAP dumps and cancelled jobs are tiles in the uptime row now.
+  const inWpBlock = new Set(["sap.sm50.priv_mode_wp", "sap.st22.dumps",
+                             "sap.sm37.cancelled_jobs"]);
+  // 27.10.2026, owner's request: not on the wall for any system.
+  const offWall = new Set(["sap.sm36.housekeeping_missing", "sap.sp01.spool_requests",
+                           "sap.su01.user_issues", "sap.slicense.days_left"]);
+  const shown = list.filter(c => !inWpBlock.has(c.metric) && !offWall.has(c.metric));
+  // Risk first: counters that say the system is in trouble. The rest (user
+  // sessions, running jobs) say how busy it is, not whether it is healthy,
+  // so they go on one muted line at the end.
+  const risky = shown.filter(c => c.risk !== false);
+  const info = shown.filter(c => c.risk === false);
+  // Round 32: count what the grid draws. PRIV mode travels in the same list
+  // for the WORK PROCESSES block and must not inflate "N checks".
+  const bad = shown.filter(c => c.status === "CRITICAL" || c.status === "WARNING").length;
+  const infoLine = "";   // busy-ness counters are off the wall, on request
+  return `<div class="checks">
+      <div class="checks-head">
+        <span>Risk checks · ${IB.esc(source || "RFC")}</span>
+        <span class="mono">${bad ? bad + " need attention" : "all within threshold"}
+              · ${shown.length} checks</span>
+      </div>
+      <div class="check-grid">
+        ${risky.map(c => `<div class="chk s-${c.status.toLowerCase()}"
+             title="${IB.esc(c.metric)}${c.detail ? " — " + IB.esc(c.detail) : ""}">
+            <span class="txt">
+              <span class="lb">${IB.esc(c.label)}</span>
+              <span class="tc">${IB.esc(c.tcode)}${c.sub ? " · " + IB.esc(c.sub) : ""}</span>
+            </span>
+            <span class="vl">${IB.esc(c.value)}</span>
+          </div>`).join("")}
+      </div>
+      ${infoLine}
+    </div>`;
+}
+
+function smonPanel(sm) {
+  if (!sm || sm.cpu === undefined && sm.dialog_queue === undefined) return "";
+  if (!Object.keys(sm).length) return "";
+  const cell = (k, v, suffix) =>
+    (v === null || v === undefined) ? "" :
+    `<div><span class="k">${k}</span><span class="v">${IB.esc(String(v))}${suffix || ""}</span></div>`;
+  const cells = [
+    cell("Dialog queue", sm.dialog_queue),
+    cell("Update queue", sm.update_queue),
+    cell("Sessions", sm.sessions),
+    cell("Users", sm.users),
+    cell("Free RAM", sm.free_mem_mb, " MB"),
+    cell("Free incl. cache", sm.free_mem_mb_inc_fs, " MB"),
+    cell("RAM excl. cache", sm.memory_excl_cache, "%"),
+    cell("CPU idle", sm.cpu_idle_raw, "%"),
+    cell("Instances", sm.instance_count),
+    cell("Dialog avg 60s", sm.dialog_avg_60s),
+    cell("DB round-trip", sm.db_rtt_ms, " ms"),
+    cell("CPUs", sm.cpus),
+  ].join("");
+  if (!cells) return "";
+  // Per-instance breakdown. Aggregate totals hide the case where one app
+  // server is saturated and the other is idle -- which averages to "fine".
+  let perServer = "";
+  if (sm.per_server && sm.per_server.length > 1) {
+    perServer = `<div class="smon-srv">` + sm.per_server.map(p =>
+      `<div><span class="k">${IB.esc(p.server)}</span><span class="v">` +
+      [p.cpu === null ? "cpu –" : `cpu ${p.cpu}%`,
+       p.free_mem_mb === null ? "" : `free ${p.free_mem_mb} MB`,
+       p.sessions === null ? "" : `${p.sessions} sess`]
+        .filter(Boolean).join(" · ") + `</span></div>`).join("") + `</div>`;
+  }
+
+  const head = sm.instance_count > 1
+    ? `${sm.instance_count} instances · ${IB.esc(sm.server || "")}`
+    : IB.esc(sm.server || "");
+
+  return `<div class="smon">
+      <div class="smon-head">
+        <span>Workload · SMON</span>
+        <span class="mono">${head}${sm.sample_time ? " · " + IB.esc(sm.sample_time) : ""}</span>
+      </div>
+      <div class="smon-grid">${cells}</div>
+      ${perServer}
+    </div>`;
+}
+
+function workProcesses(wp, list, s) {
+  if (!wp || !wp.available) {
+    return `<div class="wp"><div class="wp-head"><span>Work processes</span>
+            <span>no data</span></div>
+            <div class="no-data">TH_WPINFO returned nothing for this system.</div></div>`;
+  }
+  const pct = wp.utilization_pct;
+  const types = Object.entries(wp.by_type || {}).map(([k, v]) =>
+    `<span>${IB.esc(k)} <b>${v.in_use}/${v.total}</b></span>`).join("");
+  // A blank WP_USER used to render as the literal word "system" next to the
+  // program name, which read as a username. Show whichever fields exist.
+  const lrParts = [];
+  const lrx = wp.longest_running;
+  if (lrx) {
+    // Round 39: the real WP number (or the process id), the exact time and
+    // the long-running limit, so "9m 35s" next to "Long-running WPs: 0" reads
+    // as "below the limit", not as a contradiction.
+    if (lrx.wp) lrParts.push(`WP ${IB.esc(lrx.wp)}`);
+    else if (lrx.pid) lrParts.push(`PID ${IB.esc(lrx.pid)}`);
+    lrParts.push(fmtDuration(lrx.seconds));
+    if (lrx.user) lrParts.push(IB.esc(lrx.user));
+    if (lrx.report) lrParts.push(IB.esc(lrx.report));
+  }
+  const lrLimit = lrx && lrx.limit_seconds
+    ? ` <span style="color:var(--muted-dim)">(long-running from ${fmtDuration(lrx.limit_seconds)})</span>` : "";
+  const lg = s && s.grades && s.grades.longest;
+  const lrCls = lg ? `v-${String(lg.status).toLowerCase()}` : "";
+  const lrLim = lg && limText(lg, " min") ? ` <span style="color:var(--muted-dim)">(${IB.esc(limText(lg, " min"))})</span>` : lrLimit;
+  const lr = lrx
+    ? `<div class="longest ${lrCls}">Longest running: ${lrParts.join(" · ")}${lrLim}</div>` : "";
+  const fw = (s && s.grades && s.grades.free_wp) || {};
+  const freeLow = Object.entries(fw).filter(([k, g]) => g.status === "WARNING" || g.status === "CRITICAL")
+    .map(([k, g]) => `<b class="v-${g.status.toLowerCase()}">${IB.esc(k)} free ${IB.esc(String(g.value))}</b>`);
+  const freeLine = freeLow.length ? `<div class="longest">Low on free work processes: ${freeLow.join(" · ")}</div>` : "";
+
+  // PRIV mode belongs next to the work processes: a WP stuck in PRIV is an
+  // instance out of memory. (ABAP dumps moved back to the grid in round 31.)
+  const priv = (list || []).find(c => c.metric === "sap.sm50.priv_mode_wp");
+  const risk = [];
+  if (priv)  risk.push(`PRIV mode (SM50): <b class="v-${priv.status.toLowerCase()}">${IB.esc(priv.value)}</b>`);
+  const riskLine = risk.length ? `<div class="longest">${risk.join(" · ")}</div>` : "";
+
+  return `<div class="wp">
+      <div class="wp-head">
+        <span>Work processes</span>
+        <span class="mono">${wp.in_use} in use / ${wp.total} total · ${wp.free} free</span>
+      </div>
+      <div class="bar"><i class="${wpBarClass(s, pct)}" style="width:${pct || 0}%"
+           title="${IB.esc(limText(s && s.grades && s.grades.wp, "%"))}"></i></div>
+      <div class="wp-types">${types}</div>
+      ${riskLine}
+      ${freeLine}
+      ${lr}
+    </div>`;
+}
+
+function wpBarClass(s, pct) {
+  const g = s && s.grades && s.grades.wp;
+  if (!g) return IB.barClass(pct);
+  return g.status === "CRITICAL" ? "c" : g.status === "WARNING" ? "w" : "";
+}
+
+function instances(list) {
+  if (!list || !list.length) return "";
+
+  // SERVICES came from TH_SERVER_LIST and was empty on every system seen so
+  // far, so the column carried no information. Replaced with the per-instance
+  // response time -- which is what SMLG's own instance view shows and what
+  // the table is actually opened to find out.
+  //
+  // The separate logon-group table is gone with it. Five groups all reading
+  // "not measured" told the reader nothing except that groups exist; the
+  // per-instance figure is the same data in the form people use.
+
+  const cell = (i) => {
+    if (i.response_ms === null || i.response_ms === undefined) {
+      // STAT was readable and empty: the instance is idle, which is a
+      // measurement, not a gap. Say that instead of "not measured".
+      if (i.response_note) {
+        return `<span style="color:var(--muted)" title="${IB.esc(i.response_note)}">idle</span>` +
+               `<div style="font-size:9.5px;color:var(--muted-dim)">no dialog steps in window</div>`;
+      }
+      // Never render an unmeasured instance as 0 ms -- an instance nothing has
+      // measured is not a fast instance. The tooltip names what would make it
+      // measurable, so "not measured" is a next step rather than a dead end.
+      // Changed on request (16 Sep 2026): show "idle" here too rather than
+      // "not measured". This branch used to mean "no source could ever
+      // measure this instance" as distinct from the response_note branch
+      // above ("a source measured it and found nothing") -- but from the
+      // wall the two look identical, and the distinction was getting lost
+      // whenever a backend edge case produced this branch instead of the
+      // other one. The full explanation stays in the tooltip.
+      return '<span style="color:var(--muted-dim)" title="No RFC source has ' +
+             'a response time for this instance. RZLLITAB only measures users ' +
+             'who connect via a logon group; ST03 workload needs stat/level ' +
+             'enabled in RZ11; the STAT read found no dialog steps.">idle</span>';
+    }
+    const ms = i.response_ms;
+    // A sparse-sample or daily-aggregate STAT figure is informational, not a
+    // verdict: render it muted with the reason, never red.
+    const lowConf = !!i.response_low_confidence;
+    const rg = i.response_grade;
+    const colour = lowConf ? "var(--muted)"
+                 : rg ? ({CRITICAL: "var(--red)", WARNING: "var(--amber)", NORMAL: "var(--green)"}[rg.status] || "var(--muted)")
+                 : ms >= 1000 ? "var(--red)" : ms >= 400 ? "var(--amber)" : "var(--green)";
+    const rlim = rg ? limText(rg, " ms") : "";
+    // A raw "470596 ms" is unreadable and invites the reader to assume a unit
+    // bug. Past a second, show seconds; past a minute, minutes and seconds.
+    // The exact millisecond figure stays in the tooltip.
+    const human = ms >= 60000
+      ? `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`
+      : ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
+    const stat = i.response_statistic || "median";
+    const note = lowConf && i.response_confidence_note ? i.response_confidence_note : "";
+    return `<span style="color:${colour}" title="${IB.esc(String(Math.round(ms)))} ms · ` +
+           `${IB.esc(stat)} per dialog step · ${IB.esc(i.response_source || "")}` +
+           `${note ? " · " + IB.esc(note) : ""}${rlim ? " · limits " + IB.esc(rlim) : ""}">` +
+           `${IB.esc(human)}</span>` +
+           `<div style="font-size:9.5px;color:var(--muted-dim)">${IB.esc(stat)}` +
+           (i.response_source ? ` · ${IB.esc(i.response_source)}` : "") +
+           (note ? `<br><span style="color:var(--amber)">${IB.esc(note)}</span>` : "") +
+           `</div>`;
+  };
+
+  return `<div class="inst">
+      <table>
+        <tr><th>Instance</th><th>Host</th><th>Response</th><th>Users</th><th>State</th></tr>
+        ${list.map(i => `<tr>
+          <td class="mono">${IB.esc(i.name)}</td>
+          <td class="mono">${IB.esc(i.host || "—")}</td>
+          <td class="mono">${cell(i)}</td>
+          <td class="mono">${i.users === null || i.users === undefined
+              ? "—" : (i.users_grade && (i.users_grade.status === "WARNING" || i.users_grade.status === "CRITICAL")
+                  ? `<b class="v-${i.users_grade.status.toLowerCase()}" title="${IB.esc(limText(i.users_grade))}">${IB.esc(String(i.users))}</b>`
+                  : IB.esc(String(i.users)))}</td>
+          <td><span class="chip c-live">${IB.esc(i.state)}</span></td>
+        </tr>`).join("")}
+      </table>
+    </div>`;
+}
+
+function card(s) {
+  // Defensive defaults. A warming-up or partial payload may be missing whole
+  // sub-objects; one unguarded s.dispatcher.label used to throw here, which
+  // took down the entire .map(card) and left the wall stuck on the loader.
+  const disp = s.dispatcher || { label: "…", status: "UNKNOWN", source: "" };
+  const icm = s.icm || { label: "…", status: "UNKNOWN", source: "" };
+  const ops = (window._opsStatus || {})[s.system] || null;
+  const standby = !!(ops && ops.standby && !ops.standby.active);
+  const maint = !!(ops && ops.maintenance) || standby;
+  const st = maint ? "unknown" : overall(s);
+  const wp = s.work_processes || {};
+  const wpPct = wp.available ? wp.utilization_pct : null;
+
+  const err = s.error
+    ? `<div class="err">${IB.esc(String(s.error).split("\n").slice(0, 4).join("\n"))}${
+        s.cooldown ? `\n\nRetrying in ${s.cooldown}s.` : ""}${
+        s.logon_blocked && !s.remote ? `<div style="margin-top:6px"><button class="btn" style="padding:3px 10px;font-size:11px"
+              id="unblock-${IB.esc(s.system)}" onclick="clearLogonBlock('${IB.jsArg(s.system)}')"
+              title="Allow RFC/DB logons for this system again (operator)">Clear logon block</button></div>` : ""}</div>`
+    : "";
+
+  return `<div class="sys ${maint ? "s-maint" : "s-" + st} ${st === "unknown" && !maint ? "unknown-fill" : ""}">
+    <div class="sh">
+      <div>
+        <h3>${IB.esc(s.system)}</h3>
+        <div class="sid">${IB.esc(s.sid || "")} · client ${IB.esc(s.client || "—")}
+          ${s.db_type ? "· " + IB.esc(s.db_type) : ""}</div>
+      </div>
+      <div class="right">
+        ${s.connected ? '<span class="src src-rfc">RFC LIVE</span>'
+                      : '<span class="src src-none">no connection</span>'}
+        <span class="chip ${IB.statusClass(st)}">${standby ? "STANDBY" : maint ? "MAINTENANCE" : st.toUpperCase()}</span>
+      </div>
+    </div>
+    ${maint ? "" : whyLine(s, st)}
+    ${typeof OPS !== "undefined" && !s.remote ? OPS.strip(s.system, ops, "load") : ""}
+
+    <div class="tiles">
+      ${tile("CPU", IB.val(s.cpu, "%", 0), gs(s, "cpu", gradeCpu(s.cpu)),
+             [srcNote(s, "cpu"), IB.esc(limText(s.grades && s.grades.cpu, "%"))].filter(Boolean).join(" · "))}
+      ${/* Memory: show the percentage when one can be derived, labelled with
+            its basis so a cache-inclusive 99% is never mistaken for pressure.
+            Where no percentage exists but a free figure was read, show the
+            free figure rather than "No data". */""}
+      ${(() => {
+        const basis = (s.smon && s.smon.memory_basis) || null;
+        const freeStr = s.ccms && s.ccms.mem_free_display;
+        if (s.memory !== null && s.memory !== undefined) {
+          const label = s.memory_is_sap_internal ? "SAP memory" : "Memory";
+          const graded = memoryTrusted(s);
+          // SMON does not export total RAM, so a cache-inclusive percentage
+          // cannot be derived from it. Where the cache-inclusive FREE figure
+          // is known, show that instead: "3.9 GB free incl. cache" says
+          // something, "100%" does not.
+          const freeInc = s.smon && s.smon.free_mem_mb_inc_fs;
+          const note = graded ? (basis || srcNote(s, "memory"))
+                     : (freeInc ? IB.val(freeInc / 1024, " GB", 1) + " free incl. cache"
+                                : (basis ? basis + " — not graded" : srcNote(s, "memory")));
+          const mlim = graded ? limText(s.grades && s.grades.memory, "%") : "";
+          return tile(label, IB.val(s.memory, "%", 0), gs(s, "memory", gradeMemory(s)),
+                      [note, IB.esc(mlim)].filter(Boolean).join(" · "));
+        }
+        if (freeStr) {
+          // No denominator, but a real free figure. Show it, grade neutral --
+          // free memory without a total cannot be graded, only reported.
+          return tile("Memory free", IB.esc(freeStr), "normal",
+                      "RFC · CCMS RZ20 · no total published");
+        }
+        return tile("Memory", IB.val(null), "unknown",
+                    s.ccms && s.ccms.memory_note ? IB.esc(s.ccms.memory_note)
+                                                 : srcNote(s, "memory"));
+      })()}
+      ${tile("Dispatcher", IB.esc(disp.label), gs(s, "dispatcher", (disp.status || "unknown").toLowerCase()),
+             disp.source ? IB.esc(disp.source) : "")}
+      ${tile("ICM", IB.esc(icm.label), gs(s, "icm", (icm.status || "unknown").toLowerCase()),
+             icm.source ? IB.esc(icm.source) : "")}
+      ${/* Uptime, not wall clock. Shows how long since this instance last
+            (re)started -- the operational number. Falls back to the SAP
+            system clock only where the kernel start time is unreadable. */""}
+      ${s.uptime_text
+        ? tile("Uptime", IB.esc(s.uptime_text),
+               gs(s, "uptime", (s.uptime_seconds !== undefined && s.uptime_seconds < 1800 && !s.uptime_bounded)
+                 ? "warning" : "normal"),
+               (s.last_downtime_text
+                  ? "last down: " + IB.esc(s.last_downtime_text)
+                    + (s.last_down_from ? " (" + IB.esc(s.last_down_from) + ")" : "")
+                  : (s.uptime_since ? "since " + IB.esc(s.uptime_since) : ""))
+               + (s.uptime_source ? " · " + IB.esc(s.uptime_source) : ""), "span2")
+        : tile("Server time", IB.val(s.server_time), s.server_time ? "normal" : "unknown",
+               s.server_time_source ? IB.esc(s.server_time_source) : "", "span2")}
+      ${counterTile(s.checks, "sap.st22.dumps", "ABAP dumps")}
+      ${counterTile(s.checks, "sap.sm37.cancelled_jobs", "Cancelled jobs")}
+    </div>
+
+    ${workProcesses(wp, s.checks, s)}
+    ${instances(s.instances)}
+
+    <div style="text-align:center;margin:6px 0">
+      <button class="btn" style="font-size:11px;padding:3px 14px"
+              id="moreBtn-${IB.esc(s.system)}"
+              onclick="toggleMore('${IB.jsArg(s.system)}')">More</button>
+    </div>
+    <div id="morePanel-${IB.esc(s.system)}" style="display:none">
+      ${checks(s.checks, s.check_source, s.check_error)}
+      ${guiChecks(s.system, s.gui_checks)}
+      ${typeof OPS !== "undefined" && ops ? OPS.actionsPanel(s, ops.actions) : ""}
+    </div>
+    ${err}
+
+    <div class="foot">
+      <span>read ${IB.esc(s.read_at || "–")}</span>
+      ${s.cache_age_seconds ? `<span>cache ${s.cache_age_seconds}s</span>` : ""}
+      ${s.snapshot_age_minutes !== undefined && s.snapshot_age_minutes !== null
+        ? `<span>last sweep ${fmtAgeMinutes(s.snapshot_age_minutes)} ago</span>` : ""}
+      <span class="nextrun" data-system="${IB.esc(s.system)}">${nextRunText(s.system)}</span>
+      <button class="btn" style="margin-left:auto;padding:4px 11px;font-size:11px"
+              onclick="refreshOne('${IB.jsArg(s.system)}')"
+              id="refresh-${IB.esc(s.system)}" title="Fresh RFC read for this system only">↻ Refresh</button>
+      <button class="btn btn-primary" style="padding:4px 11px;font-size:11px"
+              onclick="${s.remote ? "monitorRemote" : "monitorOne"}('${IB.jsArg(s.system)}')"
+              ${s.source_unreachable ? "disabled" : ""}
+              title="${s.remote ? (s.source_unreachable
+                        ? `Collector ${IB.esc(s.source_label || "")} is unreachable`
+                        : `Runs the sweep on ${IB.esc(s.source_label || "the collector")}`) : ""}"
+              id="run-${IB.esc(s.system)}">Monitor this system</button>
+      <a href="/system?name=${encodeURIComponent(s.system)}"
+         style="color:var(--brand-live);font-weight:700">Detail →</a>
+    </div>
+  </div>`;
+}
+
+/* Fresh RFC read for one system only. No SAP GUI, no sweep -- just an
+   on-demand read of RFC counters + TH_WPINFO for the one card the user is
+   looking at. Bypasses the wall-wide cooldown so a dead host does not block
+   a live one, and re-renders in place instead of forcing a full wall reload.
+   The whole call takes ~1s for a healthy system, ~10s for a dead one (TCP
+   probe timeout). */
+const _moreOpen = new Set();
+
+function toggleMore(name) {
+  const panel = document.getElementById("morePanel-" + name);
+  const btn = document.getElementById("moreBtn-" + name);
+  if (!panel) return;
+  const opening = panel.style.display === "none";
+  panel.style.display = opening ? "" : "none";
+  if (btn) btn.textContent = opening ? "Less" : "More";
+  if (opening) { _moreOpen.add(name); } else { _moreOpen.delete(name); }
+}
+
+function restoreMoreState() {
+  _moreOpen.forEach(function(name) {
+    const panel = document.getElementById("morePanel-" + name);
+    const btn = document.getElementById("moreBtn-" + name);
+    if (panel) panel.style.display = "";
+    if (btn) btn.textContent = "Less";
+  });
+}
+
+async function refreshOne(name) {
+  const btn = document.getElementById("refresh-" + name);
+  if (btn) { btn.disabled = true; btn.textContent = "↻ Reading…"; }
+  try {
+    const r = await fetch("/api/live/" + encodeURIComponent(name)
+                          + "?fresh=1&_t=" + Date.now());
+    if (r.ok) {
+      await load();   // re-render the whole wall from cache; the one system
+                      // that just refreshed will have new numbers, everyone
+                      // else keeps whatever they had.
+    }
+  } catch (e) { /* button gets re-enabled below */ }
+  const b2 = document.getElementById("refresh-" + name);
+  if (b2) { b2.disabled = false; b2.textContent = "↻ Refresh"; }
+}
+
+/* Clear the cross-process RFC/DB logon block for one system (operator).
+   Use after fixing the password in .env or unlocking the user in SU01. */
+async function clearLogonBlock(name) {
+  if (!confirm("Clear the logon block for " + name + "? The next read tries ONE logon; "
+               + "a wrong password blocks it again.")) return;
+  const btn = document.getElementById("unblock-" + name);
+  if (btn) { btn.disabled = true; btn.textContent = "Clearing…"; }
+  try {
+    const r = await IB.post("/api/logon-blocks/" + encodeURIComponent(name) + "/clear");
+    if (!r.ok) {
+      let msg = "HTTP " + r.status;
+      try { msg = (await r.json()).detail || msg; } catch (e) {}
+      alert("Could not clear the logon block: " + msg);
+      if (btn) { btn.disabled = false; btn.textContent = "Clear logon block"; }
+      return;
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Clear logon block"; }
+    return;
+  }
+  refreshOne(name);
+}
+
+/* Monitor ONE system. A full sweep drives SAP GUI for every system and
+   takes minutes; re-checking the one you are looking at should not. */
+async function monitorOne(name) {
+  const btn = document.getElementById("run-" + name);
+  if (btn) { btn.disabled = true; btn.textContent = "Monitoring…"; }
+  try {
+    const r = await IB.post("/api/run-now/" + encodeURIComponent(name));
+    if (r.status === 409) {
+      const d = await r.json();
+      if (btn) { btn.disabled = false; btn.textContent = "Busy — try again"; }
+      alert(d.detail || "A run is already in progress.");
+      return;
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Monitor this system"; }
+    return;
+  }
+  pollRun(name);
+}
+
+async function pollRun(name) {
+  const btn = document.getElementById("run-" + name);
+  try {
+    const s = await IB.get("/api/run-status");
+    if (s.running) {
+      if (btn) btn.textContent = `Monitoring ${s.current_system || ""}…`;
+      return setTimeout(() => pollRun(name), 2000);
+    }
+  } catch (e) {}
+  if (btn) { btn.disabled = false; btn.textContent = "Monitor this system"; }
+  load();
+}
+
+/* Monitor a system supplied by another collector. The click is forwarded to
+   that collector (POST /api/remote-run-now), which runs the sweep; this page
+   then polls the collector's run state until it finishes. The collector's
+   own refusals (busy, bad token) are shown as they come back. */
+async function monitorRemote(name) {
+  const btn = document.getElementById("run-" + name);
+  if (btn) { btn.disabled = true; btn.textContent = "Starting on collector…"; }
+  try {
+    const r = await IB.post("/api/remote-run-now/" + encodeURIComponent(name));
+    if (!r.ok) {
+      let detail = `HTTP ${r.status}`;
+      try { detail = (await r.json()).detail || detail; } catch (e) {}
+      if (btn) { btn.disabled = false; btn.textContent = r.status === 409 ? "Busy — try again" : "Monitor this system"; }
+      alert(detail);
+      return;
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Monitor this system"; }
+    return;
+  }
+  pollRemoteRun(name, 0);
+}
+
+async function pollRemoteRun(name, polls) {
+  const btn = document.getElementById("run-" + name);
+  try {
+    const s = await IB.get("/api/remote-run-status/" + encodeURIComponent(name));
+    // The collector needs a moment to flip `running`; keep polling briefly
+    // even if the first answers say idle, then stop once it reports idle.
+    if (s.running || polls < 3) {
+      if (btn) btn.textContent = s.running
+        ? `Monitoring on ${s.collector || "collector"}…` : "Starting on collector…";
+      return setTimeout(() => pollRemoteRun(name, polls + 1), 2000);
+    }
+  } catch (e) {}
+  if (btn) { btn.disabled = false; btn.textContent = "Monitor this system"; }
+  load();
+}
+
+// One card's render failure must never blank the whole wall. If card() throws
+// on an unexpected payload, show that system as a broken tile and keep every
+// other system on screen -- the opposite of the all-or-nothing .map that left
+// the wall stuck on the loader.
+function safeCard(s) {
+  try {
+    return card(s);
+  } catch (e) {
+    const name = (s && s.system) ? IB.esc(s.system) : "unknown";
+    return `<div class="sys s-unknown unknown-fill">
+      <div class="sh"><div><h3>${name}</h3>
+      <div class="sid">render error</div></div></div>
+      <div class="err">This card could not be drawn: ${IB.esc(e.message)}.
+      The other systems are unaffected.</div></div>`;
+  }
+}
+
+async function loadOps() {
+  // Maintenance, snoozes, parked sweeps, tickets, unusual values, actions
+  // (dashboard/ops_api.py). The wall still renders if this call fails.
+  try { window._opsStatus = (await IB.get("/api/ops/status")).systems || {}; }
+  catch (e) { window._opsStatus = window._opsStatus || {}; }
+}
+
+// Next automatic run per system (/api/schedules/next). Read on its own
+// timer, so the times stay right while the wall itself is on "manual".
+window._nextRuns = null;
+function nextRunText(system) {
+  const n = window._nextRuns;
+  if (!n) return "";
+  const x = (n.systems || {})[system];
+  if (!x) return `<span class="muted" title="No saved schedule on the Scheduler page">next run: not scheduled</span>`;
+  if (x.held) return `<span style="color:var(--amber,#b45309)" title="${IB.esc(x.held)}">next run ${IB.esc(x.text)} · held</span>`;
+  return `<span title="${IB.esc(x.what || "")}">next run <b>${IB.esc(x.text)}</b></span>`;
+}
+async function loadNextRuns() {
+  try { window._nextRuns = await IB.get("/api/schedules/next"); } catch (e) { return; }
+  const n = window._nextRuns, chip = document.getElementById("nextrun-chip");
+  if (chip) {
+    if (n.held) {
+      chip.innerHTML = `⏸ ${n.paused ? "PAUSED" : "SNOOZED"} — scheduled runs held`;
+      chip.title = n.held;
+      chip.style.color = "var(--amber,#b45309)";
+    } else if (n.next) {
+      chip.innerHTML = `next run <b>${IB.esc(n.next.system)}</b> ${IB.esc(n.next.text)}`;
+      chip.title = (n.systems[n.next.system] || {}).what || "";
+      chip.style.color = "";
+    } else {
+      chip.textContent = "no scheduled run";
+      chip.title = "Nothing scheduled, or every scheduled system is held";
+      chip.style.color = "";
+    }
+  }
+  document.querySelectorAll(".nextrun").forEach(el => { el.innerHTML = nextRunText(el.dataset.system); });
+}
+
+/* Project filter (Projects & passwords page): "CEAT" shows only CEAT's systems.
+   The choice is remembered in this browser. */
+let PROJECTS = [], PROJECT = "";
+try { PROJECT = localStorage.getItem("ibo-wall-project") || ""; } catch (e) {}
+async function loadProjects() {
+  try { PROJECTS = ((await IB.get("/api/projects")).projects || []).filter(p => (p.systems || []).length); }
+  catch (e) { PROJECTS = []; }
+  if (PROJECT && !PROJECTS.some(p => p.name === PROJECT)) PROJECT = "";
+  renderProjbar();
+}
+function renderProjbar() {
+  const bar = document.getElementById("projbar");
+  if (!PROJECTS.length) { bar.innerHTML = ""; return; }
+  const btn = (name, label) => `<button class="btn ${PROJECT === name ? "btn-primary" : ""}" data-project="${IB.esc(name)}">${IB.esc(label)}</button>`;
+  bar.innerHTML = `<span style="font-size:11px;color:var(--muted);margin-right:2px">Project</span>` +
+    btn("", "All systems") + PROJECTS.map(p => btn(p.name, `${p.name} (${p.systems.length})`)).join("");
+}
+document.getElementById("projbar").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-project]");
+  if (!b) return;
+  PROJECT = b.dataset.project || "";
+  try { localStorage.setItem("ibo-wall-project", PROJECT); } catch (e) {}
+  renderProjbar();
+  load();
+});
+function inProject(systems) {
+  if (!PROJECT) return systems;
+  const p = PROJECTS.find(x => x.name === PROJECT);
+  if (!p) return systems;
+  const set = new Set(p.systems);
+  return systems.filter(s => set.has(s.system));
+}
+
+async function load() {
+  try {
+    const [d0] = await Promise.all([IB.get("/api/live"), loadOps()]);
+    const shown = inProject(d0.systems || []);
+    const d = Object.assign({}, d0, { systems: shown,
+      total: shown.length, live_count: shown.filter(s => s.connected).length });
+    IB.heartbeat.beat({ live: d.live_count, total: d.total,
+      critical: (d.systems || []).some(x => (x.checks || []).some(c => c.status === "CRITICAL")) });
+    document.getElementById("wall").innerHTML =
+      d.systems.length ? d.systems.map(safeCard).join("")
+                       : '<div class="empty">No systems configured.</div>';
+    restoreMoreState();
+    document.getElementById("livecount").textContent = `${d.live_count}/${d.total}`;
+    document.getElementById("gen").textContent = d.generated_at;
+
+    const ops = window._opsStatus || {};
+    const down = d.systems.filter(s => !s.connected && !(ops[s.system] && (ops[s.system].maintenance
+                                       || (ops[s.system].standby && !ops[s.system].standby.active))));
+    document.getElementById("banner").innerHTML = down.length
+      ? `<div class="banner banner-warn"><strong>${down.length} system(s) not reachable over RFC:</strong>
+         ${down.map(s => IB.esc(s.system)).join(", ")} — shown as UNKNOWN, not healthy.</div>`
+      : "";
+  } catch (e) {
+    document.getElementById("banner").innerHTML =
+      `<div class="banner banner-err">Could not reach /api/live — ${IB.esc(e.message)}</div>`;
+  }
+}
+
+function schedule() {
+  if (timer) timer.stop && timer.stop();
+  const ms = Number(document.getElementById("rate").value);
+  const everyEl = document.getElementById("every");
+  if (everyEl) everyEl.textContent = ms ? ms / 1000 : "manual";
+  if (ms) timer = IB.poll(load, ms);
+}
+document.getElementById("rate").onchange = schedule;
+
+// Read live: trigger an on-demand read of every system, then poll /api/live
+// while it runs so cards fill in as each system lands. This is the manual
+// replacement for the old always-on timer -- nothing reads SAP until this
+// is clicked.
+const readBtn = document.getElementById("readlive");
+let readPoll = null;
+
+async function readLive() {
+  readBtn.disabled = true;
+  readBtn.textContent = "↻ Reading…";
+  try {
+    const r = await IB.post("/api/live/refresh", { label: "Reading all systems…" });
+    const body = await r.json().catch(() => ({}));
+    if (body.started === false && body.reason === "already_running") {
+      // A read is already in flight (e.g. double click) -- just watch it.
+    }
+    // Poll the wall data AND the job status until the pass completes.
+    if (readPoll) readPoll.stop && readPoll.stop();
+    readPoll = IB.poll(async () => {
+      await load();
+      let st = {};
+      try { st = await IB.get("/api/live/refresh/status"); } catch (e) {}
+      if (st && st.total) {
+        readBtn.textContent = st.in_progress
+          ? `↻ Reading ${st.done}/${st.total}…` : "↻ Read live";
+      }
+      if (st && !st.in_progress) {
+        if (readPoll) { readPoll.stop && readPoll.stop(); readPoll = null; }
+        readBtn.disabled = false;
+        readBtn.textContent = "↻ Read live";
+      }
+    }, 1500);
+  } catch (e) {
+    readBtn.disabled = false;
+    readBtn.textContent = "↻ Read live";
+    document.getElementById("banner").innerHTML =
+      `<div class="banner banner-err">Could not start read — ${IB.esc(e.message)}</div>`;
+  }
+}
+readBtn.onclick = readLive;
+
+// On first open: show whatever is already cached (instant, may be empty),
+// then kick one read automatically so the operator sees data without a
+// second click. Auto-refresh stays off unless they pick an interval.
+//
+// Any exception in this boot sequence used to leave the page stuck on the
+// "Reading live RFC…" placeholder with no clue why. Paint it on screen.
+function bootError(where, e) {
+  const msg = (e && e.stack) ? e.stack : String(e);
+  document.getElementById("wall").innerHTML =
+    `<div class="banner banner-err"><strong>Page failed to start (${IB.esc(where)}):</strong>
+     <pre style="white-space:pre-wrap;margin:6px 0 0">${IB.esc(msg)}</pre></div>`;
+  console.error("wall boot error in", where, e);
+}
+window.addEventListener("error", ev => bootError("window", ev.error || ev.message));
+window.addEventListener("unhandledrejection", ev => bootError("promise", ev.reason));
+
+(async () => {
+  try { await loadNextRuns(); IB.poll(loadNextRuns, 60000); } catch (e) { console.error(e); }
+  try { await loadProjects(); } catch (e) { console.error(e); }
+  try { await load(); } catch (e) { bootError("load", e); return; }
+  // Viewers may not start RFC reads (operator action): they see the latest
+  // reading, and the button says so instead of a "Could not start read" banner.
+  let viewer = false;
+  try { const me = await IB.me(); viewer = !!(me && me.role === "viewer"); } catch (e) {}
+  if (viewer) {
+    readBtn.disabled = true;
+    readBtn.title = "Showing the latest reading. Live reads are started by an operator.";
+  } else {
+    try { await readLive(); } catch (e) { bootError("readLive", e); }
+  }
+  try { schedule(); } catch (e) { bootError("schedule", e); }
+})();
+</script>
+</body>
+</html>

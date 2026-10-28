@@ -1,0 +1,144 @@
+"""
+Opens SAP transactions (T-codes) via SAP GUI Scripting -- deterministic,
+does not rely on OS-level keyboard focus like the earlier keystroke-based
+approach, which proved unreliable for multi-step navigation.
+"""
+
+import time
+from utils.logger import get_logger
+
+log = get_logger(__name__, "application")
+
+
+def open_tcode(session, tcode: str, wait_seconds: float = None, max_busy_wait: float = 8.0) -> bool:
+    """
+    Opens a T-code using the scripting API's command field.
+    Waits for the session to report not-busy (data finished loading)
+    rather than a fixed sleep, since some T-codes take longer to
+    populate data than others.
+
+    SPEED: the fixed pre-wait was 2.0s, paid on every one of ~25 T-codes
+    (~50s per sweep) BEFORE the Busy poll even started -- pure dead time on
+    a screen that had usually already transitioned. It is now 0.3s and the
+    Busy poll does the real waiting. Tunable with IBO_GUI_WAIT / the poll
+    ceiling with IBO_GUI_MAX_BUSY_WAIT for a slow network.
+    """
+    import os as _os
+    if wait_seconds is None:
+        wait_seconds = float(_os.environ.get("IBO_GUI_WAIT", "0.3") or 0.3)
+    max_busy_wait = float(_os.environ.get("IBO_GUI_MAX_BUSY_WAIT", str(max_busy_wait)) or max_busy_wait)
+    log.info(f"Opening T-code via scripting: {tcode}")
+
+    try:
+        session.findById("wnd[0]/tbar[0]/okcd").text = f"/n{tcode}"
+        session.findById("wnd[0]").sendVKey(0)  # Enter
+    except Exception as e:
+        log.error(f"Scripting call failed while opening {tcode}: {e}")
+        raise
+
+    # Brief transition wait, then let the Busy poll do the real work.
+    time.sleep(wait_seconds)
+
+    # Then wait for SAP to report "not busy" (data finished loading),
+    # up to max_busy_wait seconds total.
+    end_time = time.time() + max_busy_wait
+    while time.time() < end_time:
+        try:
+            if not session.findById("wnd[0]").Busy:
+                break
+        except Exception:
+            break
+        time.sleep(0.2)
+
+    # Small extra settle time after busy clears, for rendering to finish
+    time.sleep(float(_os.environ.get("IBO_GUI_SETTLE", "0.3") or 0.3))
+
+    try:
+        current_tcode = session.Info.Transaction
+        log.info(f"After opening {tcode}, session.Info.Transaction = '{current_tcode}'")
+    except Exception as e:
+        log.warning(f"Could not read session.Info.Transaction: {e}")
+        current_tcode = ""
+
+    return tcode.upper() in current_tcode.upper()
+
+def wait_until_not_busy(session, max_busy_wait: float = 8.0, settle_time: float | None = None):
+    """
+    Waits until the SAP session reports not-busy (data finished loading),
+    then a small extra settle time for rendering. Shared by open_tcode()
+    and the per-tcode action functions.
+
+    The settle was a fixed 0.5 s on every call -- 3-4 calls per T-code. SAP GUI
+    scripting calls already block until SAP answers, so 0.2 s is enough
+    (IBO_GUI_SETTLE_STEP to change it).
+    """
+    if settle_time is None:
+        import os as _os
+        try:
+            settle_time = float(_os.environ.get("IBO_GUI_SETTLE_STEP", "0.2") or 0.2)
+        except ValueError:
+            settle_time = 0.2
+    end_time = time.time() + max_busy_wait
+    while time.time() < end_time:
+        try:
+            busy = session.Busy                      # the session's own flag
+        except Exception:
+            try:
+                busy = session.findById("wnd[0]").Busy
+            except Exception:
+                break
+        if not busy:
+            break
+        time.sleep(0.15)
+    time.sleep(settle_time)
+
+
+def recover_session(session):
+    """
+    Best-effort recovery from a mid-transaction failure, used between
+    retry attempts in collect_tcode_evidence(). Closes any stray popup
+    windows (wnd[1], wnd[2], ...) that might be blocking input, then
+    sends a bare "/n" to cancel back to the easy-access screen -- a
+    clean, known-good starting point for the next attempt.
+    Never raises: if recovery itself fails, the caller's retry will
+    simply also fail and move on, which is an acceptable outcome (this
+    is a best-effort safety net, not a guarantee).
+    """
+    try:
+        # Close any open popups/dialogs, highest index first
+        for i in range(4, 0, -1):
+            try:
+                popup = session.findById(f"wnd[{i}]")
+                popup.sendVKey(12)  # F12 = Cancel, the safest universal "close this" key
+                time.sleep(0.3)
+            except Exception:
+                continue
+    except Exception as e:
+        log.debug(f"recover_session: popup cleanup step failed (continuing): {e}")
+
+    try:
+        session.findById("wnd[0]/tbar[0]/okcd").text = "/n"
+        session.findById("wnd[0]").sendVKey(0)
+        time.sleep(1.5)
+        wait_until_not_busy(session)
+        log.info("Recovered session back to easy-access screen for retry.")
+    except Exception as e:
+        log.warning(f"recover_session: could not return to easy-access screen: {e}")
+
+
+def goto_tcode(session, tcode: str, wait_seconds: float = None):
+    """
+    Navigates to a T-code without the verification/return-value logic
+    of open_tcode() -- used as the first step inside action functions
+    in tcode_actions.py, which then perform additional recorded steps.
+
+    Same speed change as open_tcode: the fixed 1.5s pre-wait is cut to
+    0.3s (IBO_GUI_WAIT) and wait_until_not_busy does the real waiting.
+    """
+    import os as _os
+    if wait_seconds is None:
+        wait_seconds = float(_os.environ.get("IBO_GUI_WAIT", "0.3") or 0.3)
+    session.findById("wnd[0]/tbar[0]/okcd").text = f"/n{tcode}"
+    session.findById("wnd[0]").sendVKey(0)
+    time.sleep(wait_seconds)
+    wait_until_not_busy(session)

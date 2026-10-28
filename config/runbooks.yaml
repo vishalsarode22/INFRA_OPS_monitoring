@@ -1,0 +1,184 @@
+# Runbooks: a step-by-step checklist for each alert type, so a junior
+# consultant handles it the way a senior would. Opened from the alert mail
+# ("Runbook" link), the wall card and the Operations page. Each tick is
+# recorded with the person and the time, and appears on the system's
+# timeline.
+#
+#   id          unique, used in links
+#   applies_to  alert kinds (system_down, vpn_down, credentials, critical,
+#               sweep_failure, tcode_failure, ocr_parser, capacity,
+#               collector_down, not_reachable, monitor_down, peer_silent)
+#               and/or metric names (sap.st22.dumps) and incident rule ids
+#   steps       text = what to do; detail = how / what to look for (optional)
+#
+# Edit freely: the file is read on every page view. Keep the steps short
+# and in the order they should be done.
+
+runbooks:
+  - id: system_down
+    title: SYSTEM DOWN -- the SAP system does not answer
+    applies_to: [system_down]
+    steps:
+      - text: Acknowledge the alert (wall or mail) so the team knows you are on it.
+      - text: Check whether this is planned -- change calendar, customer mail, maintenance windows on the Operations page.
+        detail: If it is planned, set a maintenance window now; the reminders stop.
+      - text: Confirm from a second path -- SAP Logon from the VM, and ping / telnet to the message server and dispatcher port.
+        detail: "Dispatcher 32NN answers but gateway 33NN does not = SAP gateway problem; nothing answers = host or network."
+      - text: Log on to the host (OS) and check the SAP processes -- sapcontrol -nr NN -function GetProcessList.
+        detail: "GREEN = running; YELLOW = starting/stopping; GRAY = stopped. Note which instance and process."
+      - text: Check the database is up (HANA -- HDB info / sapcontrol; Oracle -- lsnrctl status and sqlplus; ASE -- isql).
+      - text: Read the developer traces of the failed process (work directory -- dev_disp, dev_ms, dev_w0, sapstartsrv.log).
+      - text: Check file systems -- a full /usr/sap, /sapmnt, log or archive area stops SAP (df -h).
+      - text: Restart only what failed, then watch the start (sapcontrol -function StartSystem / RestartInstance).
+        detail: Inform the customer before restarting a production instance unless the runbook for that customer says otherwise.
+      - text: When it is back, check SM21 (system log) and ST22 (dumps) around the outage time.
+      - text: Write what happened and the fix in the incident or ticket -- it goes to the knowledge base.
+
+  - id: vpn_down
+    title: VPN NOT CONNECTED -- the systems may be fine
+    applies_to: [vpn_down]
+    steps:
+      - text: Open the Health page -- see whether the VPN watchdog is retrying, stopped, or reports the account in use.
+      - text: If the account is in use by someone else, ask in the team chat before reconnecting -- do not push them off.
+      - text: "On the Ubuntu VM check the tunnel -- systemctl status ibops-vpn@<name> and journalctl -u ibops-vpn@<name> -n 50."
+      - text: "If the watchdog stopped after its retries, reset it -- sudo ibops-vpn reset <name>."
+      - text: If the gateway refuses the login (expired password, OTP), fix the credential with the customer's VPN admin.
+      - text: Once connected, press Read live on the wall and confirm every system behind this VPN is reachable.
+
+  - id: credentials
+    title: CREDENTIALS -- the system is up, the monitoring user cannot log on
+    applies_to: [credentials]
+    steps:
+      - text: Sweeps for the system are parked automatically, so the user is not locked further. Leave them parked for now.
+      - text: In SU01 on the system, check the monitoring user -- locked? password expired? validity date passed?
+      - text: Check SM21 / ST01 for the failed logons to see the exact reason (wrong password vs locked vs no authorization).
+      - text: Unlock / reset the password (with the customer's approval if their policy needs it).
+      - text: Update the password in .env on the collector (or the Systems page) -- never in systems.yaml.
+      - text: Clear the parked flag on the wall and press Monitor this system to confirm.
+
+  - id: not_reachable
+    title: NOT REACHABLE -- cannot tell VPN from system
+    applies_to: [not_reachable, collector_down]
+    steps:
+      - text: Read the message on the wall card -- it names the host and port that did not answer.
+      - text: Check the Health page -- tunnel, VPN and the other dashboard.
+      - text: From the collector, test the port by hand (Test-NetConnection host -Port 33NN on Windows, nc -vz on Ubuntu).
+      - text: If the tunnel is down, check the "IBOPS Tunnel" task on Windows and logs\supervisor-tunnel.log.
+      - text: "Add a network: {probe: host:port} for this system on the Systems page, so the next alert can say which it is."
+
+  - id: critical_dumps
+    title: ABAP dumps above the limit (ST22)
+    applies_to: [sap.st22.dumps, sap.st22.dump_count]
+    steps:
+      - text: Open ST22 for today; sort by runtime error and count -- one error repeating, or many different ones?
+      - text: "For the top error, open one dump: note program, user, transaction and the \"What happened\" section."
+        detail: "Memory errors (TSV_TNEW_PAGE_ALLOC_FAILED, SYSTEM_NO_ROLL) -- check ST02 / the user's selection. Missing objects (LOAD_PROGRAM_NOT_FOUND) -- check recent transports in STMS."
+      - text: Check whether a transport went in today (STMS import history) -- most dump waves follow an import.
+      - text: Is it one user or job? Contact the user or job owner (the wall shows owners under More).
+      - text: Hand ABAP errors in customer code (Z/Y programs) to the ABAP team with the dump and the steps.
+      - text: Record the cause and fix on the incident -- the next alert for the same error will show it.
+
+  - id: critical_jobs
+    title: Cancelled background jobs (SM37)
+    applies_to: [sap.sm37.cancelled_jobs]
+    steps:
+      - text: In SM37, list today's cancelled jobs; open the job log of each.
+      - text: "Ended at its start time = it never ran: check the step user (SU53 / SU01), the variant, and free BTC work processes (SM50)."
+      - text: Ran for a while then cancelled = failed inside ABAP -- look for a dump at the end time in ST22.
+      - text: A DBA* or backup job cancelled outranks everything else -- check the backup in DB12 / the DB tool now.
+      - text: If the cause is fixed and the job is safe to repeat, restart it (Operations -> Actions -> Restart job, or SM37 copy/repeat).
+        detail: Never restart postings, billing or interfaces without the owner's OK -- they can double-post.
+      - text: Tell the scheduler of the job (SDLUNAME) what happened.
+
+  - id: critical_locks
+    title: Too many or too old lock entries (SM12)
+    applies_to: [sap.sm12.lock_count, sap.sm12.oldest_lock_minutes, sap.sm12.locks_per_user_max]
+    steps:
+      - text: In SM12, sort by time; find the oldest entries and the users holding the most locks.
+      - text: Check whether the owner is still working -- SM04 / AL08 for the user, SM50/SM66 for the work process.
+      - text: A lock with a pending update (SM13 shows the user's update) must NOT be deleted -- fix the update first.
+      - text: Contact the user / job owner; ask them to leave the transaction or let the job finish.
+      - text: Only if the session is gone and no update is pending, delete the lock (Operations -> Actions -> Release lock, or SM12).
+        detail: Record who agreed. Deleting a lock that is still in use can corrupt data.
+      - text: If the same program leaves locks every day, raise it with the ABAP team.
+
+  - id: critical_updates
+    title: Failed updates (SM13)
+    applies_to: [sap.sm13.failed_updates]
+    steps:
+      - text: In SM13 select status "Error" for all users today; open each record and note the module and the error.
+      - text: Find the matching dump in ST22 (same time and user) for the reason.
+      - text: Agree with the functional owner whether to repeat the update (SM13 -> Repeat update) after the cause is fixed.
+        detail: Never repeat a financial update blindly; a repeated posting may duplicate a document.
+      - text: Delete only updates the business confirms are not needed.
+
+  - id: critical_queues
+    title: Stuck tRFC / qRFC entries (SM58, SMQ1, SMQ2)
+    applies_to: [sap.sm58.stuck_entries, sap.sm58.stuck_trfc, sap.smq1.entries, sap.smq2.entries, sap.smq1.stuck_queues, sap.smq2.stuck_queues]
+    steps:
+      - text: In SMQ1 (outbound) / SMQ2 (inbound) / SM58 (tRFC), note the status text (SYSFAIL, CPICERR, STOP, RETRY).
+      - text: Double-click the first entry of a blocked queue to read the error -- only the first entry blocks the rest.
+      - text: CPICERR / communication error -- test the destination in SM59; check the target system is up.
+      - text: SYSFAIL -- read the dump on the target side (ST22) and fix the cause first.
+      - text: When the cause is fixed, restart the queue (Operations -> Actions -> Restart queue, or SMQ2 -> Unlock/Activate).
+      - text: Check that QRFC scheduler (SMQR / SMQS) has the queue registered; re-register if it lost its registration.
+
+  - id: critical_wp
+    title: Work processes exhausted / long running (SM50, SM66)
+    applies_to: [sap.sm50.wp_utilization, sap.sm66.wp_saturation_pct, sap.sm50.long_running_wp, sap.sm50.priv_mode_wp, sap.sm50.wp_in_use]
+    steps:
+      - text: In SM66 (all instances) sort by time; find the longest-running and the PRIV-mode work processes.
+      - text: For each, note user, program, and what it is doing (DB read, sequential read, waiting for lock).
+      - text: Ask the user or job owner before cancelling; cancel with SM50 -> Cancel without core only if they agree.
+      - text: Check the dialog queue (SMON / ST03) -- users waiting means it is urgent.
+      - text: If it recurs at the same hour, compare with the learned normal values on the wall before changing parameters.
+
+  - id: critical_resources
+    title: CPU / memory high
+    applies_to: [cpu, memory, load_1m]
+    steps:
+      - text: Check whether the value is unusual for this time (the wall shows the learned normal range).
+      - text: In ST06 / OS07N find the top OS processes; is it SAP (disp+work), the database, or something else?
+      - text: For SAP work processes, map the PID to a user/program in SM50.
+      - text: Memory -- check ST02 for swaps and extended memory, and whether one user has a huge private memory (SM04 -> memory).
+      - text: Involve the OS / infrastructure team if a non-SAP process is the cause.
+
+  - id: capacity
+    title: Capacity forecast -- a file system or database runs out soon
+    applies_to: [capacity]
+    steps:
+      - text: Read the forecast on the Operations page -- how many days, how steady the growth (fit close to 1 = steady).
+      - text: Find what is growing -- logs, traces, archive files, transport directory, a table (DB02 / DBACOCKPIT).
+      - text: Clean up what is safe (old traces, old transport files, old job logs via housekeeping jobs).
+      - text: If it is real growth, raise a change for an extension with the infrastructure team, with the forecast date.
+
+  - id: sweep_failure
+    title: Monitoring sweep failed
+    applies_to: [sweep_failure, tcode_failure, ocr_parser]
+    steps:
+      - text: Check whether the system itself is fine (wall -> Read live). If it is down, follow the SYSTEM DOWN runbook instead.
+      - text: "On the Windows VM check logs\\application.log for the failing step (SAP Logon launch, login, T-code)."
+      - text: Is a SAP Logon window open with a popup (password change, multiple logon, system message)? Close it.
+      - text: Confirm the monitoring user for SAP GUI is set in .env (<SYSTEM>_SAP_USERNAME / _PASSWORD).
+      - text: Run Monitor this system once more and watch it.
+      - text: "For T-codes that captured nothing (parser check), compare the screenshot with config/ocr_patterns.yaml."
+
+  - id: monitor_down
+    title: Monitoring platform not running (service, Windows VM)
+    applies_to: [monitor_down, peer_silent]
+    steps:
+      - text: Open the Health page on the dashboard that is still up -- it lists which part stopped.
+      - text: "Windows VM: check it is logged on (automatic log-on), and that the tasks \"IBOPS Dashboard\" and \"IBOPS Tunnel\" are running."
+      - text: "Read logs\\supervisor-dashboard.log and logs\\supervisor-tunnel.log on Windows; systemctl status ibops-dashboard on Ubuntu."
+      - text: Restart the stopped part (Start-ScheduledTask "IBOPS Dashboard" / sudo systemctl restart ibops-dashboard).
+      - text: When it is back, check the timeline for sweeps that were missed and run them if needed.
+
+  - id: generic
+    title: General alert handling
+    applies_to: ["*"]
+    steps:
+      - text: Acknowledge the alert so the team knows someone is on it.
+      - text: Read the alert and the system's timeline -- what changed just before?
+      - text: Check the wall card (More) for the detail behind the number.
+      - text: Fix the cause, or hand it to the right team with the evidence.
+      - text: Record the fix on the incident or ticket so it goes to the knowledge base.

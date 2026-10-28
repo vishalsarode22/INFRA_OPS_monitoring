@@ -1,0 +1,705 @@
+/* =========================================================================
+   IBOPS — "Frost" shell (design system v6)
+
+   v6: minimal layout on frosted glass. Every panel is a pane of frost over
+   three still colour fields; numbers are thin display figures; the one
+   small touch is a lit top edge on each pane and a glowing status dot.
+   Page skins: Live wall = full glassmorphism (body.pg-wall), Sky view and
+   Overview = future vision (body.pg-future), sign-in/intro = future vision.
+   v5 notes follow for history.
+
+   IBOPS — "Instrument panel" shell (design system v5)
+
+   v5: minimal surfaces with a retro instrument touch and glass for the
+   things that float (dock, command bar). The page is cool engineering paper
+   with a faint dot grid; cards are flat hairline panels that do not move on
+   hover; counts are set in a pixel face, like a readout. Per-page skins
+   (body.pg-*) take one idea further: Sky view = minimal, Overview = retro
+   console, Systems = glass, sign-in and intro = future vision.
+   ========================================================================= */
+
+@font-face{font-family:'IBOPS Inter';src:url(/static/fonts/inter-400.woff) format('woff');font-weight:400;font-display:swap}
+@font-face{font-family:'IBOPS Inter';src:url(/static/fonts/inter-600.woff) format('woff');font-weight:600;font-display:swap}
+@font-face{font-family:'IBOPS Inter';src:url(/static/fonts/inter-700.woff) format('woff');font-weight:700 800;font-display:swap}
+@font-face{font-family:'IBOPS Display';src:url(/static/fonts/interdisplay-100.woff) format('woff');font-weight:100 200;font-display:swap}
+@font-face{font-family:'IBOPS Display';src:url(/static/fonts/interdisplay-300.woff) format('woff');font-weight:300 400;font-display:swap}
+@font-face{font-family:'IBOPS Pixel';src:url(/static/fonts/unifont.woff) format('woff');font-weight:400 800;font-display:swap}
+@font-face{font-family:'IBOPS Mono';src:url(/static/fonts/dejavu-mono-400.woff) format('woff');font-weight:400 500;font-display:swap}
+@font-face{font-family:'IBOPS Mono';src:url(/static/fonts/dejavu-mono-700.woff) format('woff');font-weight:600 800;font-display:swap}
+
+/* (v3 notes kept below for history)
+   IBOPS — "Sky Deck" shell (design system v3)
+
+   A cockpit with altitude. The page is a white canvas over a slow-drifting
+   blue sky mesh. Navigation is a floating glass dock, not a wall. The
+   command bar carries a live heartbeat trace that only moves when RFC
+   reads are actually landing — motion here is information, not garnish.
+
+   Red is spent in three places only: the primary call to action, the
+   critical state, and the priority badge.
+
+   Every page keeps its class names (.topbar/.content/.card/.kpi/.chip/.btn)
+   so nothing breaks; the shell decides what those words look like now.
+   ========================================================================= */
+
+:root{
+  /* sky blues */
+  --sky-950:#061A36; --sky-900:#0B2B55; --sky-800:#0F3F7C; --sky-700:#1656A6;
+  --sky-600:#1E70D6; --sky-500:#2F8CF3; --sky-400:#66ADF8; --sky-300:#9CCBFB;
+  --sky-200:#C9E2FD; --sky-100:#E3F0FE; --sky-50:#F1F7FF;
+  /* whites & ink */
+  --white:#FFFFFF; --cloud:#F7FAFE; --mist:#EEF3F9; --hair:#E1E9F3; --hair-2:#CFDBE9;
+  --ink:#0E2240; --ink-2:#4B607A; --ink-3:#8194AB;
+  /* the only red */
+  --alert-700:#B71C1C; --alert-600:#D32626; --alert-500:#E63329; --alert-100:#FDE3E3; --alert-50:#FEF1F1;
+  /* semantic */
+  --bg:var(--paper); --card:var(--white); --card-hover:#F6F9FC; --border:var(--hair);
+  --text:var(--ink); --muted:var(--ink-2); --muted-dim:var(--ink-3);
+  --brand:var(--sky-600); --brand-hover:var(--sky-700); --brand-live:var(--sky-500); --automation:#7C3AED;
+  --green:#178A45; --green-bg:#E8F7EE; --green-br:#B6E3C6;
+  --amber:#B4550A; --amber-bg:#FFF5E6; --amber-br:#F6D7A4;
+  --red:var(--alert-700); --red-bg:var(--alert-50); --red-br:var(--alert-100);
+  --info:var(--sky-700); --info-bg:var(--sky-50); --info-br:var(--sky-200);
+  --gray:var(--ink-2); --gray-bg:var(--mist); --gray-br:var(--hair-2);
+  /* shape & depth */
+  --radius:12px; --radius-sm:8px; --radius-pill:999px;
+  --shadow:0 1px 0 rgba(14,34,64,.04);
+  --shadow-lift:0 10px 30px rgba(14,34,64,.10);
+  --glass:rgba(250,252,255,.84); --glass-br:rgba(255,255,255,.9);
+  --ring:0 0 0 3px rgba(47,140,243,.30);
+  --sans:'IBOPS Inter','Segoe UI Variable','Segoe UI',system-ui,sans-serif;
+  --display:'IBOPS Display','IBOPS Inter','Segoe UI Variable Display','Segoe UI',sans-serif;
+  --mono:'IBOPS Mono','Cascadia Code',Consolas,monospace;
+  --pixel:'IBOPS Pixel','IBOPS Mono',Consolas,monospace;
+  --paper:#EDF1F5; --paper-dot:rgba(14,34,64,.075);
+  --dock-w:72px; --dock-x:14px;
+  --ease:cubic-bezier(.2,.7,.2,1);
+}
+html[data-theme="dark"]{
+  --paper:#08111D; --paper-dot:rgba(190,215,245,.07);
+  --bg:#08111D; --card:#0E1B2C; --card-hover:#12233A; --border:#1D3550; --hair-2:#2A4864;
+  --text:#EEF4FB; --muted:#A9BACD; --muted-dim:#6F849B;
+  --cloud:#07121F; --mist:#0B1727;
+  --green:#2BD46A; --green-bg:rgba(43,212,106,.12); --green-br:rgba(43,212,106,.32);
+  --amber:#F5A524; --amber-bg:rgba(245,165,36,.12); --amber-br:rgba(245,165,36,.32);
+  --red:#F44B4B; --red-bg:rgba(244,75,75,.12); --red-br:rgba(244,75,75,.34);
+  --info:#66ADF8; --info-bg:rgba(102,173,248,.12); --info-br:rgba(102,173,248,.32);
+  --gray:#8194AB; --gray-bg:rgba(129,148,171,.12); --gray-br:#1D3550;
+  --glass:rgba(14,27,44,.82); --glass-br:rgba(255,255,255,.10);
+  --shadow:0 1px 0 rgba(0,0,0,.3); --shadow-lift:0 12px 40px rgba(0,0,0,.55);
+}
+
+/* ---------- base & sky ---------- */
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;
+     min-height:100vh;-webkit-font-smoothing:antialiased;position:relative}
+/* Engineering paper: a faint dot grid, still. (v3 had drifting sky blobs;
+   v5 keeps the page quiet so only data moves.) One soft wash of brand blue
+   at the top gives the glass dock and command bar something to frost. */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(70% 38% at 30% -8%,rgba(47,140,243,.10),transparent 70%),
+    radial-gradient(circle at 1px 1px,var(--paper-dot) 1px,transparent 1.4px) 0 0/22px 22px}
+body::after{content:none}
+@keyframes sky-drift{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(3%,2%,0) scale(1.06)}}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:none;box-shadow:var(--ring);border-radius:var(--radius-sm)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--hair-2);border-radius:6px;border:2px solid var(--bg)}
+
+/* ---------- floating dock (navigation) ----------
+   72px glass pill pinned to the left edge; expands to 232px on hover/focus
+   with labels sliding in. The swirl mark rotates once on load. */
+.sidebar{position:fixed;left:var(--dock-x);top:14px;bottom:14px;width:var(--dock-w);z-index:40;
+  display:flex;flex-direction:column;border-radius:22px;overflow:hidden;
+  background:var(--glass);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
+  border:1px solid var(--glass-br);box-shadow:var(--shadow-lift);
+  transition:width .32s var(--ease),box-shadow .32s var(--ease);
+  animation:dock-in .6s var(--ease) both}
+.sidebar:hover,.sidebar:focus-within{width:232px}
+@keyframes dock-in{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+.brand{padding:14px 12px 8px;display:flex;align-items:center;gap:12px;min-height:74px}
+.brand .mark{width:46px;height:46px;flex:0 0 46px;border-radius:14px;background:var(--white);
+  display:grid;place-items:center;box-shadow:0 6px 16px rgba(30,112,214,.18);overflow:hidden}
+.brand .mark img{width:38px;height:38px;object-fit:contain;animation:mark-spin 1.4s var(--ease) .15s both}
+@keyframes mark-spin{from{transform:rotate(-140deg) scale(.6);opacity:0}to{transform:none;opacity:1}}
+.brand .word{opacity:0;transform:translateX(-6px);transition:opacity .25s .08s,transform .25s .08s;white-space:nowrap}
+.sidebar:hover .brand .word,.sidebar:focus-within .brand .word{opacity:1;transform:none}
+.brand .word img{height:22px;display:block}
+.brand .word small{display:block;font-size:10.5px;color:var(--muted-dim);font-weight:600;margin-top:3px}
+nav{flex:1;padding:4px 10px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+.nav-sec{height:0;overflow:hidden;font-size:10.5px;font-weight:700;color:var(--muted-dim);padding:0 10px;
+  opacity:0;transition:height .25s,opacity .25s,padding .25s}
+.sidebar:hover .nav-sec,.sidebar:focus-within .nav-sec{height:auto;opacity:1;padding:9px 10px 3px}
+.nav-item{display:flex;align-items:center;gap:12px;height:40px;padding:0 13px;border-radius:13px;
+  color:var(--muted);font-weight:600;font-size:13px;margin-bottom:3px;cursor:pointer;position:relative;
+  white-space:nowrap;transition:background .18s,color .18s,transform .18s var(--ease)}
+.nav-item .ico{width:20px;text-align:center;font-size:15px;flex:0 0 20px}
+.nav-item:hover{background:var(--sky-50);color:var(--sky-700);transform:translateX(2px)}
+html[data-theme="dark"] .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:var(--sky-600);color:#fff;box-shadow:inset 0 -2px 0 rgba(6,26,54,.25)}
+.nav-item.active::after{content:"";position:absolute;left:-10px;top:12px;bottom:12px;width:4px;border-radius:4px;
+  background:var(--sky-600);opacity:0;transition:opacity .2s}
+.nav-item .badge{margin-left:auto;background:var(--alert-500);color:#fff;font-size:10px;font-weight:800;
+  padding:2px 7px;border-radius:var(--radius-pill);line-height:14px}
+.nav-item.soon{opacity:.4;cursor:default}
+.nav-item.soon:hover{background:none;transform:none}
+/* label text hidden when collapsed */
+.nav-item .lbl{opacity:0;transform:translateX(-6px);transition:opacity .22s .06s,transform .22s .06s}
+.sidebar:hover .nav-item .lbl,.sidebar:focus-within .nav-item .lbl{opacity:1;transform:none}
+/* collapsed tooltip */
+.sidebar:not(:hover):not(:focus-within) .nav-item:hover::before{content:attr(data-label);position:absolute;left:62px;
+  top:50%;transform:translateY(-50%);background:var(--sky-950);color:#fff;font-size:12px;padding:6px 10px;
+  border-radius:8px;white-space:nowrap;box-shadow:var(--shadow-lift);pointer-events:none}
+.side-foot{margin:10px;padding:10px;border-radius:14px;background:var(--sky-50);border:1px solid var(--sky-100)}
+html[data-theme="dark"] .side-foot{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.08)}
+.side-foot .t{font-size:10.5px;font-weight:700;color:var(--muted-dim);margin-bottom:6px;white-space:nowrap;
+  opacity:0;height:0;overflow:hidden;transition:opacity .2s,height .2s}
+.sidebar:hover .side-foot .t,.sidebar:focus-within .side-foot .t{opacity:1;height:auto}
+.side-foot .row{display:flex;align-items:center;gap:8px;font-size:11.5px;padding:3px 0;color:var(--muted)}
+.side-foot .row span:first-child{opacity:0;width:0;overflow:hidden;white-space:nowrap;transition:opacity .2s,width .2s}
+.sidebar:hover .side-foot .row span:first-child,.sidebar:focus-within .side-foot .row span:first-child{opacity:1;width:auto;flex:1}
+.side-foot .row span:last-child{font-family:var(--mono);font-weight:700;font-size:10.5px;color:var(--sky-700);white-space:nowrap;
+  background:var(--white);padding:2px 6px;border-radius:8px;min-width:0;flex:1;text-align:center;letter-spacing:-.02em}
+html[data-theme="dark"] .side-foot .row span:last-child{background:rgba(255,255,255,.08);color:#fff}
+
+/* ---------- canvas & command bar ---------- */
+main{min-height:100vh;padding-left:calc(var(--dock-w) + var(--dock-x)*2 + 6px);display:flex;flex-direction:column}
+.topbar{position:sticky;top:14px;z-index:30;margin:14px 18px 0;padding:12px 18px;display:flex;align-items:center;gap:16px;
+  background:var(--glass);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);
+  border:1px solid var(--glass-br);border-radius:18px;box-shadow:var(--shadow);
+  animation:bar-in .55s var(--ease) .1s both}
+@keyframes bar-in{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+.topbar h2{font-size:19px;font-weight:600;letter-spacing:-.015em}
+.topbar .sub{font-size:12px;color:var(--muted)}
+.crumb{font-size:12px;color:var(--muted-dim)}
+.crumb a:hover{color:var(--sky-600)}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+/* heartbeat trace: injected by shell.js into the command bar */
+.hb{display:flex;align-items:center;gap:10px;margin-left:auto;margin-right:6px;color:var(--muted-dim);font-size:11.5px}
+.hb svg{width:120px;height:26px;overflow:visible}
+.hb path{fill:none;stroke:var(--sky-500);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:300;stroke-dashoffset:300;animation:hb-draw 2.4s linear infinite}
+.hb.crit path{stroke:var(--alert-500)}
+.hb.idle path{animation-play-state:paused;stroke:var(--hair-2)}
+@keyframes hb-draw{0%{stroke-dashoffset:300;opacity:.15}12%{opacity:1}100%{stroke-dashoffset:0;opacity:1}}
+.hb b{font-family:var(--mono);color:var(--text);font-weight:700}
+.content{padding:20px 18px 48px}
+/* orchestrated card entrance: shell.js adds .rise to direct children of .content */
+.rise{animation:none}   /* v5: no per-card entrance; the page is still */
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+/* ---------- controls ---------- */
+.btn{padding:8px 14px;border:1px solid var(--hair-2);background:var(--card);color:var(--text);border-radius:9px;
+  cursor:pointer;font-size:12.5px;font-weight:600;font-family:inherit;line-height:1.2;
+  box-shadow:inset 0 -1px 0 rgba(14,34,64,.07);
+  transition:background .15s,border-color .15s}
+.btn:hover{background:var(--sky-50);border-color:var(--sky-200)}
+html[data-theme="dark"] .btn:hover{background:var(--card-hover)}
+.btn:active{transform:translateY(0)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-brand{background:var(--sky-600);border-color:var(--sky-600);color:#fff}
+.btn-brand:hover{background:var(--sky-700);border-color:var(--sky-700)}
+.btn-primary,.btn.primary{background:linear-gradient(135deg,var(--alert-500),var(--alert-600));border-color:transparent;color:#fff;
+  box-shadow:0 8px 20px rgba(230,51,41,.30);position:relative;overflow:hidden}
+.btn-primary::after,.btn.primary::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);
+  transform:translateX(-120%);transition:transform .6s}
+.btn-primary:hover::after,.btn.primary:hover::after{transform:translateX(120%)}
+.input,select.input{padding:9px 12px;border:1px solid var(--hair-2);border-radius:12px;background:var(--card);
+  color:var(--text);font-size:12.5px;font-family:inherit}
+.input:focus{outline:none;box-shadow:var(--ring);border-color:var(--sky-400)}
+
+/* ---------- status language ---------- */
+.chip{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px;
+  border-radius:var(--radius-pill);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;line-height:1.4}
+.chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.9}
+.c-normal,.c-healthy{background:var(--green-bg);color:var(--green);border:1px solid var(--green-br)}
+.c-warning{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-br)}
+.c-critical{background:var(--alert-600);color:#fff;border:1px solid var(--alert-600);animation:crit 1.6s ease-in-out infinite}
+.c-critical::before{background:#fff}
+@keyframes crit{0%,100%{box-shadow:0 0 0 0 rgba(230,51,41,.45)}50%{box-shadow:0 0 0 6px rgba(230,51,41,0)}}
+.c-unknown{background:var(--gray-bg);color:var(--gray);border:1px solid var(--gray-br)}
+/* Finer alert grades, driven by a metric's `alert_level` rather than its
+   Status. A single "critical" colour cannot distinguish "slower than we
+   want" from "the system is in trouble right now", so SMLG response time
+   (see sap_gui/smlg_analyzer.py) carries three visible grades above normal:
+     .c-warning                  amber  -- over 1500 ms
+     .c-critical                 red    -- over 2000 ms
+     .c-critical + .c-flash      red, flashing -- over 2500 ms
+   .c-flash is deliberately louder than .c-critical's resting pulse: it
+   inverts the chip on a hard 2Hz step rather than breathing a shadow, so
+   it reads as an alarm from across a NOC wall rather than as decoration.
+   The global prefers-reduced-motion rule further down disables it, leaving
+   the solid red .c-critical underneath -- still unmistakably an alert. */
+.c-flash{animation:flash-alert .9s steps(1,end) infinite}
+@keyframes flash-alert{
+  0%,49%{background:var(--alert-600);border-color:var(--alert-600);color:#fff}
+  50%,100%{background:transparent;border-color:var(--alert-600);color:var(--alert-600)}}
+.c-unknown::before{opacity:.5}
+.c-live{background:var(--info-bg);color:var(--info);border:1px solid var(--info-br)}
+.c-live::before{animation:p 1.6s ease-in-out infinite}
+.src{font-size:9.5px;font-weight:700;letter-spacing:.03em;padding:2px 7px;border-radius:7px;text-transform:uppercase;white-space:nowrap}
+.src-rfc{color:var(--sky-700);background:var(--sky-50);border:1px solid var(--sky-200)}
+.src-ssh{color:var(--green);background:var(--green-bg);border:1px solid var(--green-br)}
+.src-gui{color:var(--automation);background:#F3EEFD;border:1px solid #D9C8F8}
+.src-stale{color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber-br)}
+.src-none{color:var(--muted-dim);background:var(--gray-bg);border:1px solid var(--gray-br)}
+.unknown-fill{background-image:repeating-linear-gradient(135deg,transparent 0 8px,rgba(129,148,171,.08) 8px 16px)}
+
+/* ---------- surfaces ---------- */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-h h3{font-size:14px;font-weight:600;flex:1;letter-spacing:-.005em}
+.card-b{padding:18px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+/* KPI: number is the hero; a signal edge on the left encodes status */
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 14px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden}
+/* the status edge reads as an indicator lamp: square, not a pill */
+.kpi::before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:4px;border-radius:0 2px 2px 0;background:var(--hair-2)}
+.kpi:has(.n-green)::before{background:var(--green)}
+.kpi:has(.n-amber)::before{background:var(--amber)}
+.kpi:has(.n-red)::before{background:var(--alert-500);box-shadow:0 0 14px rgba(230,51,41,.55)}
+.kpi:has(.n-info)::before{background:var(--sky-500)}
+.kpi .lbl{font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:8px}
+/* counts are readouts: pixel face at a 16px multiple so it stays crisp */
+.kpi .num{font-size:32px;font-weight:400;line-height:1;font-family:var(--pixel);letter-spacing:0;font-variant-numeric:tabular-nums}
+.kpi .sub{font-size:11px;color:var(--muted-dim);margin-top:6px}
+.n-green{color:var(--green)} .n-amber{color:var(--amber)} .n-red{color:var(--red)} .n-gray{color:var(--gray)} .n-info{color:var(--info)}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:11.5px;font-weight:600;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border);
+   background:var(--card);position:sticky;top:0}
+td{padding:10px 14px;border-bottom:1px solid var(--border);transition:background .15s}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--card-hover)}
+td.mono,.mono{font-family:var(--mono)}
+.bar{height:8px;border-radius:4px;background:var(--mist);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--sky-400),var(--sky-600));
+  transition:width .8s var(--ease)}
+.bar i.w{background:linear-gradient(90deg,#F6C56B,var(--amber))} .bar i.c{background:linear-gradient(90deg,#F08A83,var(--alert-600))}
+.empty{padding:36px;text-align:center;color:var(--muted-dim)}
+.banner{padding:12px 16px;border-radius:14px;margin-bottom:16px;font-size:12.5px}
+.banner-warn{background:var(--amber-bg);border:1px solid var(--amber-br);color:var(--amber)}
+.banner-err{background:var(--red-bg);border:1px solid var(--red-br);color:var(--red)}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;animation:p 1.8s ease-in-out infinite}
+@keyframes p{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+/* ---------- intro / loader: future vision ----------
+   Deep-space navy, a blue perspective grid running to a glowing horizon,
+   the brand mark inside a ring whose scan arc is the only thing that moves.
+   The wordmark is a thin, wide-tracked display cut: the one loud element. */
+.ibo-loader{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;color:#EAF3FF;overflow:hidden;
+  background:radial-gradient(90% 60% at 50% 38%,#0C2550 0%,#061533 45%,#030914 100%);transition:opacity .45s ease}
+.ibo-loader.hide{opacity:0;pointer-events:none}
+.ibo-loader::before{content:"";position:absolute;left:-50%;right:-50%;bottom:-6%;height:42%;
+  background:
+    linear-gradient(rgba(102,173,248,.42) 1px,transparent 1px) 0 0/100% 46px,
+    linear-gradient(90deg,rgba(102,173,248,.42) 1px,transparent 1px) 0 0/46px 100%;
+  transform:perspective(420px) rotateX(64deg);transform-origin:50% 0;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,#000 30%,#000 70%,transparent 100%);
+          mask-image:linear-gradient(to bottom,transparent 0%,#000 30%,#000 70%,transparent 100%)}
+.ibo-loader::after{content:"";position:absolute;left:0;right:0;top:64%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(156,203,251,.9),transparent);box-shadow:0 0 24px 4px rgba(47,140,243,.45)}
+.ibo-loader .stage{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;transform:translateY(-14vh)}
+.ibo-loader .orbit{width:min(42vw,232px);aspect-ratio:1/1;position:relative;display:grid;place-items:center}
+.ibo-loader .orbit::before{content:"";position:absolute;inset:0;border-radius:50%;
+  border:1px solid rgba(156,203,251,.28);box-shadow:0 0 0 10px rgba(47,140,243,.05),0 0 60px rgba(47,140,243,.25) inset}
+.ibo-loader .orbit::after{content:"";position:absolute;inset:-1px;border-radius:50%;
+  background:conic-gradient(from 0deg,transparent 0 78%,rgba(156,203,251,.0) 78%,rgba(156,203,251,.95) 100%);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 2px),#000 calc(100% - 2px));
+          mask:radial-gradient(farthest-side,transparent calc(100% - 2px),#000 calc(100% - 2px));
+  animation:ibo-scan 2.2s linear infinite}
+@keyframes ibo-scan{to{transform:rotate(360deg)}}
+.ibo-loader .frame{width:72%;aspect-ratio:1/1;border-radius:50%;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,255,255,.10),0 20px 60px rgba(0,0,0,.6)}
+.ibo-loader video,.ibo-loader img{width:100%;height:100%;object-fit:cover;display:block}
+.ibo-loader .word{margin-top:30px;font-family:var(--display);font-weight:100;font-size:clamp(24px,3.4vw,38px);
+  letter-spacing:.42em;text-indent:.42em;color:#F2F8FF;text-shadow:0 0 18px rgba(102,173,248,.55)}
+.ibo-loader .msg{margin-top:14px;font-family:var(--pixel);font-size:16px;color:#8FB8E8;text-align:center;letter-spacing:.04em}
+.ibo-loader .bar{width:200px;height:1px;margin:14px auto 0;background:rgba(156,203,251,.18);overflow:hidden}
+.ibo-loader .bar i{display:block;height:100%;width:30%;background:#9CCBFB;box-shadow:0 0 10px #66ADF8;animation:ibo-sweep 1.4s ease-in-out infinite}
+@keyframes ibo-sweep{0%{transform:translateX(-100%)}100%{transform:translateX(440%)}}
+
+@media (max-width:900px){.sidebar{display:none}main{padding-left:0}.content{padding:14px}.topbar{margin:10px}}
+/* Phones: the 3 am view. Navigation moves to a menu button; the top bar
+   wraps; wide tables scroll inside themselves instead of the page. */
+.mnav-btn,.mnav{display:none}
+@media (max-width:900px){
+  .mnav-btn{display:flex;position:fixed;right:16px;bottom:16px;z-index:60;width:52px;height:52px;border-radius:50%;
+    align-items:center;justify-content:center;background:var(--brand);color:#fff;font-size:22px;border:0;
+    box-shadow:var(--shadow-lift);cursor:pointer}
+  .mnav.open{display:block;position:fixed;inset:auto 0 0 0;z-index:59;max-height:75vh;overflow:auto;background:var(--card);
+    border-top:1px solid var(--border);border-radius:18px 18px 0 0;padding:14px 16px 84px;box-shadow:var(--shadow-lift)}
+  .mnav a{display:flex;gap:10px;align-items:center;padding:11px 8px;border-radius:10px;color:var(--text);
+    text-decoration:none;font-weight:600}
+  .mnav a.active{background:var(--info-bg);color:var(--info)}
+  .mnav .sec{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-dim);margin:10px 8px 2px}
+  .topbar{flex-wrap:wrap;top:0;margin:0 0 6px;border-radius:0 0 14px 14px}
+  .top-actions{flex-wrap:wrap;margin-left:0;width:100%}
+  .content table{display:block;overflow-x:auto;max-width:100%}
+  .grid.g4,.grid.g3,.grid.g2{grid-template-columns:1fr}
+  .ops-dlg{max-height:85vh}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.ibo-loader video{display:none}}
+@media print{.sidebar,.topbar,.btn,.ibo-loader{display:none!important}body{background:#fff}main{padding:0}}
+
+/* ---------- attribution ("who and what") ---------- */
+.attr{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+.attr-sec{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px}
+.attr-sec h5{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.attr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.attr-cap{font-size:11px;font-weight:700;color:var(--muted-dim);margin-bottom:4px}
+.attr table.attr{font-size:12px}
+.attr table.attr th{padding:6px 8px;font-size:10.5px;background:transparent;position:static}
+.attr table.attr td{padding:6px 8px;vertical-align:top}
+.attr .empty-s{font-size:11.5px;color:var(--muted-dim);padding:6px 0}
+.attr-note{font-size:11.5px;color:var(--muted);margin-top:8px}
+.attr-gaps{font-size:11.5px;color:var(--muted-dim);padding:8px 12px;border-radius:10px;background:var(--mist);border:1px dashed var(--hair-2)}
+
+/* ---------------------------------------------------------------------------
+   Global loading indicator (IB.loader in shell.js)
+
+   One element, appended to <body> on first use, driven by the count of
+   requests in flight. Fixed to the corner rather than overlaying the page:
+   a full-screen blocker on a dashboard that polls every 60 seconds would
+   cover the very numbers someone is watching.
+
+   The mark rotates and pulses together. prefers-reduced-motion drops the
+   spin and keeps the fade, so the indicator still communicates "busy"
+   without moving for anyone who has asked for less animation.
+--------------------------------------------------------------------------- */
+
+#ibo-loading {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px 9px 10px;
+  border-radius: 999px;
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #e3e8ef);
+  box-shadow: 0 6px 22px rgba(15, 30, 60, .14);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #5b6b83);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+#ibo-loading.on {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#ibo-loading img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  animation: ibo-spin 1.15s linear infinite,
+             ibo-breathe 1.9s ease-in-out infinite;
+}
+
+@keyframes ibo-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ibo-breathe {
+  0%, 100% { opacity: .55; }
+  50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #ibo-loading img { animation: ibo-breathe 2.4s ease-in-out infinite; }
+}
+
+/* Inline placeholder for a panel that has not had its first read yet.
+   Same mark, same motion, sitting where the content will appear -- so the
+   page does not simply show empty boxes during the first RFC pass. */
+
+.ibo-loading-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 26px 0;
+  color: var(--muted, #5b6b83);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.ibo-loading-inline img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  animation: ibo-spin 1.15s linear infinite,
+             ibo-breathe 1.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ibo-loading-inline img { animation: ibo-breathe 2.4s ease-in-out infinite; }
+}
+
+
+/* =========================================================================
+   v6.1 "Pastel frost" layer — minimal + glassmorphism, applied to every page.
+   Light by default: five pastel sky-blue fields (sky, ice, aqua, powder, azure)
+   behind clear, deep frost. Figures are tinted with a soft gradient by
+   status. Placed last so it overrides the v5 rules above.
+   ========================================================================= */
+:root{
+  --ink:#17304F; --ink-2:#4F6A8A; --ink-3:#8AA2BD; --hair:#DCEAF7; --hair-2:#C6DDF2;
+  --paper:#F2F8FE; --paper-dot:rgba(30,100,170,.05);
+  --gl-bg:rgba(255,255,255,.40); --gl-bg-2:rgba(255,255,255,.26); --gl-solid:rgba(246,251,255,.94);
+  --gl-edge:rgba(255,255,255,.95); --gl-line:rgba(30,90,160,.10);
+  --gl-shadow:0 12px 32px rgba(40,120,200,.13),0 2px 6px rgba(40,120,200,.06);
+  --gl-blur:blur(26px) saturate(1.9);
+  --gl-sheen:linear-gradient(135deg,rgba(255,255,255,.72) 0%,rgba(255,255,255,.18) 34%,rgba(255,255,255,0) 60%);
+  --gl-inner:inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(255,255,255,.30);
+  --radius:18px; --radius-sm:11px;
+  /* pastel status: soft fills, deeper text so it stays readable */
+  --green:#22936A; --green-bg:rgba(126,222,178,.26); --green-br:rgba(80,190,140,.38);
+  --amber:#B86E0C; --amber-bg:rgba(255,206,130,.30); --amber-br:rgba(230,165,60,.42);
+  --red:#C93535;   --red-bg:rgba(255,165,160,.24);  --red-br:rgba(225,95,90,.40);
+  --info:#4A6FD1;  --info-bg:rgba(160,195,255,.28); --info-br:rgba(110,150,235,.40);
+  --gray:#6E7395;  --gray-bg:rgba(170,170,205,.20); --gray-br:rgba(140,140,185,.32);
+  --alert-500:#EB5757; --alert-600:#D93F3F; --alert-700:#C03535; --alert-100:#FFDCDC; --alert-50:#FFF1F1;
+  --brand-grad:linear-gradient(135deg,#9FDBFF,#7CC0FF);
+  --field-a:rgba(140,205,255,.80); --field-b:rgba(170,225,255,.75); --field-c:rgba(150,230,240,.65);
+  --field-d:rgba(190,222,255,.70); --field-e:rgba(160,215,255,.50);
+  /* figure tints */
+  --val-neutral:linear-gradient(135deg,#1E78D8,#36B4E8);
+  --val-ok:linear-gradient(135deg,#17966A,#3FBBA6);
+  --val-warn:linear-gradient(135deg,#D27D12,#E9A93F);
+  --val-crit:linear-gradient(135deg,#D23A3A,#EE6B5E);
+  --val-info:linear-gradient(135deg,#3F78E0,#62A8F0);
+  --val-unk:linear-gradient(135deg,#8AA2BD,#ADC0D4);
+}
+html[data-theme="dark"]{
+  --paper:#07111E; --paper-dot:rgba(180,215,250,.045);
+  --gl-bg:rgba(18,40,66,.48); --gl-bg-2:rgba(18,40,66,.30); --gl-solid:rgba(12,28,48,.95);
+  --gl-edge:rgba(255,255,255,.11); --gl-line:rgba(255,255,255,.08);
+  --gl-shadow:0 12px 36px rgba(0,0,0,.42);
+  --gl-sheen:linear-gradient(135deg,rgba(255,255,255,.08) 0%,rgba(255,255,255,.02) 34%,rgba(255,255,255,0) 60%);
+  --gl-inner:inset 0 1px 0 rgba(255,255,255,.10);
+  --green:#6FE3AE; --green-bg:rgba(111,227,174,.13); --green-br:rgba(111,227,174,.32);
+  --amber:#FFCB7A; --amber-bg:rgba(255,203,122,.13); --amber-br:rgba(255,203,122,.32);
+  --red:#FF8A80;   --red-bg:rgba(255,138,128,.14);  --red-br:rgba(255,138,128,.36);
+  --info:#9CC2FF;  --info-bg:rgba(156,194,255,.13); --info-br:rgba(156,194,255,.32);
+  --gray:#9AA0C2;  --gray-bg:rgba(154,160,194,.12); --gray-br:rgba(154,160,194,.28);
+  --field-a:rgba(60,150,240,.30); --field-b:rgba(80,190,250,.22); --field-c:rgba(40,190,210,.16);
+  --field-d:rgba(90,160,255,.12); --field-e:rgba(70,170,240,.12);
+  --val-neutral:linear-gradient(135deg,#8CCBFF,#9FEAFF);
+  --val-ok:linear-gradient(135deg,#6FE3AE,#9DF0DA);
+  --val-warn:linear-gradient(135deg,#FFC56B,#FFE0A6);
+  --val-crit:linear-gradient(135deg,#FF7A6E,#FFAFA5);
+  --val-info:linear-gradient(135deg,#8CC0FF,#B8DAFF);
+  --val-unk:linear-gradient(135deg,#7F88A8,#A6ADC6);
+}
+/* five still pastel fields; the frost blurs them. Faint dots are the small touch. */
+body::before{background:
+  radial-gradient(38% 46% at 6% 4%,var(--field-a),transparent 70%),
+  radial-gradient(34% 42% at 94% 6%,var(--field-b),transparent 70%),
+  radial-gradient(42% 48% at 78% 100%,var(--field-c),transparent 70%),
+  radial-gradient(30% 36% at 22% 88%,var(--field-d),transparent 70%),
+  radial-gradient(28% 34% at 52% 46%,var(--field-e),transparent 72%),
+  radial-gradient(circle at 1px 1px,var(--paper-dot) 1px,transparent 1.4px) 0 0/24px 24px,
+  var(--paper)}
+
+/* panes: clear frost, a diagonal sheen, a bright top edge */
+.card,.kpi,.attr-sec{background:var(--gl-sheen),var(--gl-bg);border:1px solid var(--gl-edge);border-radius:var(--radius);
+  backdrop-filter:var(--gl-blur);-webkit-backdrop-filter:var(--gl-blur);
+  box-shadow:var(--gl-shadow),var(--gl-inner)}
+.card-h{border-bottom:1px solid var(--gl-line);padding:15px 20px}
+.card-h h3{font-weight:600;font-size:14px}
+.card-b{padding:20px}
+.grid{gap:18px}
+.topbar,.sidebar{background:var(--gl-sheen),var(--gl-bg);border-color:var(--gl-edge);backdrop-filter:blur(28px) saturate(1.9);
+  -webkit-backdrop-filter:blur(28px) saturate(1.9);box-shadow:var(--gl-shadow),var(--gl-inner)}
+.topbar h2{font-family:var(--display);font-weight:300;font-size:22px;letter-spacing:-.02em}
+.brand .mark{box-shadow:0 6px 16px rgba(40,140,230,.25)}
+.side-foot{background:var(--gl-bg-2);border-color:var(--gl-edge)}
+.side-foot .row span:last-child{background:var(--gl-bg);color:var(--info)}
+.nav-item:hover{background:var(--gl-bg);color:var(--text)}
+html[data-theme="dark"] .nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav-item.active{background:var(--brand-grad);color:#0F2A4A;box-shadow:0 6px 18px rgba(40,150,240,.35),inset 0 1px 0 rgba(255,255,255,.7)}
+html[data-theme="dark"] .nav-item.active{background:linear-gradient(135deg,rgba(90,180,255,.38),rgba(60,140,240,.38));color:#fff;
+  box-shadow:0 6px 18px rgba(40,140,255,.30),inset 0 1px 0 rgba(255,255,255,.18)}
+
+/* figures: soft gradient by status, thin display cut */
+.kpi{padding:18px 20px 16px}
+.kpi::before{left:auto;right:16px;top:18px;bottom:auto;width:8px;height:8px;border-radius:50%;background:var(--hair-2)}
+.kpi:has(.n-green)::before{box-shadow:0 0 10px var(--green)}
+.kpi:has(.n-amber)::before{box-shadow:0 0 10px var(--amber)}
+.kpi:has(.n-info)::before{box-shadow:0 0 10px var(--info)}
+.kpi .lbl{font-weight:500}
+.kpi .num{display:inline-block;font-family:var(--display);font-weight:400;font-size:40px;padding-right:.1em;letter-spacing:-.035em;line-height:1.05;
+  background:var(--val-neutral);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 2px 6px rgba(30,120,210,.14))}
+.kpi .num.n-green{background-image:var(--val-ok)} .kpi .num.n-amber{background-image:var(--val-warn)}
+.kpi .num.n-red{background-image:var(--val-crit)} .kpi .num.n-info{background-image:var(--val-info)}
+.kpi .num.n-gray{background-image:var(--val-unk)}
+
+/* tables: hairlines on the pane; the sticky header is near-solid frost */
+th{background:var(--gl-solid);border-bottom:1px solid var(--gl-line);font-weight:500}
+td{border-bottom:1px solid var(--gl-line)}
+tr:hover td{background:var(--gl-bg-2)}
+
+/* controls: small glass pills */
+.btn{background:var(--gl-sheen),var(--gl-bg);border:1px solid var(--gl-edge);box-shadow:var(--gl-inner),0 2px 8px rgba(40,120,200,.08);
+  backdrop-filter:blur(10px) saturate(1.6);-webkit-backdrop-filter:blur(10px) saturate(1.6);border-radius:11px;color:var(--text)}
+.btn:hover{background:var(--gl-sheen),rgba(255,255,255,.7);border-color:rgba(120,195,255,.7)}
+html[data-theme="dark"] .btn:hover{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.18)}
+.btn-brand{background:var(--brand-grad);border-color:transparent;color:#0F2A4A;backdrop-filter:none}
+.btn-brand:hover{background:linear-gradient(135deg,#86CFFF,#62AEF8);border-color:transparent}
+.btn-primary,.btn.primary{background:linear-gradient(135deg,#4FB6F7,#1E88E5);color:#fff;backdrop-filter:none;border:0;
+  box-shadow:0 8px 20px rgba(30,136,229,.30),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn-primary:hover,.btn.primary:hover{background:linear-gradient(135deg,#3AA8F2,#1676CC);border:0}
+.c-critical{background:linear-gradient(135deg,#EE6B5E,#D93F3F);border-color:transparent}
+.input,select.input,textarea.input{background:var(--gl-bg);border:1px solid var(--gl-edge);border-radius:11px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:var(--gl-inner)}
+.input:focus{background:rgba(255,255,255,.75);border-color:rgba(80,170,245,.7);box-shadow:0 0 0 3px rgba(80,170,245,.22)}
+html[data-theme="dark"] .input:focus{background:var(--gl-bg)}
+select.input option{background:var(--gl-solid);color:var(--text)}
+.banner{border-radius:14px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.bar{background:var(--gl-line)}
+.bar i{background:var(--val-info)} .bar i.w{background:var(--val-warn)} .bar i.c{background:var(--val-crit)}
+.attr-gaps{background:var(--gl-bg-2);border-color:var(--gl-line)}
+#ibo-loading{background:var(--gl-bg);border-color:var(--gl-edge);backdrop-filter:var(--gl-blur);-webkit-backdrop-filter:var(--gl-blur)}
+@media (max-width:900px){.mnav.open{background:var(--gl-solid);backdrop-filter:var(--gl-blur);-webkit-backdrop-filter:var(--gl-blur)}
+  .mnav-btn{background:var(--brand-grad);color:#0F2A4A}}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .card,.kpi,.attr-sec,.topbar,.sidebar{background:var(--gl-solid)}
+}
+
+/* =========================================================================
+   Future vision skin (body.pg-future) — Sky view and Overview.
+   Light theme = sky morning: pale blue sky, a sky-blue floor grid
+   running to a glowing horizon, white frost HUD panes with corner brackets.
+   Dark theme = the night deck. Same structure, different light.
+   ========================================================================= */
+body.pg-future{   /* night */
+  --fv-ice:#9CCBFB; --fv-line:rgba(102,173,248,.20); --fv-line-hi:rgba(156,203,251,.55);
+  --fv-title:#F2F8FF; --fv-title-glow:rgba(102,173,248,.5); --fv-bar:rgba(5,16,38,.62); --fv-bar-solid:rgba(5,16,38,.96);
+  --fv-grid:rgba(102,173,248,.26); --fv-horizon:rgba(156,203,251,.55); --fv-horizon-glow:rgba(47,140,243,.30);
+  --fv-nav-hi:#fff; --fv-input:rgba(4,14,32,.6); --fv-tint:rgba(102,173,248,.08);
+  --fv-sky:radial-gradient(80% 55% at 50% 0%,#0C2550 0%,rgba(6,21,51,.6) 45%,transparent 75%),linear-gradient(#050E20,#030914);
+  --fv-dot:rgba(156,203,251,.05);
+  --paper:#040B18; --bg:#040B18; --text:#EAF3FF; --muted:#93B2D6; --muted-dim:#5F80A8;
+  --card:rgba(9,26,56,.50); --card-hover:rgba(102,173,248,.07); --border:var(--fv-line); --hair-2:rgba(102,173,248,.28);
+  --mist:rgba(255,255,255,.06); --cloud:#050D1C;
+  --gl-bg:rgba(9,26,56,.46); --gl-bg-2:rgba(9,26,56,.30); --gl-solid:rgba(6,18,40,.95);
+  --gl-edge:var(--fv-line); --gl-line:rgba(102,173,248,.13); --gl-shadow:0 14px 40px rgba(0,0,0,.45);
+  --gl-sheen:linear-gradient(135deg,rgba(156,203,251,.07),rgba(156,203,251,0) 45%); --gl-inner:inset 0 0 40px rgba(47,140,243,.05);
+  --green:#3BE58A; --green-bg:rgba(59,229,138,.10); --green-br:rgba(59,229,138,.35);
+  --amber:#FFC23D; --amber-bg:rgba(255,194,61,.10); --amber-br:rgba(255,194,61,.35);
+  --red:#FF5A4E; --red-bg:rgba(255,90,78,.12); --red-br:rgba(255,90,78,.40);
+  --info:#66ADF8; --info-bg:rgba(102,173,248,.12); --info-br:rgba(102,173,248,.35);
+  --gray:#7F9BBF; --gray-bg:rgba(127,155,191,.10); --gray-br:rgba(127,155,191,.30);
+  --val-neutral:linear-gradient(135deg,#9CCBFB,#A8EEFF); --val-ok:linear-gradient(135deg,#3BE58A,#9DF0DA);
+  --val-warn:linear-gradient(135deg,#FFC23D,#FFE0A6); --val-crit:linear-gradient(135deg,#FF5A4E,#FFA3B1);
+  --val-unk:linear-gradient(135deg,#4F6E94,#7F9BBF);
+  --radius:8px; --radius-sm:5px;
+  color-scheme:dark;
+}
+html:not([data-theme="dark"]) body.pg-future{   /* sky morning */
+  --fv-ice:#1E7FD6; --fv-line:rgba(40,140,230,.22); --fv-line-hi:rgba(30,130,225,.60);
+  --fv-title:#163A62; --fv-title-glow:rgba(90,180,255,.45); --fv-bar:rgba(255,255,255,.46); --fv-bar-solid:rgba(246,251,255,.97);
+  --fv-grid:rgba(60,150,235,.32); --fv-horizon:rgba(120,205,255,.95); --fv-horizon-glow:rgba(110,200,255,.55);
+  --fv-nav-hi:#0F2A4A; --fv-input:rgba(255,255,255,.55); --fv-tint:rgba(50,150,240,.08);
+  --fv-sky:radial-gradient(70% 50% at 50% 0%,rgba(160,212,255,.95) 0%,rgba(190,228,255,.5) 45%,transparent 75%),
+           radial-gradient(40% 40% at 88% 30%,rgba(170,232,250,.6),transparent 70%),
+           radial-gradient(36% 40% at 10% 40%,rgba(185,225,255,.55),transparent 70%),
+           linear-gradient(#E2F1FF 0%,#EDF7FF 55%,#F4FBFF 100%);
+  --fv-dot:rgba(30,120,210,.06);
+  --paper:#EEF7FF; --bg:#EEF7FF; --text:#17304F; --muted:#4F6A8A; --muted-dim:#8AA2BD;
+  --card:rgba(255,255,255,.45); --card-hover:rgba(50,150,240,.07); --hair-2:rgba(40,140,230,.30);
+  --mist:rgba(40,140,230,.08); --cloud:#F5FAFF;
+  --gl-bg:rgba(255,255,255,.42); --gl-bg-2:rgba(255,255,255,.26); --gl-solid:rgba(246,251,255,.95);
+  --gl-line:rgba(30,110,200,.12); --gl-shadow:0 14px 36px rgba(40,120,210,.16),0 2px 6px rgba(40,120,210,.06);
+  --gl-sheen:linear-gradient(135deg,rgba(255,255,255,.75) 0%,rgba(255,255,255,.18) 34%,rgba(255,255,255,0) 60%);
+  --gl-inner:inset 0 1px 0 rgba(255,255,255,.95);
+  --green:#1F9A6C; --green-bg:rgba(126,222,178,.26); --green-br:rgba(80,190,140,.40);
+  --amber:#B86E0C; --amber-bg:rgba(255,206,130,.30); --amber-br:rgba(230,165,60,.45);
+  --red:#C93535; --red-bg:rgba(255,165,160,.24); --red-br:rgba(225,95,90,.45);
+  --info:#4A6FD1; --info-bg:rgba(160,195,255,.28); --info-br:rgba(110,150,235,.40);
+  --gray:#6E7395; --gray-bg:rgba(170,170,205,.20); --gray-br:rgba(140,140,185,.32);
+  --val-neutral:linear-gradient(135deg,#1E78D8,#36B4E8); --val-ok:linear-gradient(135deg,#17966A,#3FBBA6);
+  --val-warn:linear-gradient(135deg,#D27D12,#E9A93F); --val-crit:linear-gradient(135deg,#D23A3A,#EE6B5E);
+  --val-unk:linear-gradient(135deg,#8AA2BD,#ADC0D4);
+  color-scheme:light;
+}
+body.pg-future::before{background:
+  radial-gradient(circle at 1px 1px,var(--fv-dot) 1px,transparent 1.4px) 0 0/28px 28px,var(--fv-sky)}
+/* the floor grid, fixed to the bottom of the screen */
+body.pg-future::after{content:"";position:fixed;z-index:-1;pointer-events:none;left:-50%;right:-50%;bottom:-4%;height:34vh;
+  background:
+    linear-gradient(var(--fv-grid) 1px,transparent 1px) 0 0/100% 44px,
+    linear-gradient(90deg,var(--fv-grid) 1px,transparent 1px) 0 0/44px 100%;
+  transform:perspective(420px) rotateX(64deg);transform-origin:50% 0;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,#000 35%,#000 70%,transparent 100%);
+          mask-image:linear-gradient(to bottom,transparent 0%,#000 35%,#000 70%,transparent 100%)}
+body.pg-future main::after{content:"";position:fixed;z-index:-1;pointer-events:none;left:0;right:0;bottom:34vh;height:1px;
+  background:linear-gradient(90deg,transparent,var(--fv-horizon),transparent);box-shadow:0 0 24px 4px var(--fv-horizon-glow)}
+/* HUD panes: corner brackets drawn as gradients, so any element can wear them */
+.pg-future .hud,.pg-future .kpi,.pg-future .card{
+  background:
+    linear-gradient(var(--fv-line-hi),var(--fv-line-hi)) left top/14px 1px no-repeat,
+    linear-gradient(var(--fv-line-hi),var(--fv-line-hi)) left top/1px 14px no-repeat,
+    linear-gradient(var(--fv-line-hi),var(--fv-line-hi)) right top/14px 1px no-repeat,
+    linear-gradient(var(--fv-line-hi),var(--fv-line-hi)) right top/1px 14px no-repeat,
+    linear-gradient(var(--fv-line-hi),var(--fv-line-hi)) left bottom/14px 1px no-repeat,
+    linear-gradient(var(--fv-line-hi),var(--fv-line-hi)) left bottom/1px 14px no-repeat,
+    linear-gradient(var(--fv-line-hi),var(--fv-line-hi)) right bottom/14px 1px no-repeat,
+    linear-gradient(var(--fv-line-hi),var(--fv-line-hi)) right bottom/1px 14px no-repeat,
+    var(--gl-sheen),var(--gl-bg);
+  border:1px solid var(--fv-line);border-radius:var(--radius);
+  backdrop-filter:blur(22px) saturate(1.6);-webkit-backdrop-filter:blur(22px) saturate(1.6);
+  box-shadow:var(--gl-shadow),var(--gl-inner)}
+.pg-future .topbar,.pg-future .sidebar{background:var(--gl-sheen),var(--fv-bar);border-color:var(--fv-line);box-shadow:var(--gl-shadow),var(--gl-inner)}
+.pg-future .topbar h2{font-family:var(--display);font-weight:100;font-size:22px;letter-spacing:.32em;text-transform:uppercase;
+  color:var(--fv-title);text-shadow:0 0 16px var(--fv-title-glow)}
+.pg-future .topbar .sub{color:var(--muted)}
+.pg-future .brand .mark{background:rgba(255,255,255,.95);box-shadow:0 0 18px var(--fv-title-glow)}
+.pg-future .nav-item{color:var(--muted)}
+.pg-future .nav-item:hover{background:var(--fv-tint);color:var(--fv-nav-hi)}
+.pg-future .nav-item.active{background:var(--fv-tint);color:var(--fv-nav-hi);box-shadow:inset 0 0 0 1px var(--fv-line-hi),0 0 18px var(--fv-title-glow)}
+.pg-future .side-foot{background:var(--fv-tint);border-color:var(--fv-line)}
+.pg-future .side-foot .row span:last-child{background:var(--fv-tint);color:var(--fv-ice)}
+.pg-future .btn{background:var(--gl-sheen),var(--fv-tint);border:1px solid var(--fv-line);color:var(--fv-ice);box-shadow:none;border-radius:6px}
+.pg-future .btn:hover{background:var(--gl-sheen),var(--gl-bg);border-color:var(--fv-line-hi);color:var(--fv-nav-hi);box-shadow:0 0 14px var(--fv-title-glow)}
+.pg-future .btn-primary,.pg-future .btn.primary{background:linear-gradient(135deg,#4FB6F7,#1E88E5);color:#fff;border:0;box-shadow:0 0 18px rgba(30,136,229,.40)}
+.pg-future .input,.pg-future select.input{background:var(--fv-input);border:1px solid var(--fv-line);color:var(--text);border-radius:6px}
+.pg-future .input::placeholder{color:var(--muted-dim)}
+.pg-future .input:focus{border-color:var(--fv-line-hi);box-shadow:0 0 0 3px var(--fv-tint)}
+.pg-future .kpi::before{display:none}
+.pg-future .chip{border-radius:4px}
+.pg-future .c-critical{background:var(--red-bg);color:var(--red);border-color:var(--red-br);box-shadow:0 0 12px var(--red-br)}
+.pg-future .c-critical::before{background:var(--red)}
+.pg-future .banner{background:var(--amber-bg);border:1px solid var(--amber-br);color:var(--amber);border-radius:6px}
+.pg-future .hb path{stroke:var(--fv-ice);filter:drop-shadow(0 0 4px var(--fv-title-glow))}
+@media (max-width:900px){.pg-future .mnav.open{background:var(--fv-bar-solid)}}
+@media (prefers-reduced-motion:reduce){body.pg-future::after{display:none}}
+
+/* =========================================================================
+   Live wall skin (body.pg-wall) — full glassmorphism.
+   Stronger pastel fields, the deepest frost on any page, see-through tiles
+   divided by light hairlines. Trouble tints the glass and glows; nothing
+   blinks.
+   ========================================================================= */
+body.pg-wall{--field-a:rgba(120,195,255,.95); --field-b:rgba(160,222,255,.90); --field-c:rgba(130,225,240,.80);
+  --field-d:rgba(175,215,255,.85); --field-e:rgba(140,205,255,.70);
+  --gl-bg:rgba(255,255,255,.34); --gl-bg-2:rgba(255,255,255,.22); --gl-blur:blur(32px) saturate(2)}
+html[data-theme="dark"] body.pg-wall{--field-a:rgba(60,150,240,.42); --field-b:rgba(80,190,250,.30); --field-c:rgba(40,190,210,.24);
+  --field-d:rgba(90,160,255,.16); --field-e:rgba(70,170,240,.18);
+  --gl-bg:rgba(18,40,66,.42); --gl-bg-2:rgba(18,40,66,.26)}

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Team &amp; access</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .cols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;align-items:start}
+  .stack{display:flex;flex-direction:column;gap:18px}
+  .me-role{font-family:var(--display);font-weight:300;font-size:30px;letter-spacing:-.02em;line-height:1.1;
+    background:var(--val-neutral);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;display:inline-block}
+  .muted{color:var(--muted);font-size:12.5px}
+  .dim{color:var(--muted-dim);font-size:11.5px}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;
+    background:var(--info-bg);border:1px solid var(--info-br);color:var(--info)}
+  .tag button{border:0;background:none;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0;opacity:.7}
+  .tag button:hover{opacity:1}
+  .tag.all{background:var(--green-bg);border-color:var(--green-br);color:var(--green)}
+  .checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;margin:8px 0 14px}
+  .checks label{display:flex;gap:7px;align-items:center;font-size:13px}
+  .form-row{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+  .form-row > span{font-size:12px;font-weight:600;color:var(--muted)}
+  .form-row .input{width:100%}
+  .st{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid var(--border)}
+  .st-pending{color:var(--amber);background:var(--amber-bg);border-color:var(--amber-br)}
+  .st-approved{color:var(--green);background:var(--green-bg);border-color:var(--green-br)}
+  .st-rejected,.st-withdrawn{color:var(--gray);background:var(--gray-bg);border-color:var(--gray-br)}
+  td .input{padding:6px 9px;font-size:12px}
+  td.who b{display:block;font-weight:600}
+  .people-tools{display:flex;gap:10px;align-items:center;margin-left:auto}
+  .msg{margin-top:10px;font-size:12.5px;padding:9px 12px;border-radius:10px;display:none}
+  .msg.ok{display:block;background:var(--green-bg);border:1px solid var(--green-br);color:var(--green)}
+  .msg.err{display:block;background:var(--red-bg);border:1px solid var(--red-br);color:var(--red)}
+  .msg code{word-break:break-all;font-size:11.5px}
+  .guide td{vertical-align:top;font-size:12.5px} .guide td:first-child{font-weight:600;white-space:nowrap}
+  .lvl{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px}
+  .l3{background:var(--red)} .l2{background:var(--info)} .l1{background:var(--green)}
+  .flag{font-size:10.5px;font-weight:700;color:var(--amber)}
+  @media (max-width:1100px){.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Team &amp; access</h2><div class="sub">Who can see and change which project</div></div>
+    <div class="top-actions">
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="banner"></div>
+    <div class="cols">
+      <div class="stack">
+        <div class="card" id="decide-card" style="display:none">
+          <div class="card-h"><h3>Requests waiting for you</h3><span class="dim" id="decide-count"></span></div>
+          <div id="decide"></div>
+        </div>
+
+        <div class="card" id="people-card" style="display:none">
+          <div class="card-h"><h3>People</h3>
+            <div class="people-tools"><input class="input" id="q" placeholder="Search name, e-mail, project…" style="width:240px"></div>
+          </div>
+          <div style="overflow-x:auto"><table><thead><tr><th>Person</th><th>Role</th><th>Projects</th><th>Status</th><th></th></tr></thead>
+            <tbody id="people"></tbody></table></div>
+          <div class="msg" id="people-msg" style="margin:0 18px 16px"></div>
+        </div>
+
+        <div class="card" id="invite-card" style="display:none">
+          <div class="card-h"><h3>Add a person</h3><span class="dim">They get a mail with a link to choose their password</span></div>
+          <div class="card-b">
+            <div class="grid g2">
+              <label class="form-row"><span>E-mail</span><input class="input" id="inv-email" type="email" placeholder="name@company.com"></label>
+              <label class="form-row"><span>Full name</span><input class="input" id="inv-name"></label>
+            </div>
+            <label class="form-row" style="max-width:320px"><span>Role</span><select class="input" id="inv-role"></select></label>
+            <div class="form-row"><span>Projects</span><div class="checks" id="inv-projects"></div></div>
+            <button class="btn btn-primary" id="inv-go">Create account and send mail</button>
+            <div class="msg" id="inv-msg"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h"><h3>What each role can do</h3></div>
+          <table class="guide"><tbody>
+            <tr><td><span class="lvl l3"></span>Admin</td><td>Every project. Adds systems, changes settings and thresholds, manages every user and every role.</td></tr>
+            <tr><td><span class="lvl l2"></span>Manager</td><td>His projects: everything a team leader does, plus approves access requests and adds people to his projects as team leader, senior consultant, consultant, viewer or client.</td></tr>
+            <tr><td><span class="lvl l2"></span>Team leader</td><td>His projects: runs and stops sweeps, snoozes and acknowledges alerts, incident actions.</td></tr>
+            <tr><td><span class="lvl l2"></span>Senior consultant</td><td>Same as team leader.</td></tr>
+            <tr><td><span class="lvl l1"></span>Consultant</td><td>His projects, read-only: sees everything, changes nothing.</td></tr>
+            <tr><td><span class="lvl l1"></span>Viewer</td><td>His projects, read-only.</td></tr>
+            <tr><td><span class="lvl l1"></span>Client</td><td>His own project, read-only. Only an admin or manager can create a client account.</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="card-h"><h3>Your access</h3></div>
+          <div class="card-b">
+            <div class="me-role" id="me-role">–</div>
+            <div class="muted" id="me-who" style="margin:4px 0 12px"></div>
+            <div class="tags" id="me-projects"></div>
+          </div>
+        </div>
+
+        <div class="card" id="ask-card">
+          <div class="card-h"><h3>Ask for access</h3></div>
+          <div class="card-b">
+            <div class="muted" style="margin-bottom:6px">Pick the projects you work on. Their manager gets a mail and approves it here.</div>
+            <div class="checks" id="ask-projects"></div>
+            <label class="form-row"><span>Role you need</span><select class="input" id="ask-role"></select></label>
+            <label class="form-row"><span>Note for the manager (optional)</span><input class="input" id="ask-note" placeholder="e.g. joining the CEAT AMS team"></label>
+            <button class="btn btn-primary" id="ask-go">Send request</button>
+            <div class="msg" id="ask-msg"></div>
+          </div>
+        </div>
+
+        <div class="card" id="mine-card" style="display:none">
+          <div class="card-h"><h3>Your requests</h3></div>
+          <div id="mine"></div>
+        </div>
+
+        <div class="card" id="pw-card" style="display:none">
+          <div class="card-h"><h3>Change your password</h3></div>
+          <div class="card-b">
+            <label class="form-row"><span>Current password</span><input class="input" id="pw-cur" type="password" autocomplete="current-password"></label>
+            <label class="form-row"><span>New password</span><input class="input" id="pw-new" type="password" autocomplete="new-password"></label>
+            <label class="form-row"><span>Repeat new password</span><input class="input" id="pw-new2" type="password" autocomplete="new-password"></label>
+            <button class="btn" id="pw-go">Change password</button>
+            <div class="msg" id="pw-msg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=ds6"></script>
+<script>
+IB.mountShell("team");
+IB.themeToggle(document.getElementById("theme"));
+const $ = id => document.getElementById(id);
+const esc = IB.esc;
+let T = null;
+
+function say(id, ok, html) { const m = $(id); m.className = "msg " + (ok ? "ok" : "err"); m.innerHTML = html; }
+
+async function send(url, body) {
+  const r = await IB.post(url, { body: JSON.stringify(body || {}), headers: { "Content-Type": "application/json" } });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || ("HTTP " + r.status));
+  return data;
+}
+
+const roleLabel = id => ((T.roles || []).find(r => r.id === id) || {}).label || id;
+const options = (list, sel) => list.map(r => `<option value="${esc(r.id)}" ${r.id === sel ? "selected" : ""}>${esc(r.label)}</option>`).join("");
+const projectTags = (p, removable) => p === "*"
+  ? `<span class="tag all">All projects</span>`
+  : (p.length ? p.map(x => `<span class="tag">${esc(x)}${removable && T.managed_projects.includes(x)
+      ? ` <button title="Remove ${esc(x)}" data-act="rm" data-p="${esc(x)}">×</button>` : ""}</span>`).join("")
+      : `<span class="dim">No project yet</span>`);
+
+function renderMe() {
+  const me = T.me;
+  $("me-role").textContent = me.role_label || me.role;
+  $("me-who").textContent = [me.full_name, me.email || me.username].filter(Boolean).join(" · ");
+  $("me-projects").innerHTML = projectTags(me.projects, false);
+  $("pw-card").style.display = me.has_account ? "" : "none";
+
+  const free = me.projects === "*" ? [] : T.projects.filter(p => !me.projects.includes(p));
+  const pending = new Set(T.requests.mine.filter(r => r.status === "pending").map(r => r.project));
+  $("ask-card").style.display = me.has_account && free.length ? "" : "none";
+  $("ask-projects").innerHTML = free.map(p => `<label><input type="checkbox" value="${esc(p)}" ${pending.has(p) ? "disabled" : ""}>
+      ${esc(p)}${pending.has(p) ? ` <span class="flag">asked</span>` : ""}</label>`).join("");
+  $("ask-role").innerHTML = `<option value="">Let the manager decide</option>` + options(T.requestable_roles, "");
+
+  const mine = T.requests.mine;
+  $("mine-card").style.display = mine.length ? "" : "none";
+  $("mine").innerHTML = mine.length ? `<table><tbody>${mine.map(r => `<tr>
+      <td><b>${esc(r.project)}</b><div class="dim">${esc(r.created_at)}${r.decided_by ? " · by " + esc(r.decided_by) : ""}</div>
+        ${r.decision_note ? `<div class="dim">${esc(r.decision_note)}</div>` : ""}</td>
+      <td><span class="st st-${esc(r.status)}">${esc(r.status)}</span>${r.status === "approved" && r.decided_role ? `<div class="dim">${esc(roleLabel(r.decided_role))}</div>` : ""}</td>
+      <td>${r.status === "pending" ? `<button class="btn" data-withdraw="${r.id}">Withdraw</button>` : ""}</td></tr>`).join("")}</tbody></table>` : "";
+}
+
+function renderDecide() {
+  const list = T.requests.to_decide;
+  const canManage = T.grantable_roles.length > 0;
+  $("decide-card").style.display = canManage ? "" : "none";
+  $("decide-count").textContent = list.length ? `${list.length} open` : "";
+  $("decide").innerHTML = list.length ? `<table><thead><tr><th>Person</th><th>Project</th><th>Role to give</th><th>Note</th><th></th></tr></thead><tbody>
+    ${list.map(r => `<tr data-req="${r.id}">
+      <td class="who"><b>${esc(r.full_name || r.username)}</b><span class="dim">${esc(r.email || r.username)} · now ${esc(r.current_role_label || "—")}</span></td>
+      <td><span class="tag">${esc(r.project)}</span></td>
+      <td><select class="input" data-role>${options(T.grantable_roles, r.role_wanted || r.current_role || "consultant")}</select></td>
+      <td class="dim" style="max-width:220px">${esc(r.note || "")}</td>
+      <td style="white-space:nowrap"><button class="btn btn-primary" data-decide="1">Approve</button>
+        <button class="btn" data-decide="0">Reject</button></td></tr>`).join("")}</tbody></table>`
+    : `<div class="empty">No open requests.</div>`;
+}
+
+function renderPeople() {
+  const lead = ["team_lead", "operator"].includes(T.me.role);
+  const canManage = T.grantable_roles.length > 0 || lead;
+  $("people-card").style.display = canManage ? "" : "none";
+  $("invite-card").style.display = T.grantable_roles.length > 0 ? "" : "none";
+  if (!canManage) return;
+  const q = $("q").value.trim().toLowerCase();
+  const rows = T.users.filter(u => !q || [u.username, u.email, u.full_name, u.role_label,
+    u.projects === "*" ? "all" : u.projects.join(" ")].join(" ").toLowerCase().includes(q));
+  const addable = u => u.projects === "*" ? [] : T.managed_projects.filter(p => !u.projects.includes(p));
+  $("people").innerHTML = rows.map(u => `<tr data-user="${esc(u.username)}">
+    <td class="who"><b>${esc(u.full_name || u.username)}</b><span class="dim">${esc(u.email || u.username)}</span></td>
+    <td>${u.role_editable && u.username !== T.me.username
+        ? `<select class="input" data-act="role">${options(T.grantable_roles.some(r => r.id === u.role) ? T.grantable_roles
+            : [{ id: u.role, label: u.role_label }].concat(T.grantable_roles), u.role)}</select>`
+        : esc(u.role_label)}</td>
+    <td><div class="tags">${projectTags(u.projects, u.editable)}
+      ${u.editable && addable(u).length ? `<select class="input" data-act="add" style="width:auto"><option value="">+ project</option>
+        ${addable(u).map(p => `<option>${esc(p)}</option>`).join("")}</select>` : ""}</div></td>
+    <td>${u.disabled ? `<span class="st st-rejected">disabled</span>` : !u.email_verified ? `<span class="st st-pending">e-mail not confirmed</span>` : `<span class="st st-approved">active</span>`}
+      <div class="dim">${esc(u.created_by ? "by " + u.created_by : "")}</div></td>
+    <td style="white-space:nowrap">${["senior_consultant", "consultant"].includes(u.role) && u.editable
+        ? `<a class="btn" href="/access?person=${encodeURIComponent(u.username)}#perm" title="What this person may do, per project">Permissions</a>` : ""}
+      ${u.editable && u.username !== T.me.username && !lead ? `
+      <button class="btn" data-act="reset" title="Mail a link to choose a new password">Reset link</button>
+      <button class="btn" data-act="${u.disabled ? "enable" : "disable"}">${u.disabled ? "Enable" : "Disable"}</button>` : ""}</td>
+  </tr>`).join("") || `<tr><td colspan="5" class="empty">Nobody matches.</td></tr>`;
+
+  $("inv-role").innerHTML = options(T.grantable_roles, "consultant");
+  if (!$("inv-projects").dataset.done) {
+    $("inv-projects").innerHTML = T.managed_projects.map(p => `<label><input type="checkbox" value="${esc(p)}"> ${esc(p)}</label>`).join("");
+    $("inv-projects").dataset.done = "1";
+  }
+}
+
+async function load() {
+  try {
+    T = await IB.get("/api/team");
+    renderMe(); renderDecide(); renderPeople();
+  } catch (e) {
+    $("banner").innerHTML = `<div class="banner banner-err">Could not load: ${esc(e.message)}</div>`;
+  }
+}
+
+$("q").oninput = renderPeople;
+
+$("ask-go").onclick = async () => {
+  const projects = [...$("ask-projects").querySelectorAll("input:checked")].map(i => i.value);
+  if (!projects.length) return say("ask-msg", false, "Tick at least one project.");
+  try {
+    const r = await send("/api/access/requests", { projects, role_wanted: $("ask-role").value, note: $("ask-note").value });
+    say("ask-msg", true, r.created.length ? `Sent. The manager of ${esc(r.created.map(x => x.project).join(", "))} got a mail.`
+      : "You already asked for these.");
+    $("ask-note").value = "";
+    load();
+  } catch (e) { say("ask-msg", false, esc(e.message)); }
+};
+
+$("mine").onclick = async ev => {
+  const id = ev.target.dataset.withdraw;
+  if (!id) return;
+  try { await send(`/api/access/requests/${id}/withdraw`); load(); } catch (e) { alert(e.message); }
+};
+
+$("decide").onclick = async ev => {
+  const b = ev.target.closest("[data-decide]");
+  if (!b) return;
+  const tr = b.closest("tr");
+  const approve = b.dataset.decide === "1";
+  let note = "";
+  if (!approve) { note = prompt("Reason (optional, mailed to the person):") ; if (note === null) return; }
+  b.disabled = true;
+  try {
+    const r = await send(`/api/access/requests/${tr.dataset.req}/decide`,
+      { approve, role: tr.querySelector("[data-role]").value, note });
+    if (r.note) alert(r.note);
+    load();
+  } catch (e) { b.disabled = false; alert(e.message); }
+};
+
+async function change(username, body) {
+  try {
+    await send(`/api/team/users/${encodeURIComponent(username)}`, body);
+    say("people-msg", true, "Saved.");
+    load();
+  } catch (e) { say("people-msg", false, esc(e.message)); load(); }
+}
+
+$("people").onclick = async ev => {
+  const b = ev.target.closest("button[data-act]");
+  if (!b) return;
+  const user = b.closest("tr").dataset.user;
+  const act = b.dataset.act;
+  if (act === "rm") {
+    if (confirm(`Remove ${b.dataset.p} from ${user}?`)) change(user, { remove_projects: [b.dataset.p] });
+  } else if (act === "disable" || act === "enable") {
+    if (act === "enable" || confirm(`Disable ${user}? They are signed out at once.`)) change(user, { disabled: act === "disable" });
+  } else if (act === "reset") {
+    try {
+      const r = await send(`/api/team/users/${encodeURIComponent(user)}/reset`);
+      say("people-msg", true, r.mailed ? `A link to choose a new password was mailed to ${esc(user)}.`
+        : `Mail could not be sent. Give ${esc(user)} this link yourself (works once, 72 h):<br><code>${esc(r.link)}</code>`);
+    } catch (e) { say("people-msg", false, esc(e.message)); }
+  }
+};
+
+$("people").onchange = ev => {
+  const el = ev.target;
+  const user = el.closest("tr") && el.closest("tr").dataset.user;
+  if (!user) return;
+  if (el.dataset.act === "role") change(user, { role: el.value });
+  if (el.dataset.act === "add" && el.value) change(user, { add_projects: [el.value] });
+};
+
+$("inv-go").onclick = async () => {
+  const projects = [...$("inv-projects").querySelectorAll("input:checked")].map(i => i.value);
+  try {
+    const r = await send("/api/team/users", { email: $("inv-email").value, full_name: $("inv-name").value,
+      role: $("inv-role").value, projects });
+    say("inv-msg", true, r.mailed ? `Account created. ${esc(r.user.email)} got a mail to choose a password.`
+      : `Account created, but the mail could not be sent. Give them this link yourself (works once, 72 h):<br><code>${esc(r.link)}</code>`);
+    $("inv-email").value = ""; $("inv-name").value = "";
+    $("inv-projects").querySelectorAll("input").forEach(i => { i.checked = false; });
+    load();
+  } catch (e) { say("inv-msg", false, esc(e.message)); }
+};
+
+$("pw-go").onclick = async () => {
+  if ($("pw-new").value !== $("pw-new2").value) return say("pw-msg", false, "The two new passwords differ.");
+  try {
+    const r = await send("/api/me/password", { current: $("pw-cur").value, new: $("pw-new").value });
+    say("pw-msg", true, esc(r.detail));
+    setTimeout(() => { location.href = "/login?next=/team"; }, 1500);
+  } catch (e) { say("pw-msg", false, esc(e.message)); }
+};
+
+load();
+</script>
+</body>
+</html>

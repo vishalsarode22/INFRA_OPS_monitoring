@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Runbook</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .pick{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+  .step{display:grid;grid-template-columns:34px 1fr;gap:12px;padding:14px 18px;border-top:1px solid var(--border)}
+  .step:first-child{border-top:0}
+  .step input[type=checkbox]{width:20px;height:20px;margin-top:2px;cursor:pointer}
+  .step .tx{font-size:13.5px;font-weight:600;line-height:1.45}
+  .step.done .tx{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--green)}
+  .step .dt{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
+  .step .by{font-size:11px;color:var(--green);margin-top:4px;font-family:var(--mono)}
+  .step .note{display:flex;gap:6px;margin-top:6px}
+  .step .note input{flex:1;font-size:12px;padding:6px 10px}
+  .prog{height:6px;border-radius:6px;background:var(--mist);overflow:hidden;margin-top:8px}
+  .prog span{display:block;height:100%;background:var(--green)}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2 id="title">Runbook</h2><div class="sub" id="sub">Step-by-step, ticked with your name and the time</div></div>
+    <div class="top-actions"><button class="btn" id="theme">◑ Light</button></div>
+  </div>
+  <div class="content">
+    <div class="pick">
+      <select class="input" id="rb"></select>
+      <select class="input" id="sys"><option value="">— choose the system —</option></select>
+      <input class="input" type="date" id="day" title="A run is one runbook for one system on one day">
+      <a class="btn" id="tl" href="#">Timeline</a>
+    </div>
+    <div class="card"><div class="card-h"><h3 id="rbtitle">…</h3><span id="count" class="mono" style="font-size:12px"></span></div>
+      <div class="card-b" style="padding:0"><div id="steps"></div></div>
+      <div style="padding:0 18px 14px"><div class="prog"><span id="bar" style="width:0"></span></div></div>
+    </div>
+    <p style="margin-top:12px;font-size:11.5px;color:var(--muted-dim)">Runbooks live in
+      <span class="mono">config/runbooks.yaml</span> — edit them there; the page reads the file every time.</p>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script src="/static/ops.js?v=ops1"></script>
+<script>
+IB.mountShell("ops");
+IB.themeToggle(document.getElementById("theme"));
+const P = new URLSearchParams(location.search);
+let VIEW = null;
+
+function render() {
+  const v = VIEW;
+  document.getElementById("rbtitle").textContent = v.runbook ? v.runbook.title : "";
+  const steps = v.steps || [];
+  const sys = document.getElementById("sys").value;
+  document.getElementById("count").textContent = sys ? `${v.done || 0} of ${v.total || steps.length} done` : "choose a system to tick steps";
+  document.getElementById("bar").style.width = sys && steps.length ? `${100 * (v.done || 0) / steps.length}%` : "0";
+  document.getElementById("steps").innerHTML = steps.map((s, i) => `<div class="step ${s.done ? "done" : ""}">
+    <div><input type="checkbox" ${s.done ? "checked" : ""} ${sys ? "" : "disabled"} onchange="tick(${i}, this.checked)"></div>
+    <div><div class="tx">${i + 1}. ${IB.esc(s.text)}</div>
+      ${s.detail ? `<div class="dt">${IB.esc(s.detail)}</div>` : ""}
+      ${s.by ? `<div class="by">✓ ${IB.esc(s.by)} · ${IB.esc(String(s.at).slice(0, 16))}${s.note ? " — " + IB.esc(s.note) : ""}</div>` : ""}
+      ${sys && !s.done ? `<div class="note"><input class="input" id="note-${i}" placeholder="note (optional), then tick"></div>` : ""}
+    </div></div>`).join("");
+}
+
+async function load() {
+  const id = document.getElementById("rb").value;
+  const sys = document.getElementById("sys").value;
+  const day = document.getElementById("day").value;
+  document.getElementById("tl").href = "/timeline" + (sys ? `?system=${encodeURIComponent(sys)}` : "");
+  document.getElementById("title").textContent = "Runbook" + (sys ? ` — ${sys}` : "");
+  try {
+    VIEW = await IB.get(`/api/ops/runbook?id=${encodeURIComponent(id)}` + (sys ? `&system=${encodeURIComponent(sys)}` : "")
+                        + (day ? `&day=${day}` : ""));
+    if (!VIEW.runbook) VIEW = { runbook: VIEW.runbook || { title: "" }, steps: VIEW.steps || [] };
+    render();
+  } catch (e) {
+    document.getElementById("steps").innerHTML = `<div class="banner banner-err" style="margin:14px">${IB.esc(e.message)}</div>`;
+  }
+}
+
+async function tick(i, done) {
+  const note = (document.getElementById("note-" + i) || {}).value || "";
+  try {
+    VIEW = await OPS.post("/api/ops/runbook/tick", { run_key: VIEW.run_key, step: i, done, note });
+    render();
+  } catch (e) { OPS.toast(e.message, "err"); load(); }
+}
+
+(async () => {
+  const today = new Date();
+  document.getElementById("day").value = OPS.localStamp(today).slice(0, 10);
+  if (P.get("day")) document.getElementById("day").value = P.get("day");
+  const list = (await IB.get("/api/ops/runbooks")).runbooks || [];
+  let chosen = P.get("id");
+  if (!chosen && (P.get("kind") || P.get("metric"))) {
+    try {
+      const r = await IB.get(`/api/ops/runbook?kind=${encodeURIComponent(P.get("kind") || "")}&metric=${encodeURIComponent(P.get("metric") || "")}`);
+      chosen = r.runbook && r.runbook.id;
+    } catch (e) {}
+  }
+  document.getElementById("rb").innerHTML = list.map(r =>
+    `<option value="${IB.esc(r.id)}">${IB.esc(r.title)}</option>`).join("");
+  if (chosen) document.getElementById("rb").value = chosen;
+  try {
+    const s = await IB.get("/api/systems");
+    document.getElementById("sys").innerHTML += (s.systems || s || []).map(x =>
+      `<option>${IB.esc(x.name || x)}</option>`).join("") + `<option value="IBOPS">IBOPS (platform)</option>`;
+  } catch (e) {}
+  if (P.get("system")) document.getElementById("sys").value = P.get("system");
+  ["rb", "sys", "day"].forEach(id => document.getElementById(id).onchange = load);
+  load();
+})();
+</script>
+</body>
+</html>

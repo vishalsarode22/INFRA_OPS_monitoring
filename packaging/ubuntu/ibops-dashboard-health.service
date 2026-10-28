@@ -1,0 +1,6 @@
+[Unit]
+Description=InfraBeatOps dashboard health check (restarts it when hung)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ibops-dashboard-health

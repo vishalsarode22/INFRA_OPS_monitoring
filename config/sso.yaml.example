@@ -1,0 +1,19 @@
+# Who may sign in with Microsoft (core/sso.py), and with which role.
+# Copy to config/sso.yaml. Read at every sign-in.
+
+allowed_domains: [infrabeat.com]
+
+roles:                       # first match wins: admin, then operator, then viewer
+  admin: []                  # e.g. [staff.a@infrabeat.com]
+  operator: ["*@infrabeat.com"]
+  viewer: []
+
+# Entra group object IDs -> role (needs the "groups" claim in Token configuration).
+groups: {}
+
+# Customer scope by address pattern; default is every customer.
+customers: {}
+#  "*@metro.example": Metro
+
+# Anyone not matched above: none (refused), viewer, operator or admin.
+default_role: none

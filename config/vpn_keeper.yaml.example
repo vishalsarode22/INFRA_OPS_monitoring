@@ -1,0 +1,20 @@
+# Automatic reconnect of the client VPNs on the Windows monitoring VM
+# (core/vpn_keeper.py). Copy to config/vpn_keeper.yaml and restart the dashboard.
+#
+# Needs FortiSSLVPNclient.exe (Fortinet "FortiClientTools" package; ask IT /
+# the Fortinet support portal). Put it in <project>\tools\ or set
+# IBO_FORTISSLVPN_EXE=C:\path\to\FortiSSLVPNclient.exe in .env.
+# Use the 32-bit (x86) build with FortiClient 7.0.3 and later.
+#
+# The user name and password go in .env, never here:
+#   AG_VPN_USERNAME=...
+#   AG_VPN_PASSWORD=...
+vpns:
+  - name: AG
+    gateway: 203.0.113.74:10443
+    username: ${AG_VPN_USERNAME}
+    password: ${AG_VPN_PASSWORD}
+    # The systems behind this VPN. Their RFC hosts are tested every minute;
+    # 2 failures in a row = the tunnel is down and it is reconnected.
+    systems: [CARFOUR QAS, CARFOUR PRD, CARFOUR PRDDUCTION, CAR PRD, PS4]
+    # probe: 198.51.100.213:3300    # optional: test these host:port instead

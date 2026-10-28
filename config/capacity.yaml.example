@@ -1,0 +1,12 @@
+# Capacity forecasting (core/capacity.py). Optional: without this file,
+# file systems (disk_*) and any "% used" metric are forecast against 100 %.
+# Copy to config/capacity.yaml to change limits or add metrics.
+
+# Alert Basis (once a day) when something is forecast to run out within:
+warn_days: 30
+
+metrics:
+  # Plan for 95 %, not 100 %, on file systems:
+  "disk_*": {limit: 95, unit: "%", label: "File system"}
+  # A metric with an absolute limit, if a collector provides it:
+  # db.size_gb: {limit: 2048, unit: " GB", label: "Database size"}

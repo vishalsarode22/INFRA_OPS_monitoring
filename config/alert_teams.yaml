@@ -1,0 +1,9 @@
+# Alert teams and their mail addresses (Thresholds & alerts page).
+# Public copy: real addresses live only on the monitoring VM.
+standard:
+  ABAP: []
+  Basis: []
+  FI: []
+  MM: []
+  SD: []
+systems: {}

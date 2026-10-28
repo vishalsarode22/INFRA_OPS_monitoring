@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Settings</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .sgrid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));align-items:start}
+  @media (max-width:560px){.sgrid{grid-template-columns:1fr}}
+  .srow{display:flex;gap:14px;align-items:flex-start;padding:12px 18px;border-top:1px solid var(--border)}
+  .srow:first-child{border-top:0}
+  .srow .tx{flex:1;min-width:0}
+  .srow .n{font-weight:700;font-size:13px}
+  .srow .h{color:var(--muted);font-size:12px;margin-top:2px;overflow-wrap:anywhere}
+  .srow .d{color:var(--muted-dim);font-size:11px;margin-top:2px}
+  .sw{position:relative;width:42px;height:24px;flex:none;margin-top:2px}
+  .sw input{opacity:0;width:0;height:0;position:absolute}
+  .sw span{position:absolute;inset:0;border-radius:999px;background:var(--gray);transition:.15s;cursor:pointer}
+  .sw span:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.15s}
+  .sw input:checked + span{background:var(--green)}
+  .sw input:checked + span:before{transform:translateX(18px)}
+  .sw input:disabled + span{opacity:.5;cursor:not-allowed}
+  .sw input:focus-visible + span{outline:2px solid var(--brand-live);outline-offset:2px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .em{display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;border:1px solid var(--border);
+      border-radius:999px;font-size:12px;font-family:var(--mono);background:var(--card)}
+  .em button{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 4px}
+  .em button:hover{color:var(--red)}
+  .addr{display:flex;gap:6px;margin-top:8px}
+  .addr input{flex:1;min-width:0}
+  .vst{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid}
+  .v-up{color:var(--green);border-color:var(--green-br);background:var(--green-bg)}
+  .v-off{color:var(--muted);border-color:var(--border);background:var(--card)}
+  .v-bad{color:var(--red);border-color:var(--red-br);background:var(--red-bg)}
+  .v-wait{color:var(--amber);border-color:var(--amber-br);background:var(--amber-bg)}
+  .vbtns{display:flex;gap:6px;flex:none}
+  .ro{font-size:12px;color:var(--amber);padding:10px 18px;border-bottom:1px solid var(--border)}
+  .dirty{border-color:var(--amber) !important}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Settings</h2>
+      <div class="sub">Switch features, change who gets the alerts, connect or disconnect the client VPN — applied at once, logged on the Timeline</div></div>
+    <div class="top-actions">
+      <a class="btn" href="/timeline?system=IBOPS">Change log</a>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div id="msg"></div>
+    <div class="sgrid">
+      <div class="card"><div class="card-h"><h3>Features</h3></div><div id="ro1"></div><div id="features">
+        <div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading…</span></div></div></div>
+      <div>
+        <div class="card" style="margin-bottom:16px"><div class="card-h"><h3>Client VPN</h3>
+          <span style="font-size:11px;color:var(--muted-dim)">refreshes every 15 s</span></div><div id="vpns"></div></div>
+        <div class="card" style="margin-bottom:16px"><div class="card-h"><h3>Who gets the alerts</h3></div><div id="mails"></div></div>
+        <div class="card" id="secrets-card"><div class="card-h"><h3>Passwords and tokens</h3>
+          <span style="font-size:11px;color:var(--muted-dim)">write-only — never shown</span></div><div id="secrets"></div></div>
+      </div>
+    </div>
+    <div style="margin-top:14px;font-size:11px;color:var(--muted-dim)">Each dashboard has its own settings (Windows
+      and Ubuntu are set separately). Passwords and tokens are not shown or changed here.</div>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script src="/static/ops.js?v=ops1"></script>
+<script>
+IB.mountShell("settings");
+IB.themeToggle(document.getElementById("theme"));
+let DATA = null, EDIT = false;
+const pending = {};        // mail list key -> array being edited
+
+function showMsg(text, kind) {
+  document.getElementById("msg").innerHTML = text
+    ? `<div class="banner ${kind === "err" ? "banner-err" : ""}" style="margin-bottom:14px">${IB.esc(text)}</div>` : "";
+}
+
+function renderFeatures() {
+  document.getElementById("ro1").innerHTML = EDIT ? "" :
+    `<div class="ro">Read only — an admin can change these.</div>`;
+  document.getElementById("features").innerHTML = DATA.features.map(f => `
+    <div class="srow"><label class="sw" title="${f.on ? "On" : "Off"}">
+        <input type="checkbox" data-k="${OPS.esc(f.key)}" ${f.on ? "checked" : ""} ${EDIT ? "" : "disabled"}
+               aria-label="${OPS.esc(f.label)}"><span></span></label>
+      <div class="tx"><div class="n">${IB.esc(f.label)}</div><div class="h">${IB.esc(f.help)}</div>
+        <div class="d mono">${IB.esc(f.key)}${f.set ? "" : ` · not set, default ${f.default ? "on" : "off"}`}</div></div></div>`).join("");
+  document.querySelectorAll("#features input").forEach(el => el.onchange = () => toggle(el));
+}
+
+async function toggle(el) {
+  const key = el.dataset.k, on = el.checked;
+  const f = DATA.features.find(x => x.key === key);
+  if (key === "IBO_ACTIONS_ENABLED" && on) {
+    const ok = await OPS.dialog("Allow one-click actions?",
+      `<p style="font-size:13px">People with the right role will be able to <b>change SAP systems</b> from the dashboard:
+       restart jobs, release locks, restart queues, unlock users, cancel jobs. Each action still shows what it touches
+       first, asks for confirmation (or a second person), and is logged. Each system also needs <span class="mono">actions:</span>
+       in systems.yaml.</p>`, "Allow", async () => true);
+    if (!ok) { el.checked = false; return; }
+  }
+  el.disabled = true;
+  try {
+    await OPS.post("/api/settings", { features: { [key]: on } }, "Saving…");
+    f.on = on; f.set = true;
+    OPS.toast(`${f.label}: ${on ? "on" : "off"}`);
+  } catch (e) {
+    el.checked = !on;
+    OPS.toast(e.message, "err");
+  } finally { el.disabled = !EDIT; renderFeatures(); }
+}
+
+function renderMails() {
+  document.getElementById("mails").innerHTML = DATA.mail_lists.map(m => {
+    const list = pending[m.key] || m.emails;
+    const dirty = !!pending[m.key];
+    return `<div class="srow"><div class="tx"><div class="n">${IB.esc(m.label)}</div><div class="h">${IB.esc(m.help)}</div>
+      <div class="chips">${list.length ? list.map((e, i) => `<span class="em">${IB.esc(e)}${EDIT
+        ? `<button type="button" title="Remove" data-rm="${OPS.esc(m.key)}" data-i="${i}">×</button>` : ""}</span>`).join("")
+        : `<span class="d">nobody</span>`}</div>
+      ${EDIT ? `<div class="addr"><input class="input ${dirty ? "dirty" : ""}" type="email" placeholder="add an address"
+          data-add="${OPS.esc(m.key)}" aria-label="Add an address to ${OPS.esc(m.label)}">
+        <button class="btn" data-plus="${OPS.esc(m.key)}">Add</button>
+        ${dirty ? `<button class="btn btn-brand" data-save="${OPS.esc(m.key)}">Save</button>
+                   <button class="btn" data-undo="${OPS.esc(m.key)}">Undo</button>` : ""}</div>` : ""}
+      <div class="d mono">${IB.esc(m.key)}</div></div></div>`;
+  }).join("");
+  const box = document.getElementById("mails");
+  box.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => {
+    const k = b.dataset.rm, cur = (pending[k] || DATA.mail_lists.find(x => x.key === k).emails).slice();
+    cur.splice(+b.dataset.i, 1); pending[k] = cur; renderMails();
+  });
+  const add = k => {
+    const inp = box.querySelector(`[data-add="${k}"]`), v = inp.value.trim();
+    if (!v) return;
+    if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/.test(v)) { OPS.toast("Not an e-mail address: " + v, "err"); return; }
+    const cur = (pending[k] || DATA.mail_lists.find(x => x.key === k).emails).slice();
+    if (!cur.some(x => x.toLowerCase() === v.toLowerCase())) cur.push(v);
+    pending[k] = cur; renderMails();
+    const again = box.querySelector(`[data-add="${k}"]`); if (again) again.focus();
+  };
+  box.querySelectorAll("[data-plus]").forEach(b => b.onclick = () => add(b.dataset.plus));
+  box.querySelectorAll("[data-add]").forEach(i => i.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); add(i.dataset.add); } });
+  box.querySelectorAll("[data-undo]").forEach(b => b.onclick = () => { delete pending[b.dataset.undo]; renderMails(); });
+  box.querySelectorAll("[data-save]").forEach(b => b.onclick = async () => {
+    const k = b.dataset.save;
+    try {
+      await OPS.post("/api/settings", { mail_lists: { [k]: pending[k] } }, "Saving…");
+      DATA.mail_lists.find(x => x.key === k).emails = pending[k];
+      delete pending[k];
+      OPS.toast("Saved — used for the next alert");
+      renderMails();
+    } catch (e) { OPS.toast(e.message, "err"); }
+  });
+}
+
+const VCLASS = { up: "v-up", off: "v-off", stopped: "v-bad", service_down: "v-bad", "unreachable": "v-bad", in_use: "v-wait",
+                 retrying: "v-wait", connecting: "v-wait" };
+const VLABEL = { up: "Connected", off: "Off", stopped: "Gave up", service_down: "Service not running", in_use: "Account in use", retrying: "Retrying",
+                 connecting: "Connecting", unreachable: "Cannot ask", unknown: "Unknown", "unknown-collector": "Unknown" };
+
+function renderVpns() {
+  const v = DATA.vpns || [];
+  if (!v.length) {
+    document.getElementById("vpns").innerHTML = `<div class="srow"><div class="tx"><div class="h">No client VPN is run by
+      IBOPS on or through this machine. (The Sarloha VPN is run by the Ubuntu VM; systems that use it have
+      <span class="mono">check: remote:ubuntu/pune_ttml</span> or <span class="mono">openfortivpn:pune_ttml</span>.)</div></div></div>`;
+    return;
+  }
+  document.getElementById("vpns").innerHTML = v.map((x, i) => {
+    const st = x.state || "unknown";
+    const can = EDIT && x.controllable;
+    const connectOk = can && st !== "up" && st !== "in_use" && st !== "connecting";
+    // (an "off" VPN whose last state was "account in use" is refused by the server until that back-off ends)
+    const discOk = can && st !== "off";
+    return `<div class="srow"><div class="tx"><div class="n">${IB.esc(x.name)}
+        <span class="vst ${VCLASS[st] || "v-off"}">${IB.esc(VLABEL[st] || st)}</span></div>
+      <div class="h">${IB.esc(x.reason || "")}${x.next_attempt ? ` · next try ${IB.esc(String(x.next_attempt).slice(11, 16))}` : ""}</div>
+      <div class="d">${IB.esc(x.where)} · systems: ${IB.esc((x.systems || []).join(", ") || "–")}</div></div>
+      <div class="vbtns">
+        <button class="btn" ${connectOk ? "" : "disabled"} title="${st === "in_use" ? "Account in use by someone else — not pushing them off" : ""}"
+          data-vpn="${i}" data-act="connect">Connect</button>
+        <button class="btn" ${discOk ? "" : "disabled"} data-vpn="${i}" data-act="disconnect">Disconnect</button>
+      </div></div>`;
+  }).join("");
+  document.querySelectorAll("#vpns [data-vpn]").forEach(b => b.onclick = () => {
+    const x = DATA.vpns[+b.dataset.vpn];
+    vpnAct(x.name, b.dataset.act, x.source ? `&source=${encodeURIComponent(x.source)}` : "");
+  });
+}
+
+async function vpnAct(name, action, src) {
+  const x = DATA.vpns.find(v => v.name === name);
+  const sys = (x && x.systems || []).join(", ") || "the systems behind it";
+  const body = action === "disconnect"
+    ? `<p style="font-size:13px">Disconnect <b>${OPS.esc(name)}</b>? ${OPS.esc(sys)} will not be monitored until someone
+       presses Connect (or the Ubuntu VM restarts). No VPN or DOWN alerts are sent while it is off on purpose.</p>`
+    : `<p style="font-size:13px">Connect <b>${OPS.esc(name)}</b>? If the account turns out to be in use by someone else,
+       the VPN backs off instead of pushing them out.</p>`;
+  const ok = await OPS.dialog(action === "disconnect" ? "Disconnect VPN" : "Connect VPN", body,
+    action === "disconnect" ? "Disconnect" : "Connect", async () => {
+      await OPS.post(`/api/settings/vpn/${encodeURIComponent(name)}/${action}?x=1${src}`, {},
+                     action === "disconnect" ? "Disconnecting…" : "Connecting…");
+      return true;
+    });
+  if (ok) { OPS.toast(action === "disconnect" ? `${name} disconnected` : `${name}: connecting`); setTimeout(load, 2500); }
+}
+
+function renderSecrets() {
+  const box = document.getElementById("secrets");
+  const list = DATA.secrets || [];
+  if (!EDIT) { document.getElementById("secrets-card").style.display = "none"; return; }
+  if (!list.length) { box.innerHTML = `<div class="srow"><div class="tx"><div class="h">No passwords found.</div></div></div>`; return; }
+  let html = "", group = "";
+  list.forEach((s, i) => {
+    if (s.group !== group) { group = s.group; html += `<div class="srow" style="padding-bottom:0"><div class="d" style="font-weight:800;text-transform:uppercase;letter-spacing:.05em">${IB.esc(group)}</div></div>`; }
+    html += `<div class="srow"><div class="tx"><div class="n">${IB.esc(s.label.split(" -- ").slice(-1)[0])}</div>
+      <div class="d mono">${IB.esc(s.key)} · ${s.set ? "set (" + IB.esc(s.where) + ")" : "not set"}</div></div>
+      <div class="vbtns"><button class="btn" data-sec="${i}">${s.set ? "Change" : "Set"}</button></div></div>`;
+  });
+  box.innerHTML = html;
+  box.querySelectorAll("[data-sec]").forEach(b => b.onclick = () => setSecret(list[+b.dataset.sec]));
+}
+
+async function setSecret(s) {
+  const ok = await OPS.dialog(`${s.set ? "Change" : "Set"} ${s.key}`,
+    `<p style="font-size:13px">${IB.esc(s.label)}. The value is stored at once and used from the next connection.
+       It is never shown again; Basis gets a mail that it was changed.</p>
+     <label class="d">New value<input class="input" name="v" type="password" autocomplete="new-password" required style="width:100%"></label>
+     <label class="d">Again<input class="input" name="a" type="password" autocomplete="new-password" required style="width:100%"></label>`,
+    "Save", async f => {
+      const v = f.get("v") || "", a = f.get("a") || "";
+      if (!v) throw new Error("Type the new value.");
+      if (v !== a) throw new Error("The two values are not the same.");
+      await OPS.post("/api/settings/secret", { key: s.key, value: v, again: a }, "Saving…");
+      return true;
+    });
+  if (ok) { OPS.toast(`${s.key} saved`); load(); }
+}
+
+async function load() {
+  try {
+    DATA = await IB.get("/api/settings");
+    EDIT = !!DATA.can_edit;
+    showMsg("");
+    renderFeatures(); renderMails(); renderVpns(); renderSecrets();
+  } catch (e) { showMsg(e.message, "err"); }
+}
+
+async function refreshVpns() {
+  if (!DATA || document.querySelector(".ops-ov")) return;
+  try { const d = await IB.get("/api/settings"); DATA.vpns = d.vpns; renderVpns(); } catch (e) {}
+}
+
+load();
+IB.poll(refreshVpns, 15000);
+</script>
+</body>
+</html>

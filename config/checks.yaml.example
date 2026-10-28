@@ -1,0 +1,40 @@
+# Extra SAP checks (collectors/extra_checks.py). Optional: defaults apply
+# without this file. Copy to config/checks.yaml to change them.
+# Per-system settings (certificates, expected_jobs, watch_users,
+# rfc_destinations, spool_max, hana) go in systems.yaml under the system.
+
+days:
+  cert_warning: 30          # certificate expires within N days -> warning
+  cert_critical: 7
+  licence_warning: 30
+  licence_critical: 7
+  user_validity_warning: 14
+
+# RFC destination check: count failed tRFC calls (SM58) of the last N days only.
+sm58_days: 2
+
+# "Job running long": jobs whose runtime varies by design, never flagged.
+# Wildcards allowed. Can also be set per system (checks: runtime_ignore:).
+runtime_ignore: []          # e.g. ["/1LT/*"] for SLT load jobs
+
+# SAP standard housekeeping jobs that must have finished recently (SAP note 16083).
+# Set to [] to switch the housekeeping check off.
+housekeeping_jobs:
+  - {job: SAP_REORG_JOBS, within_days: 8}
+  - {job: SAP_REORG_SPOOL, within_days: 8}
+  - {job: SAP_REORG_BATCHINPUT, within_days: 8}
+  - {job: SAP_REORG_ABAPDUMPS, within_days: 8}
+  - {job: SAP_REORG_UPDATERECORDS, within_days: 8}
+  - {job: SAP_COLLECTOR_FOR_PERFMONITOR, within_days: 1}
+
+# Function modules tried, in order, for the SAP licence expiry. Each is
+# inspected first and used only if it exists, needs no input and returns a
+# table with an expiry date. Run scripts/probe_checks.py to see what a
+# system offers.
+licence_function_modules: [SLIC_GET_LICENCE_KEYS, SLIC_LIKEY_GET_ALL_LICENSES]
+
+# Expected jobs can also be listed here per system name:
+# expected_jobs:
+#   PS4:
+#     - {job: Z_DAILY_BILLING, by: "06:00", days: mon-fri, severity: critical}
+#     - {job: Z_MONTH_END, by: "08:00", days: "monthly:1"}

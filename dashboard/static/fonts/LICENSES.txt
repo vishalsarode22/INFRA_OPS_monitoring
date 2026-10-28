@@ -1,0 +1,13 @@
+Web fonts bundled with IBOPS (subset to Latin, converted to WOFF):
+
+inter-*.woff, interdisplay-*.woff
+  Inter / Inter Display, (c) The Inter Project Authors.
+  SIL Open Font License 1.1 - https://openfontlicense.org
+
+unifont.woff
+  GNU Unifont, (c) Roman Czyborra, Paul Hardy and contributors.
+  SIL Open Font License 1.1 / GNU GPL v2+ with the GNU font embedding exception.
+
+dejavu-mono-*.woff
+  DejaVu Sans Mono, (c) Bitstream (Vera) and DejaVu authors.
+  Bitstream Vera Fonts license (permissive, free redistribution).

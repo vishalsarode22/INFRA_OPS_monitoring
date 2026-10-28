@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Timeline</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+  .cats{display:flex;flex-wrap:wrap;gap:5px}
+  .cat{padding:4px 9px;border:1px solid var(--border);border-radius:999px;font-size:11px;font-weight:700;cursor:pointer;
+       color:var(--muted-dim);user-select:none;background:var(--card)}
+  .cat.on{border-color:var(--brand-live);color:var(--brand-live);background:var(--info-bg)}
+  .day{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-dim);margin:18px 0 6px}
+  .ev{display:grid;grid-template-columns:64px 14px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+  .ev .tm{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .ev .dot{width:10px;height:10px;border-radius:50%;margin-top:4px;background:var(--gray)}
+  .sv-ok .dot{background:var(--green)} .sv-warning .dot{background:var(--amber)} .sv-critical .dot{background:var(--red)}
+  .sv-info .dot{background:var(--sky-500,#2f8cf3)}
+  .ev .ti{font-size:13px;font-weight:600}
+  .ev .ti .sys{font-family:var(--mono);font-size:11px;color:var(--muted-dim);margin-right:6px}
+  .ev .ca{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-dim);margin-left:6px}
+  .ev .de{font-size:12px;color:var(--muted);margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere}
+  .ev .ac{font-size:11px;color:var(--muted-dim);margin-top:2px}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2 id="title">Timeline</h2>
+      <div class="sub">Alerts, sweeps, VPN drops, recoveries, and who acknowledged what — in order</div></div>
+    <div class="top-actions">
+      <span id="rep" style="display:none;gap:6px;align-items:center">
+        <a class="btn" id="rep-html" target="_blank" rel="noopener" title="Last outage (or last 24 h): sequence, changes before, fix">Incident report</a>
+        <a class="btn" id="rep-pdf" title="Same, as PDF with screenshots">PDF</a>
+        <a class="btn" id="rep-cust" target="_blank" rel="noopener" title="Without names, mail addresses and internal steps">Customer version</a>
+      </span>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="filters">
+      <select class="input" id="sys"><option value="">All systems</option></select>
+      <select class="input" id="days">
+        <option value="1">last 24 h</option><option value="3">3 days</option>
+        <option value="7" selected>7 days</option><option value="30">30 days</option><option value="90">90 days</option>
+      </select>
+      <input class="input" id="q" placeholder="search text…" style="min-width:180px">
+      <div class="cats" id="cats"></div>
+    </div>
+    <div id="list"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading…</span></div></div>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script>
+IB.mountShell("timeline");
+IB.themeToggle(document.getElementById("theme"));
+const params = new URLSearchParams(location.search);
+let EVENTS = [], CATS = [], OFF = new Set();
+const DAYNAME = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function render() {
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  const rows = EVENTS.filter(e => !OFF.has(e.category) &&
+    (!q || [e.title, e.detail, e.actor, e.system].join(" ").toLowerCase().includes(q)));
+  if (!rows.length) { document.getElementById("list").innerHTML = '<div class="empty">Nothing in this period.</div>'; return; }
+  let html = "", day = "";
+  const showSys = !document.getElementById("sys").value;
+  for (const e of rows) {
+    const d = e.at.slice(0, 10);
+    if (d !== day) {
+      day = d;
+      const dt = new Date(d + "T00:00:00");
+      html += `<div class="day">${DAYNAME[dt.getDay()]} ${IB.esc(d)}</div>`;
+    }
+    html += `<div class="ev sv-${IB.esc(e.severity)}"><div class="tm">${IB.esc(e.at.slice(11, 19))}</div><span class="dot"></span>
+      <div><div class="ti">${showSys ? `<span class="sys">${IB.esc(e.system)}</span>` : ""}${IB.esc(e.title)}
+        <span class="ca">${IB.esc(e.category)}</span></div>
+        ${e.detail ? `<div class="de">${IB.esc(e.detail)}</div>` : ""}
+        ${e.actor ? `<div class="ac">by ${IB.esc(e.actor)}</div>` : ""}</div></div>`;
+  }
+  document.getElementById("list").innerHTML = html;
+}
+
+function renderCats() {
+  document.getElementById("cats").innerHTML = CATS.map(c =>
+    `<span class="cat ${OFF.has(c) ? "" : "on"}" data-c="${IB.esc(c)}">${IB.esc(c)}</span>`).join("");
+  document.querySelectorAll(".cat").forEach(el => el.onclick = () => {
+    const c = el.dataset.c; OFF.has(c) ? OFF.delete(c) : OFF.add(c); renderCats(); render();
+  });
+}
+
+async function load() {
+  const sys = document.getElementById("sys").value;
+  const days = document.getElementById("days").value;
+  document.getElementById("title").textContent = sys ? `Timeline — ${sys}` : "Timeline";
+  const rep = document.getElementById("rep");
+  const plat = !sys || sys === "IBOPS";
+  rep.style.display = plat ? "none" : "inline-flex";
+  if (!plat) {
+    const q = "?system=" + encodeURIComponent(sys);
+    document.getElementById("rep-html").href = "/report/incident" + q;
+    document.getElementById("rep-pdf").href = "/report/incident.pdf" + q;
+    document.getElementById("rep-cust").href = "/report/incident" + q + "&audience=customer";
+  }
+  const u = `/api/timeline?days=${days}` + (sys ? `&system=${encodeURIComponent(sys)}` : "");
+  try {
+    const d = await IB.get(u);
+    EVENTS = d.events || [];
+    if (!CATS.length) { CATS = d.categories || []; renderCats(); }
+    render();
+  } catch (e) {
+    document.getElementById("list").innerHTML = `<div class="banner banner-err">${IB.esc(e.message)}</div>`;
+  }
+}
+
+(async () => {
+  try {
+    const s = await IB.get("/api/systems");
+    const names = (s.systems || s || []).map(x => x.name || x).filter(Boolean);
+    document.getElementById("sys").innerHTML += names.map(n => `<option>${IB.esc(n)}</option>`).join("")
+      + `<option value="IBOPS">IBOPS (platform)</option>`;
+  } catch (e) {}
+  if (params.get("system")) document.getElementById("sys").value = params.get("system");
+  if (params.get("days")) document.getElementById("days").value = params.get("days");
+  document.getElementById("sys").onchange = () => {
+    const v = document.getElementById("sys").value;
+    history.replaceState(null, "", v ? `?system=${encodeURIComponent(v)}` : location.pathname);
+    load();
+  };
+  document.getElementById("days").onchange = load;
+  document.getElementById("q").oninput = render;
+  load();
+  IB.poll(load, 60000);
+})();
+</script>
+</body>
+</html>

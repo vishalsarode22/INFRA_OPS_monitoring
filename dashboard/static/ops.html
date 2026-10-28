@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Operations</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .tab{padding:9px 14px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted);
+       border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab.on{color:var(--brand-live);border-bottom-color:var(--brand-live)}
+  .pane{display:none} .pane.on{display:block}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .tw{overflow-x:auto}
+  td{vertical-align:top}
+  .muted{color:var(--muted-dim);font-size:12px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:700;border:1px solid var(--border)}
+  .p-ok{color:var(--green);border-color:var(--green-br);background:var(--green-bg)}
+  .p-warn{color:var(--amber);border-color:var(--amber-br);background:var(--amber-bg)}
+  .p-bad{color:var(--red);border-color:var(--red-br);background:var(--red-bg)}
+  .p-info{color:var(--info);border-color:var(--info-br);background:var(--info-bg)}
+  .kb{border-top:1px solid var(--border);padding:12px 0}
+  .kb:first-child{border-top:0}
+  .kb .t{font-weight:700;font-size:13px}
+  .kb .f{font-size:12.5px;margin-top:4px;white-space:pre-wrap}
+  .kb .m{font-size:11px;color:var(--muted-dim);margin-top:4px}
+  textarea.input{min-height:70px;width:100%;box-sizing:border-box;font:inherit}
+  .fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+  .fg label{display:flex;flex-direction:column;gap:5px;font-size:10px;font-weight:700;text-transform:uppercase;
+       letter-spacing:.05em;color:var(--muted-dim)}
+  .fg .input{text-transform:none;letter-spacing:0;font-weight:400}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Operations</h2><div class="sub">Maintenance, alerts on hold, on-call, tickets, fixes, actions and forecasts</div></div>
+    <div class="top-actions"><button class="btn" id="theme">◑ Light</button></div>
+  </div>
+  <div class="content">
+    <div class="tabs">
+      <div class="tab on" data-p="now">Now</div>
+      <div class="tab" data-p="maint">Maintenance</div>
+      <div class="tab" data-p="oncall">On call</div>
+      <div class="tab" data-p="tickets">Tickets</div>
+      <div class="tab" data-p="kb">Knowledge base</div>
+      <div class="tab" data-p="actions">Actions</div>
+      <div class="tab" data-p="capacity">Capacity</div>
+      <div class="tab" data-p="baseline">Learned normal</div>
+      <div class="tab" data-p="runbooks">Runbooks</div>
+      <div class="tab" data-p="ask">Ask</div>
+      <div class="tab" data-p="noise">Noise &amp; availability</div>
+      <div class="tab" data-p="changes">Changes</div>
+    </div>
+
+    <div class="pane on" id="p-now"></div>
+
+    <div class="pane" id="p-maint">
+      <div class="row"><select class="input" id="m-sys"></select>
+        <button class="btn btn-brand" onclick="OPS.maintenance(document.getElementById('m-sys').value).then(loadMaint)">New window…</button></div>
+      <div class="card"><div class="card-b tw" style="padding:0"><table id="m-tbl"></table></div></div>
+    </div>
+
+    <div class="pane" id="p-oncall"></div>
+
+    <div class="pane" id="p-tickets"></div>
+
+    <div class="pane" id="p-kb">
+      <div class="row"><input class="input" id="kb-q" placeholder="search fixes…" style="min-width:260px">
+        <button class="btn btn-brand" id="kb-add">Add a fix…</button></div>
+      <div class="card"><div class="card-b" id="kb-list"></div></div>
+    </div>
+
+    <div class="pane" id="p-actions">
+      <div id="act-banner"></div>
+      <div class="row"><select class="input" id="a-sys"></select><select class="input" id="a-act"></select>
+        <button class="btn btn-brand" id="a-go">Choose…</button></div>
+      <div class="card" style="margin-bottom:16px"><div class="card-h"><h3>Standing approvals</h3>
+        <span class="muted">time-boxed: two-person actions run on one click until it ends (admin)</span>
+        <button class="btn ops-btn" id="sa-add">Add…</button></div>
+        <div class="card-b tw" style="padding:0"><table id="sa-tbl"></table></div></div>
+      <div class="card"><div class="card-h"><h3>Requests and results</h3></div><div class="card-b tw" style="padding:0"><table id="a-tbl"></table></div></div>
+    </div>
+
+    <div class="pane" id="p-capacity">
+      <div class="row"><select class="input" id="c-sys"><option value="">All systems</option></select>
+        <span class="muted">Daily highest reading, best straight line, where it crosses the limit. "Fit" near 1 = a steady climb you can plan on.</span></div>
+      <div class="card"><div class="card-b tw" style="padding:0"><table id="c-tbl"></table></div></div>
+    </div>
+
+    <div class="pane" id="p-baseline">
+      <div class="row"><select class="input" id="b-sys"></select><span class="muted" id="b-mode"></span></div>
+      <div class="card"><div class="card-b tw" style="padding:0"><table id="b-tbl"></table></div></div>
+      <p class="muted" style="margin-top:10px">"Normal" for an hour of the week is the middle value of past readings at that
+        hour, give or take three times how far they usually stray. It needs readings from three different weeks at that hour
+        (or five days at that hour on weekdays/weekends) before it says anything.</p>
+    </div>
+
+    <div class="pane" id="p-ask">
+      <div class="card"><div class="card-b">
+        <div class="row"><input class="input" id="ask-q" style="flex:1;min-width:260px"
+          placeholder="What happened on PS4 last night?  ·  Which systems had VPN problems this week?  ·  Who acknowledged SARLOHA PRD yesterday?">
+          <button class="btn btn-brand" id="ask-go">Ask</button></div>
+        <div class="muted">Answered only from what the platform recorded (timeline, open problems, fixes). With AI on
+          (IBO_ENABLE_AI=1) the facts are summarised; otherwise they are listed.</div>
+        <div id="ask-out" style="margin-top:14px"></div>
+      </div></div>
+    </div>
+
+    <div class="pane" id="p-noise">
+      <div class="row"><select class="input" id="n-days"><option value="7">7 days</option><option value="30" selected>30 days</option>
+        <option value="90">90 days</option></select>
+        <a class="btn" href="/api/ops/digest/preview" target="_blank" rel="noopener">Preview weekly digest</a>
+        <button class="btn" id="digest-send">Send digest now</button></div>
+      <div class="card"><div class="card-h"><h3>Availability</h3><span class="muted">SYSTEM DOWN time only</span></div>
+        <div class="card-b tw" style="padding:0"><table id="av-tbl"></table></div></div>
+      <div class="card" style="margin-top:16px"><div class="card-h"><h3>Noisiest alerts</h3>
+        <span class="muted">what to retune: often snoozed, ignored or never acted on</span></div>
+        <div class="card-b tw" style="padding:0"><table id="n-tbl"></table></div></div>
+    </div>
+
+    <div class="pane" id="p-changes">
+      <div class="row"><select class="input" id="ch-sys"></select><button class="btn" id="ch-snap">Snapshot now</button>
+        <span class="muted">Kernel, support packages, profile parameters and imports -- checked every 6 h; differences go on the timeline.</span></div>
+      <div id="ch-out"></div>
+    </div>
+
+    <div class="pane" id="p-runbooks"><div class="card"><div class="card-b tw" style="padding:0"><table id="r-tbl"></table></div></div></div>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script src="/static/ops.js?v=ops1"></script>
+<script>
+IB.mountShell("ops");
+IB.themeToggle(document.getElementById("theme"));
+const E = s => IB.esc(s ?? "");
+const safeUrl = u => /^https?:\/\//i.test(u || "");
+let SYSTEMS = [];
+
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.id === "p-" + t.dataset.p));
+  history.replaceState(null, "", "#" + t.dataset.p);
+  ({ now: loadNow, maint: loadMaint, oncall: loadOncall, tickets: loadTickets, kb: loadKb, actions: loadActions,
+     capacity: loadCapacity, baseline: loadBaseline, runbooks: loadRunbooks, ask: () => {}, noise: loadNoise,
+     changes: loadChanges })[t.dataset.p]();
+});
+
+function fail(el, e) { document.getElementById(el).innerHTML = `<div class="banner banner-err">${E(e.message)}</div>`; }
+
+/* ---------------------------------------------------------------- now */
+async function loadNow() {
+  try {
+    const [st, sil, tk, act] = await Promise.all([IB.get("/api/ops/status"), IB.get("/api/ops/silences"),
+      IB.get("/api/ops/tickets?status=open"), IB.get("/api/ops/actions")]);
+    const sys = st.systems || {};
+    const maint = Object.entries(sys).filter(([, v]) => v.maintenance);
+    const down = Object.entries(sys).filter(([, v]) => v.reach);
+    const pend = (act.actions || []).filter(a => a.status === "pending");
+    const oc = st.oncall || {};
+    document.getElementById("p-now").innerHTML = `
+      <div class="grid g4" style="margin-bottom:16px">
+        <div class="kpi"><div class="lbl">On call</div><div class="num" style="font-size:16px">${E((oc.names || []).join(", ") || "—")}</div>
+          <div class="sub">${oc.source ? E(oc.source) + (oc.until ? " · until " + E(oc.until) : "") : "no rotation configured"}</div></div>
+        <div class="kpi"><div class="lbl">Not reachable</div><div class="num ${down.length ? "n-red" : "n-green"}">${down.length}</div>
+          <div class="sub">${down.map(([n, v]) => E(n) + " — " + E(v.reach.state)).join("<br>") || "all reachable"}</div></div>
+        <div class="kpi"><div class="lbl">In maintenance</div><div class="num ${maint.length ? "n-info" : ""}">${maint.length}</div>
+          <div class="sub">${maint.map(([n, v]) => E(n) + " until " + E(String(v.maintenance.ends_at).slice(11, 16))).join("<br>") || "none"}</div></div>
+        <div class="kpi"><div class="lbl">Waiting for approval</div><div class="num ${pend.length ? "n-amber" : ""}">${pend.length}</div>
+          <div class="sub">${pend.length ? "see Actions" : "nothing pending"}</div></div>
+      </div>
+      ${st.mail_buttons ? "" : `<div class="banner banner-warn">IBO_PUBLIC_URL is not set, so alert mails go out without the
+        Snooze / Acknowledge buttons. Set it in .env to the address people use to open this dashboard.</div>`}
+      <div class="grid g2">
+        <div class="card"><div class="card-h"><h3>Alerts on hold</h3></div><div class="card-b tw" style="padding:0"><table>
+          <tr><th>System</th><th>What</th><th>By</th><th>Until</th><th></th></tr>
+          ${(sil.silences || []).map(s => `<tr><td>${E(s.system)}</td><td>${E(s.mode === "snooze" ? "snoozed" : s.mode === "ack" ? "acknowledged" : String(s.kind).startsWith("metric:") ? "ignored until back to normal" : "ignored until fixed")}
+            · ${E(s.kind === "*" ? "all alerts" : String(s.kind).startsWith("metric:") ? (s.label || s.kind.slice(7)) : s.kind)}</td><td>${E(s.created_by)}</td><td class="mono">${E(s.until ? s.until.slice(5, 16) : "fixed")}</td>
+            <td><button class="btn ops-btn" onclick="OPS.clearSilence(${s.id}).then(loadNow)">Clear</button></td></tr>`).join("")
+            || `<tr><td colspan="5" class="muted">No alert is snoozed or acknowledged.</td></tr>`}
+        </table></div></div>
+        <div class="card"><div class="card-h"><h3>Parked sweeps</h3></div><div class="card-b tw" style="padding:0"><table>
+          <tr><th>System</th><th>Why</th><th>Since</th><th></th></tr>
+          ${(sil.parked || []).map(p => `<tr><td>${E(p.system)}</td><td>${E(p.reason)}</td><td class="mono">${E(p.parked_at.slice(5, 16))}</td>
+            <td><button class="btn ops-btn" onclick='OPS.unpark(${OPS.esc(JSON.stringify(p.system))}).then(loadNow)'>Resume</button></td></tr>`).join("")
+            || `<tr><td colspan="4" class="muted">No system is parked.</td></tr>`}
+        </table></div></div>
+        <div class="card"><div class="card-h"><h3>Open tickets</h3></div><div class="card-b tw" style="padding:0"><table>
+          <tr><th>System</th><th>Alert</th><th>Ticket</th><th>Opened</th></tr>
+          ${(tk.tickets || []).map(t => `<tr><td>${E(t.system)}</td><td>${E(t.kind)}</td><td>${safeUrl(t.url) ? `<a href="${E(t.url)}" target="_blank" rel="noopener">${E(t.external_id || "#" + t.id)}</a>` : E(t.external_id || "#" + t.id)}</td>
+            <td class="mono">${E(t.created_at.slice(5, 16))}</td></tr>`).join("")
+            || `<tr><td colspan="4" class="muted">${tk.provider === "off" ? "Ticket creation is off (IBO_TICKETS)." : "No open tickets."}</td></tr>`}
+        </table></div></div>
+      </div>`;
+  } catch (e) { fail("p-now", e); }
+}
+
+/* -------------------------------------------------------- maintenance */
+async function loadMaint() {
+  try {
+    const d = await IB.get("/api/ops/maintenance?days=14");
+    const cls = { active: "p-info", planned: "p-ok", ended: "", cancelled: "" };
+    document.getElementById("m-tbl").innerHTML = `<tr><th>System</th><th>From</th><th>Until</th><th>Reason</th><th>By</th><th>State</th><th></th></tr>` +
+      ((d.windows || []).map(w => `<tr><td>${E(w.system === "*" ? "all systems" : w.system)}</td><td class="mono">${E(w.starts_at.slice(0, 16))}</td>
+        <td class="mono">${E(w.ends_at.slice(0, 16))}</td><td>${E(w.reason)}</td><td>${E(w.created_by)}</td>
+        <td><span class="pill ${cls[w.state] || ""}">${E(w.state)}</span></td>
+        <td>${w.state === "active" || w.state === "planned" ? `<button class="btn ops-btn" onclick="OPS.endMaintenance(${w.id}).then(loadMaint)">${w.state === "active" ? "End now" : "Cancel"}</button>` : ""}</td></tr>`).join("")
+       || `<tr><td colspan="7" class="muted">No windows in the last 14 days.</td></tr>`);
+  } catch (e) { fail("m-tbl", e); }
+}
+
+/* ------------------------------------------------------------ on call */
+async function loadOncall() {
+  try {
+    const d = await IB.get("/api/ops/oncall");
+    const c = d.current || {};
+    document.getElementById("p-oncall").innerHTML = `
+      ${d.configured ? "" : `<div class="banner banner-warn">No rotation yet. Copy <span class="mono">config/oncall.yaml.example</span>
+        to <span class="mono">config/oncall.yaml</span> and list the Basis consultants. Until then, Basis alerts go to IBO_BASIS_EMAILS.</div>`}
+      <div class="grid g2">
+        <div class="card"><div class="card-h"><h3>Now</h3></div><div class="card-b">
+          <div style="font-size:18px;font-weight:800">${E((c.names || []).join(", ") || "—")}</div>
+          <div class="muted">${E((c.emails || []).join(", "))}</div>
+          <div class="muted" style="margin-top:6px">${E(c.source || "")}${c.until ? " · until " + E(c.until) : ""}
+            ${(c.always_copy || []).length ? " · always copied: " + E(c.always_copy.join(", ")) : ""}</div>
+          ${c.shift_source_error ? `<div class="banner banner-warn" style="margin-top:10px">Shift tool not answering: ${E(c.shift_source_error)} — using the rotation.</div>` : ""}
+        </div></div>
+        <div class="card"><div class="card-h"><h3>Cover for someone</h3></div><div class="card-b">
+          <div class="fg"><label>From<input class="input" type="datetime-local" id="o-from"></label>
+            <label>Until<input class="input" type="datetime-local" id="o-to"></label>
+            <label>Who (e-mail)<input class="input" id="o-who" placeholder="staff.g@infrabeat.com"></label>
+            <label>Why<input class="input" id="o-why" placeholder="leave, swap…"></label></div>
+          <button class="btn btn-brand" style="margin-top:10px" onclick="addOverride()">Add cover</button>
+          <div id="o-msg" style="margin-top:8px;font-size:12px"></div>
+          ${(d.overrides || []).map(o => `<div class="muted" style="margin-top:6px">${E(o.starts_at.slice(0, 16))} → ${E(o.ends_at.slice(0, 16))}:
+            <b>${E(o.emails)}</b> ${E(o.reason)} <a href="#" onclick="cancelOverride(${o.id});return false">cancel</a></div>`).join("")}
+        </div></div>
+      </div>
+      <div class="card" style="margin-top:16px"><div class="card-h"><h3>Coming shifts</h3></div><div class="card-b tw" style="padding:0"><table>
+        <tr><th>From</th><th>Until</th><th>On call</th><th>Cover</th></tr>
+        ${(d.schedule || []).map(s => `<tr><td class="mono">${E(s.from)}</td><td class="mono">${E(s.until)}</td><td>${E(s.names.join(", "))}</td>
+          <td>${s.override ? E(s.override.emails.join(", ")) : ""}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">—</td></tr>`}
+      </table></div></div>`;
+    const now = new Date();
+    document.getElementById("o-from").value = OPS.localStamp(now);
+    document.getElementById("o-to").value = OPS.localStamp(new Date(now.getTime() + 24 * 3600e3));
+    loadEscalation();
+  } catch (e) { fail("p-oncall", e); }
+}
+async function loadEscalation() {
+  try {
+    const d = await IB.get("/api/ops/escalation");
+    const box = document.createElement("div");
+    box.className = "card"; box.style.marginTop = "16px";
+    box.innerHTML = `<div class="card-h"><h3>Escalation by time</h3>
+      <span class="muted">${d.configured ? "on" : "off -- copy config/escalation.yaml.example to config/escalation.yaml"}</span></div>
+      <div class="card-b"><div class="muted">For: ${E((d.states || []).join(", "))}. Stops on Acknowledge / Ignore / Snooze, maintenance or recovery.</div>
+      <ol style="margin:8px 0 0 18px">${(d.steps || []).map(s => `<li>after ${E(s.after_minutes)} min: ${E(s.action)}${s.to ? " to " + E(s.to.join(", ")) : ""}</li>`).join("")}</ol>
+      <div class="muted" style="margin-top:8px">MSG91 SMS: ${d.sms ? "configured" : "not configured"} · voice call: ${d.voice ? "configured" : "not configured"} (see notifications/sms.py)</div>
+      <div class="row" style="margin-top:10px"><input class="input" id="sms-to" placeholder="+91 98xxxxxxxx"><button class="btn" id="sms-test">Send test SMS</button></div></div>`;
+    document.getElementById("p-oncall").appendChild(box);
+    document.getElementById("sms-test").onclick = async () => {
+      try { await OPS.post("/api/ops/escalation/test-sms", { phone: document.getElementById("sms-to").value }, "Sending…"); OPS.toast("Test SMS sent"); }
+      catch (e) { OPS.toast(e.message, "err"); }
+    };
+  } catch (e) { /* escalation panel is optional */ }
+}
+async function addOverride() {
+  try {
+    await OPS.post("/api/ops/oncall/override", { starts_at: document.getElementById("o-from").value.replace("T", " "),
+      ends_at: document.getElementById("o-to").value.replace("T", " "), emails: document.getElementById("o-who").value,
+      reason: document.getElementById("o-why").value });
+    OPS.toast("Cover added"); loadOncall();
+  } catch (e) { document.getElementById("o-msg").innerHTML = `<span style="color:var(--red)">${E(e.message)}</span>`; }
+}
+async function cancelOverride(id) { await OPS.post(`/api/ops/oncall/override/${id}/cancel`, {}); loadOncall(); }
+
+/* ------------------------------------------------------------ tickets */
+async function loadTickets() {
+  try {
+    const d = await IB.get("/api/ops/tickets");
+    const cls = { open: "p-warn", opening: "p-info", closed: "p-ok", failed: "p-bad" };
+    document.getElementById("p-tickets").innerHTML = `
+      ${d.provider === "off" ? `<div class="banner banner-warn">Ticket creation is off. Set IBO_TICKETS (email, webhook, jira or servicenow) in .env —
+        see core/tickets.py for the settings of each.</div>` : `<div class="muted" style="margin-bottom:10px">Provider: <b>${E(d.provider)}</b>.
+        Red alerts (${E("IBO_TICKET_KINDS")}) open one ticket per system and alert type; closing it clears the alert.</div>`}
+      <div class="card"><div class="card-b tw" style="padding:0"><table>
+        <tr><th>System</th><th>Alert</th><th>Ticket</th><th>Status</th><th>Opened</th><th>Closed</th><th></th></tr>
+        ${(d.tickets || []).map(t => `<tr><td>${E(t.system)}</td><td>${E(t.kind)}<div class="muted">${E(t.subject)}</div></td>
+          <td>${safeUrl(t.url) ? `<a href="${E(t.url)}" target="_blank" rel="noopener">${E(t.external_id || "#" + t.id)}</a>` : E(t.external_id || "#" + t.id)}</td>
+          <td><span class="pill ${cls[t.status] || ""}">${E(t.status)}</span>${t.error ? `<div class="muted" style="color:var(--red)">${E(t.error)}</div>` : ""}</td>
+          <td class="mono">${E(t.created_at.slice(5, 16))}</td><td class="mono">${E((t.closed_at || "").slice(5, 16))}<div class="muted">${E(t.closed_by || "")}</div></td>
+          <td>${t.status === "open" || t.status === "opening" ? `<button class="btn ops-btn" onclick="closeTicket(${t.id})">Close…</button>` : ""}</td></tr>`).join("")
+          || `<tr><td colspan="7" class="muted">No tickets yet.</td></tr>`}
+      </table></div></div>`;
+  } catch (e) { fail("p-tickets", e); }
+}
+function closeTicket(id) {
+  OPS.dialog("Close ticket", `<p>Closing clears the alert: acknowledgements are cleared and parked sweeps resume.
+    The fix you write here goes into the knowledge base.</p><label>What fixed it</label><textarea class="input" name="r"></textarea>`,
+    "Close", async f => { await OPS.post(`/api/ops/tickets/${id}/close`, { resolution: f.get("r") }); return true; })
+    .then(ok => { if (ok) { OPS.toast("Ticket closed"); loadTickets(); } });
+}
+
+/* ----------------------------------------------------- knowledge base */
+async function loadKb() {
+  try {
+    const q = document.getElementById("kb-q").value.trim();
+    const d = await IB.get("/api/ops/kb" + (q ? "?q=" + encodeURIComponent(q) : ""));
+    document.getElementById("kb-list").innerHTML = (d.entries || []).map(k => `<div class="kb">
+      <div class="t">${E(k.title)} ${k.system ? `<span class="pill">${E(k.system)}</span>` : ""} ${k.rule ? `<span class="pill p-info">${E(k.rule)}</span>` : ""}</div>
+      <div class="f">${E(k.fix)}</div>
+      ${k.root_cause ? `<div class="f"><i>Root cause: ${E(k.root_cause)}</i></div>` : ""}
+      <div class="m">${E(k.created_at.slice(0, 16))} · ${E(k.created_by || "?")} · from ${E(k.source)}${k.source_ref ? " " + E(k.source_ref) : ""}
+        · <a href="#" onclick="retireKb(${k.id});return false">retire</a></div></div>`).join("")
+      || `<div class="muted">No fixes recorded yet. They are added when an incident is resolved with a summary, when a ticket
+          is closed with notes, or with "Add a fix".</div>`;
+  } catch (e) { fail("kb-list", e); }
+}
+let kbTimer = null;
+document.getElementById("kb-q").oninput = () => { clearTimeout(kbTimer); kbTimer = setTimeout(loadKb, 300); };
+document.getElementById("kb-add").onclick = () => OPS.dialog("Add a fix to the knowledge base", `
+  <label>Problem (what the alert or dump said)</label><input class="input" name="title" required maxlength="300"
+    placeholder="TSV_TNEW_PAGE_ALLOC_FAILED in ZSD_BILLING_REPORT">
+  <label>Fix</label><textarea class="input" name="fix" required></textarea>
+  <label>Root cause (optional)</label><input class="input" name="root_cause">
+  <label>System (optional)</label><select class="input" name="system"><option value="">any system</option>${SYSTEMS.map(s => `<option>${E(s)}</option>`).join("")}</select>
+  <label>Alert type / metric (optional)</label><input class="input" name="rule" placeholder="system_down, sap.st22.dumps …">`,
+  "Save", async f => { await OPS.post("/api/ops/kb", Object.fromEntries(f.entries())); return true; })
+  .then(ok => { if (ok) { OPS.toast("Saved"); loadKb(); } });
+async function retireKb(id) { if (confirm("Retire this entry? It will no longer be suggested.")) { await OPS.post(`/api/ops/kb/${id}/retire`, {}); loadKb(); } }
+
+/* ------------------------------------------------------------ actions */
+async function loadApprovals() {
+  try {
+    const d = await IB.get("/api/ops/actions/approvals");
+    document.getElementById("sa-tbl").innerHTML = `<tr><th>System</th><th>Action</th><th>Until</th><th>Why</th><th>By</th><th></th></tr>` +
+      ((d.approvals || []).map(a => `<tr><td>${E(a.system === "*" ? "all" : a.system)}</td><td>${E(a.action === "*" ? "all" : a.action)}</td>
+        <td class="mono">${E(a.ends_at.slice(5, 16))}</td><td>${E(a.reason)}</td><td>${E(a.created_by)}</td>
+        <td><button class="btn ops-btn" onclick="revokeApproval(${a.id})">Revoke</button></td></tr>`).join("")
+       || `<tr><td colspan="6" class="muted">none active</td></tr>`);
+  } catch (e) { fail("sa-tbl", e); }
+}
+async function revokeApproval(id) { try { await OPS.post(`/api/ops/actions/approvals/${id}/revoke`, {}); loadApprovals(); } catch (e) { OPS.toast(e.message, "err"); } }
+document.getElementById("sa-add").onclick = () => OPS.dialog("Standing approval", `
+  <label>System</label><select class="input" name="system">${SYSTEMS.map(s => `<option>${E(s)}</option>`).join("")}<option value="*">all systems</option></select>
+  <label>Action</label><select class="input" name="action"><option value="*">all actions</option>
+    <option value="restart_job">restart cancelled job</option><option value="cancel_job">cancel running job</option>
+    <option value="release_lock">release old lock</option><option value="restart_queue">restart inbound queue</option>
+    <option value="unlock_user">unlock user</option></select>
+  <label>For (minutes)</label><input class="input" name="minutes" type="number" value="120" min="5" max="1440">
+  <label>Why</label><input class="input" name="reason" required maxlength="300" placeholder="month-end close, go-live…">`,
+  "Add", async f => { await OPS.post("/api/ops/actions/approvals", Object.fromEntries(f.entries())); return true; })
+  .then(ok => { if (ok) { OPS.toast("Standing approval added"); loadApprovals(); } });
+
+async function loadActions() {
+  loadApprovals();
+  try {
+    const d = await IB.get("/api/ops/actions");
+    document.getElementById("act-banner").innerHTML = d.enabled ? (d.two_person
+      ? `<div class="muted" style="margin-bottom:10px">Two-person approval is on: someone other than the requester approves.</div>` : "")
+      : `<div class="banner banner-warn">One-click actions are off. Set IBO_ACTIONS_ENABLED=1 in .env and tick the allowed actions per
+         system on the Systems page. Try each one on a QAS system first.</div>`;
+    const allowed = d.allowed || {};
+    const sysSel = document.getElementById("a-sys");
+    const cur = sysSel.value;
+    sysSel.innerHTML = Object.keys(allowed).filter(s => allowed[s].length).map(s => `<option>${E(s)}</option>`).join("")
+      || `<option value="">no system has actions enabled</option>`;
+    if (cur) sysSel.value = cur;
+    const fillAct = () => {
+      document.getElementById("a-act").innerHTML = (allowed[sysSel.value] || []).map(a =>
+        `<option value="${E(a)}">${E(d.catalog[a].label)}</option>`).join("");
+    };
+    sysSel.onchange = fillAct; fillAct();
+    const cls = { done: "p-ok", failed: "p-bad", pending: "p-warn", running: "p-info", rejected: "", expired: "" };
+    document.getElementById("a-tbl").innerHTML = `<tr><th>When</th><th>System</th><th>Action</th><th>What</th><th>Asked / approved</th><th>Result</th><th></th></tr>` +
+      ((d.actions || []).map(a => `<tr><td class="mono">${E(a.requested_at.slice(5, 16))}</td><td>${E(a.system)}</td><td>${E(a.label)}</td>
+        <td>${E(a.preview)}<div class="muted">reason: ${E(a.reason)}</div></td>
+        <td>${E(a.requested_by)}${a.approved_by ? "<br>" + E(a.approved_by) : ""}</td>
+        <td><span class="pill ${cls[a.status] || ""}">${E(a.status)}</span><div class="muted">${E(a.result || a.error)}</div></td>
+        <td>${a.status === "pending" ? `<button class="btn ops-btn" onclick="approve(${a.id})">Approve</button>
+            <button class="btn ops-btn" onclick="rejectA(${a.id})">Reject</button>` : ""}</td></tr>`).join("")
+       || `<tr><td colspan="7" class="muted">No actions yet.</td></tr>`);
+  } catch (e) { fail("a-tbl", e); }
+}
+document.getElementById("a-go").onclick = () => {
+  const s = document.getElementById("a-sys").value, a = document.getElementById("a-act").value;
+  if (!s || !a) return;
+  OPS.pick(s, a, document.getElementById("a-act").selectedOptions[0].textContent).then(() => setTimeout(loadActions, 1500));
+};
+async function approve(id) {
+  if (!confirm("Approve and run this action in SAP now?")) return;
+  try { await OPS.post(`/api/ops/actions/${id}/approve`, {}, "Running in SAP…"); OPS.toast("Approved — running"); setTimeout(loadActions, 1500); }
+  catch (e) { OPS.toast(e.message, "err"); }
+}
+async function rejectA(id) {
+  const why = prompt("Why reject?") || "";
+  try { await OPS.post(`/api/ops/actions/${id}/reject`, { why }); loadActions(); } catch (e) { OPS.toast(e.message, "err"); }
+}
+
+/* ----------------------------------------------------------- capacity */
+async function loadCapacity() {
+  try {
+    const s = document.getElementById("c-sys").value;
+    const d = await IB.get("/api/ops/capacity" + (s ? "?system=" + encodeURIComponent(s) : ""));
+    const lvl = f => f.state === "full" ? "p-bad" : f.state === "growing" && f.days_left <= d.warn_days ? "p-warn" : f.state === "growing" ? "p-info" : "p-ok";
+    document.getElementById("c-tbl").innerHTML = `<tr><th>System</th><th>What</th><th>Now</th><th>Growth / day</th><th>Fit</th><th>Forecast</th></tr>` +
+      ((d.forecasts || []).map(f => `<tr><td>${E(f.system)}</td><td class="mono">${E(f.metric)}</td>
+        <td class="mono">${f.current !== undefined ? E(f.current + f.unit) : "—"}</td>
+        <td class="mono">${f.per_day !== undefined ? E(f.per_day + f.unit) : "—"}</td><td class="mono">${f.r2 ?? "—"}</td>
+        <td><span class="pill ${lvl(f)}">${E(f.state === "growing" ? (f.days_left + " days") : f.state)}</span> <span class="muted">${E(f.text)}</span></td></tr>`).join("")
+       || `<tr><td colspan="6" class="muted">No capacity metrics in the history yet. File systems are read from CCMS (RZ20)
+            hourly during live reads; disk_* metrics also come from SSH. See config/capacity.yaml to add more.</td></tr>`);
+  } catch (e) { fail("c-tbl", e); }
+}
+document.getElementById("c-sys").onchange = loadCapacity;
+
+/* ------------------------------------------------------------ baseline */
+async function loadBaseline() {
+  const s = document.getElementById("b-sys").value;
+  if (!s) return;
+  try {
+    const d = await IB.get("/api/ops/baselines/" + encodeURIComponent(s));
+    document.getElementById("b-mode").textContent = `mode: ${d.mode}` + (d.mode === "smart"
+      ? " — a warning that is normal for the hour is graded normal; an unusual value becomes a warning; critical is never changed" : "");
+    const cls = { normal: "p-ok", high: "p-warn", low: "p-info", learning: "" };
+    document.getElementById("b-tbl").innerHTML = `<tr><th>Metric</th><th>Now</th><th>Normal for this hour</th><th>State</th><th>Based on</th></tr>` +
+      ((d.metrics || []).map(m => `<tr><td class="mono">${E(m.metric)}</td><td class="mono">${m.value ?? "—"}</td>
+        <td class="mono">${m.low !== undefined ? E(m.low + " – " + m.high) + ` <span class="muted">(middle ${E(m.median)})</span>` : "—"}</td>
+        <td><span class="pill ${cls[m.state] || ""}">${E(m.state)}</span></td><td class="muted">${E(m.basis)} · ${m.days} day(s) of data</td></tr>`).join("")
+       || `<tr><td colspan="5" class="muted">No history for this system yet.</td></tr>`);
+  } catch (e) { fail("b-tbl", e); }
+}
+document.getElementById("b-sys").onchange = loadBaseline;
+
+/* ------------------------------------------------------------ runbooks */
+async function loadRunbooks() {
+  try {
+    const d = await IB.get("/api/ops/runbooks");
+    document.getElementById("r-tbl").innerHTML = `<tr><th>Runbook</th><th>Used for</th><th>Steps</th><th></th></tr>` +
+      (d.runbooks || []).map(r => `<tr><td><b>${E(r.title)}</b></td><td class="mono" style="font-size:11px">${E(r.applies_to.join(", "))}</td>
+        <td class="mono">${r.steps}</td><td><a class="btn ops-btn" href="/runbook?id=${encodeURIComponent(r.id)}">Open</a></td></tr>`).join("");
+  } catch (e) { fail("r-tbl", e); }
+}
+
+/* --------------------------------------------------------------- ask */
+document.getElementById("ask-go").onclick = askNow;
+document.getElementById("ask-q").addEventListener("keydown", e => { if (e.key === "Enter") askNow(); });
+async function askNow() {
+  const q = document.getElementById("ask-q").value.trim();
+  if (!q) return;
+  const out = document.getElementById("ask-out");
+  out.innerHTML = IB.busy.inline("Looking through the record…");
+  try {
+    const d = await OPS.post("/api/ops/ask", { question: q }, "Thinking…");
+    out.innerHTML = `<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.55">${E(d.answer)}</div>
+      <div class="muted" style="margin-top:8px">${d.ai ? "Summarised by AI from" : "From"} ${d.events.length} recorded event(s) in ${E(d.window)}
+        · ${E(d.systems.join(", "))}${d.ai_error ? " · AI unavailable: " + E(d.ai_error) : ""}</div>
+      <details style="margin-top:8px"><summary class="muted">Facts used</summary><div class="tw"><table>
+      ${d.events.map(e => `<tr><td class="mono" style="white-space:nowrap">${E(e.at.slice(5, 16))}</td><td>${E(e.system)}</td><td>${E(e.title)}</td></tr>`).join("")}
+      </table></div></details>`;
+  } catch (e) { out.innerHTML = `<div class="banner banner-err">${E(e.message)}</div>`; }
+}
+
+/* ------------------------------------------------------ noise, availability */
+async function loadNoise() {
+  const days = document.getElementById("n-days").value;
+  try {
+    const [n, a] = await Promise.all([IB.get("/api/ops/noise?days=" + days), IB.get("/api/ops/availability?days=" + days)]);
+    document.getElementById("av-tbl").innerHTML = `<tr><th>System</th><th>Availability</th><th>Outages</th><th>Down</th><th>Not reachable (any reason)</th></tr>` +
+      (a.rows || []).map(r => `<tr><td>${E(r.system)}</td><td><span class="pill ${r.availability_pct >= 99.5 ? "p-ok" : r.availability_pct >= 98 ? "p-warn" : "p-bad"}">${r.availability_pct}%</span>${r.open ? " <span class='pill p-bad'>open now</span>" : ""}</td>
+        <td class="mono">${r.outages}</td><td class="mono">${r.down_minutes} min</td><td class="mono">${r.unreachable_minutes} min</td></tr>`).join("");
+    document.getElementById("n-tbl").innerHTML = `<tr><th>System</th><th>Alert</th><th>Sent</th><th>Repeats held</th><th>Snoozed</th><th>Ack'd</th><th>Ignored</th><th>Median time to ack</th><th>Advice</th></tr>` +
+      ((n.rows || []).slice(0, 40).map(r => `<tr><td>${E(r.system)}</td><td class="mono">${E(r.kind)}</td><td class="mono">${r.sent}</td>
+        <td class="mono">${r.repeats_held}</td><td class="mono">${r.snoozed}</td><td class="mono">${r.acknowledged}</td><td class="mono">${r.ignored}</td>
+        <td class="mono">${r.median_ack_minutes === null ? "—" : r.median_ack_minutes + " min"}</td><td>${E(r.tip)}</td></tr>`).join("")
+       || `<tr><td colspan="9" class="muted">No alerts in this period.</td></tr>`);
+  } catch (e) { fail("n-tbl", e); }
+}
+document.getElementById("n-days").onchange = loadNoise;
+document.getElementById("digest-send").onclick = async () => {
+  try { await OPS.post("/api/ops/digest/send", {}, "Sending…"); OPS.toast("Digest sent"); } catch (e) { OPS.toast(e.message, "err"); }
+};
+
+/* ------------------------------------------------------------ changes */
+async function loadChanges() {
+  const s = document.getElementById("ch-sys").value;
+  if (!s) return;
+  try {
+    const d = await IB.get(`/api/ops/changes/${encodeURIComponent(s)}`);
+    const k = d.kernel || {};
+    const comps = Object.entries(d.components || {});
+    document.getElementById("ch-out").innerHTML = `<div class="grid g2">
+      <div class="card"><div class="card-h"><h3>Now</h3><span class="muted">snapshot ${E(d.snapshot_at || "never")}</span></div><div class="card-b">
+        ${Object.keys(k).length ? Object.entries(k).map(([a, b]) => `<div><span class="muted">${E(a.replace(/_/g, " "))}:</span> <span class="mono">${E(b)}</span></div>`).join("") : '<div class="muted">no snapshot yet</div>'}
+        ${(d.unavailable || []).length ? `<div class="muted" style="margin-top:8px">Not available: ${E(d.unavailable.join("; "))}</div>` : ""}
+        ${comps.length ? `<details style="margin-top:8px"><summary class="muted">${comps.length} software components</summary>
+          ${comps.map(([a, b]) => `<div class="mono" style="font-size:11.5px">${E(a)} ${E(b)}</div>`).join("")}</details>` : ""}</div></div>
+      <div class="card"><div class="card-h"><h3>Recorded changes</h3><a class="btn ops-btn" href="/timeline?system=${encodeURIComponent(s)}">Timeline</a></div>
+        <div class="card-b tw" style="padding:0"><table>${(d.recent || []).map(r => `<tr><td class="mono" style="white-space:nowrap">${E(r.at.slice(5, 16))}</td>
+        <td>${E(r.title)}</td></tr>`).join("") || `<tr><td class="muted">none in the last 7 days</td></tr>`}</table></div></div></div>`;
+  } catch (e) { fail("ch-out", e); }
+}
+document.getElementById("ch-sys").onchange = loadChanges;
+document.getElementById("ch-snap").onclick = async () => {
+  try {
+    const d = await OPS.post(`/api/ops/changes/${encodeURIComponent(document.getElementById("ch-sys").value)}/snapshot`, {}, "Reading SAP…");
+    OPS.toast(`${d.changes.length} change(s) found`); loadChanges();
+  } catch (e) { OPS.toast(e.message, "err"); }
+};
+
+(async () => {
+  try {
+    const s = await IB.get("/api/systems");
+    SYSTEMS = (s.systems || s || []).map(x => x.name || x).filter(Boolean);
+  } catch (e) { SYSTEMS = []; }
+  document.getElementById("m-sys").innerHTML = SYSTEMS.map(n => `<option>${E(n)}</option>`).join("") + `<option value="*">All systems</option>`;
+  document.getElementById("c-sys").innerHTML += SYSTEMS.map(n => `<option>${E(n)}</option>`).join("");
+  document.getElementById("b-sys").innerHTML = SYSTEMS.map(n => `<option>${E(n)}</option>`).join("");
+  document.getElementById("ch-sys").innerHTML = SYSTEMS.map(n => `<option>${E(n)}</option>`).join("");
+  const tab = (location.hash || "#now").slice(1).replace(/[^a-z]/g, "");
+  const el = Array.from(document.querySelectorAll(".tab")).find(t => t.dataset.p === tab) || document.querySelector(".tab");
+  el.click();
+})();
+</script>
+</body>
+</html>

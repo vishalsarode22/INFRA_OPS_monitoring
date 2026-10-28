@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Monitoring log</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .mono{font-family:var(--mono);font-size:11.5px;white-space:nowrap}
+  .why{font-size:11.5px;color:var(--muted-dim);overflow-wrap:anywhere;max-width:420px}
+  .who{font-size:11.5px;overflow-wrap:anywhere;max-width:320px}
+  .flag{color:var(--red);font-weight:800;font-size:11px}
+  .sec-h{font-size:13px;font-weight:700;margin:18px 0 8px}
+  td{vertical-align:top}
+  tr.run{cursor:pointer}
+  tr.run:hover td{background:var(--gray-bg)}
+  tr.detail td{background:var(--gray-bg);padding:10px 14px}
+  .caret{display:inline-block;width:12px;color:var(--muted-dim)}
+  .c-info{background:var(--info-bg);color:var(--info);border:1px solid var(--info-br)}
+  .st-sent{color:var(--green);font-weight:700}
+  .st-suppressed{color:var(--amber);font-weight:700}
+  .st-failed{color:var(--red);font-weight:700}
+  .st-queued,.st-sending{color:var(--muted-dim);font-weight:700}
+  .tabs{display:flex;gap:6px;margin:18px 0 8px}
+  .tabs .btn.on{outline:2px solid var(--sky-600)}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Monitoring log</h2><div class="sub">Which monitoring ran, when it started and ended, which mails went out and to whom, and when the next run is due</div></div>
+    <div class="top-actions">
+      <span class="chip c-live"><span class="pulse"></span> live</span>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="row">
+      <select class="input" id="system"><option value="">all systems</option></select>
+      <select class="input" id="days"><option value="1">last 24 h</option><option value="7" selected>7 days</option>
+        <option value="30">30 days</option></select>
+      <select class="input" id="result"><option value="">all results</option>
+        <option>success</option><option>failed</option><option>skipped</option><option>missed</option>
+        <option>parked</option><option>hung-killed</option><option>abandoned</option><option>stopped-by-user</option></select>
+      <a class="btn" id="csv" href="/api/monitoring-log.csv" style="text-decoration:none">Download CSV</a>
+      <span class="sub" id="sum"></span>
+    </div>
+    <div id="banner"></div>
+
+    <div class="sec-h">Next monitoring</div>
+    <div class="card"><div id="next"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading…</span></div></div></div>
+
+    <div class="tabs">
+      <button class="btn on" id="tab-runs" type="button">Monitoring runs</button>
+      <button class="btn" id="tab-mails" type="button">All emails</button>
+    </div>
+    <div class="card" id="pane-runs"><div id="runs"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading…</span></div></div></div>
+    <div class="card" id="pane-mails" style="display:none"><div id="mails"></div></div>
+    <p style="margin-top:12px;font-size:11.5px;color:var(--muted-dim)">
+      A mail belongs to a run when its delivery carries the run's id, or when it was sent for the same system
+      between the run's start and a few minutes after its end. Suppressed mails show why they were held
+      (switched off, maintenance, snooze, cap, mail outage). Times are local time of this browser.</p>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script>
+IB.mountShell("monitoringlog");
+IB.themeToggle(document.getElementById("theme"));
+const $ = id => document.getElementById(id);
+/* Every value from the server goes through esc() before it reaches innerHTML. */
+const esc = s => IB.esc(s == null ? "" : String(s));
+const CHIP = {"success": "c-normal", "failed": "c-critical", "hung-killed": "c-critical", "abandoned": "c-critical",
+              "parked": "c-warning", "missed": "c-warning", "skipped": "c-unknown", "stopped-by-user": "c-info"};
+const STATE = {"scheduled": "c-normal", "held": "c-warning", "parked": "c-warning", "paused": "c-warning",
+               "disabled": "c-unknown"};
+const pad = n => String(n).padStart(2, "0");
+let DATA = null, OPEN = new Set(), TAB = "runs";
+
+// Stamps are the VM's local clock with no zone; DATA tells how far that clock
+// is from UTC, and the page shows every time in IST (display_* fields).
+function toDate(s) {
+  if (!s) return null;
+  const t = String(s).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/.exec(t);
+  if (!m) { const d = new Date(t); return isNaN(d.getTime()) ? null : d; }
+  const srv = DATA && DATA.server_utc_offset_min != null ? DATA.server_utc_offset_min : -new Date().getTimezoneOffset();
+  const utc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) - srv * 60000;
+  return new Date(utc);
+}
+function when(s) {
+  const d = toDate(s);
+  if (!d) return s ? String(s) : "";
+  const off = DATA && DATA.display_utc_offset_min != null ? DATA.display_utc_offset_min : 330;
+  const z = new Date(d.getTime() + off * 60000);
+  let h = z.getUTCHours(); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
+  const mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][z.getUTCMonth()];
+  return `${pad(z.getUTCDate())} ${mon} ${z.getUTCFullYear()}, ${pad(h)}:${pad(z.getUTCMinutes())} ${ap} ${(DATA && DATA.display_tz_name) || "IST"}`;
+}
+function relative(s) {
+  const d = toDate(s);
+  if (!d) return "";
+  let min = Math.round((d.getTime() - Date.now()) / 60000);
+  const past = min < 0; min = Math.abs(min);
+  if (min < 1) return "now";
+  const h = Math.floor(min / 60), m = min % 60, days = Math.floor(h / 24);
+  const txt = days >= 1 ? `${days} d ${h % 24} h` : h ? `${h} h ${m} min` : `${m} min`;
+  return past ? `${txt} ago` : `in ${txt}`;
+}
+function dur(sec) {
+  if (sec == null || sec === "") return "";
+  const s = Math.round(Number(sec));
+  if (!isFinite(s)) return "";
+  return s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`;
+}
+const list = a => (a || []).map(esc).join(", ");
+function who(m) {
+  if (DATA && DATA.recipients_hidden) return `<span class="why">hidden (admin only)</span>`;
+  return list(m.to) || "—";
+}
+const statusCell = m => `<span class="st-${esc(m.status)}">${esc(m.status_text || m.status)}</span>`;
+
+function query() {
+  const p = new URLSearchParams();
+  if ($("system").value) p.set("system", $("system").value);
+  if ($("result").value) p.set("result", $("result").value);
+  p.set("days", $("days").value || "7");
+  p.set("limit", "200");
+  return p.toString();
+}
+
+function renderNext(d) {
+  const notes = [];
+  if (d.paused) notes.push("Automatic monitoring is paused.");
+  if (d.snoozed) notes.push("Automatic monitoring is snoozed.");
+  if (d.manual_hold) notes.push("A manual run is in progress; automatic runs wait until it ends.");
+  $("banner").innerHTML = notes.map(n => `<div class="banner banner-err" style="margin-bottom:10px">${esc(n)}</div>`).join("");
+  const rows = (d.upcoming || []).map(u => `<tr>
+      <td>${esc(u.system)}${u.name ? `<div><b>${esc(u.name)}</b></div>` : ""}<div class="why">${u.profile ? "profile " + esc(u.profile) : esc(u.source)}</div></td>
+      <td class="mono">${u.next_run_at ? esc(when(u.next_run_at)) : "—"}<div class="why">${esc(u.next_run_at ? relative(u.next_run_at) : "")}</div></td>
+      <td>${esc(u.schedule)}</td>
+      <td><span class="chip ${STATE[u.state] || "c-unknown"}">${esc(u.state)}</span>
+          ${u.state !== "scheduled" ? `<div class="why">${esc(u.reason)}</div>` : ""}</td>
+      <td class="mono">${esc(when(u.last_run))}</td></tr>`).join("");
+  $("next").innerHTML = rows ? `<table><thead><tr><th>System / profile</th><th>Next run</th><th>Schedule</th>
+      <th>Status</th><th>Last planned run</th></tr></thead><tbody>${rows}</tbody></table>`
+    : `<div class="empty">No profile or saved schedule — nothing runs automatically.</div>`;
+}
+
+function mailTable(mails, withSystem) {
+  if (!mails.length) return `<div class="empty">No mail recorded.</div>`;
+  return `<table><thead><tr><th>Time</th>${withSystem ? "<th>System</th>" : ""}<th>Type</th><th>Subject</th>
+      <th>To</th><th>Cc</th><th>Channel</th><th>Status</th></tr></thead><tbody>
+    ${mails.map(m => `<tr>
+      <td class="mono">${esc(when(m.at))}</td>
+      ${withSystem ? `<td>${esc(m.system)}</td>` : ""}
+      <td>${esc(m.kind_label)}</td>
+      <td class="why">${esc(m.subject || m.detail || "")}</td>
+      <td class="who">${who(m)}</td>
+      <td class="who">${DATA && DATA.recipients_hidden ? "" : list(m.cc)}</td>
+      <td>${esc(m.channel_label || m.channel)}</td>
+      <td class="why">${statusCell(m)}</td></tr>`).join("")}</tbody></table>`;
+}
+
+function shortWhy(r) {
+  const t = String(r.failure_reason || r.failed_stage || "");
+  return t.length > 90 ? t.slice(0, 88) + "…" : t;
+}
+// Who got the mails of this run, in full: "Report → a, b (cc c)"; what was not sent and why.
+function mailWho(mails) {
+  const hidden = DATA && DATA.recipients_hidden;
+  // A sent mail with nobody on it ("Job owner → —") is noise: leave it out.
+  const sent = mails.filter(m => m.status === "sent" && (hidden || (m.to || []).length || (m.cc || []).length));
+  const notSent = mails.filter(m => m.status !== "sent");
+  if (!sent.length && !notSent.length) return "—";
+  const parts = sent.map(m => `<div><b>${esc(m.kind_label || "Mail")}</b> → ${hidden ? "sent" : list(m.to) || "—"}`
+      + (!hidden && (m.cc || []).length ? ` <span class="why">(cc ${list(m.cc)})</span>` : "") + `</div>`);
+  notSent.forEach(m => parts.push(`<div class="why">${esc(m.kind_label || "Mail")}: ${esc(m.status_text || m.status)}</div>`));
+  return parts.join("");
+}
+
+function renderRuns(d) {
+  const runs = d.runs || [];
+  $("sum").textContent = `${runs.length} run(s) · ${(d.emails || []).length} mail decision(s)`;
+  if (!runs.length) { $("runs").innerHTML = `<div class="empty">No monitoring recorded for this filter.</div>`; return; }
+  const body = runs.map((r, i) => {
+    const mails = r.emails || [];
+    const sent = mails.filter(m => m.status === "sent");
+    const first = sent.length ? (DATA.recipients_hidden ? "" : list((sent[0].to || []).slice(0, 2))) : "";
+    const open = OPEN.has(String(r.id));
+    const main = `<tr class="run" data-i="${i}">
+      <td class="mono"><span class="caret">${open ? "▾" : "▸"}</span>${esc(when(r.started_at || r.planned_at || r.recorded_at))}</td>
+      <td class="mono">${esc(when(r.ended_at))}</td>
+      <td class="mono">${esc(dur(r.duration_s))}</td>
+      <td>${esc(r.system)}</td>
+      <td>${r.run_name ? "<b>" + esc(r.run_name) + "</b><div class='why'>" + esc(r.trigger_label) + "</div>"
+           : r.profile_id ? esc(r.profile_id) + "<div class='why'>" + esc(r.trigger_label) + "</div>" : esc(r.trigger_label)}
+          ${r.unexpected ? ` <span class="flag" title="Started outside its schedule">UNEXPECTED</span>` : ""}</td>
+      <td><span class="chip ${CHIP[r.result] || "c-unknown"}">${esc(r.result)}</span>
+          ${r.result !== "success" && (r.failure_reason || r.failed_stage)
+            ? `<div class="why" title="${esc(r.failure_reason || "")}">${esc(shortWhy(r))}</div>` : ""}</td>
+      <td class="mono">${r.screenshots_captured != null ? esc(r.screenshots_captured) : ""}</td>
+      <td class="who">${mails.length ? mailWho(mails) : "—"}</td>
+      <td class="why">${r.next_run_at ? esc(when(r.next_run_at)) + " " : ""}${esc(r.next_run_reason || "")}</td></tr>`;
+    if (!open) return main;
+    const fail = (r.failed_stage || r.failure_reason)
+      ? `<div style="margin-bottom:8px"><b>Failed at:</b> ${esc(r.failed_stage || "—")} <div class="why">${esc(r.failure_reason || "")}</div></div>` : "";
+    const meta = `<div class="why" style="margin-bottom:8px">Run ${esc(r.run_id)} · planned ${esc(when(r.planned_at) || "—")}
+      ${r.attempt ? " · attempt " + esc(r.attempt) + "/" + esc(r.attempts_max || "?") : ""}${r.note ? " · " + esc(r.note) : ""}</div>`;
+    return main + `<tr class="detail"><td colspan="9">${meta}${fail}${mailTable(mails, false)}</td></tr>`;
+  }).join("");
+  $("runs").innerHTML = `<table><thead><tr><th>Started</th><th>Ended</th><th>Duration</th><th>System</th>
+      <th>Profile / trigger</th><th>Result</th><th>Screens</th><th>Emails</th><th>Next run</th></tr></thead>
+      <tbody>${body}</tbody></table>`;
+}
+
+function render() {
+  if (!DATA) return;
+  renderNext(DATA);
+  renderRuns(DATA);
+  $("mails").innerHTML = mailTable(DATA.emails || [], true);
+}
+
+async function load() {
+  const q = query();
+  $("csv").href = "/api/monitoring-log.csv?" + q;
+  try {
+    DATA = await IB.get("/api/monitoring-log?" + q);
+    const sel = $("system"), cur = sel.value;
+    const have = new Set([...sel.options].map(o => o.value));
+    (DATA.systems || []).forEach(s => { if (!have.has(s)) sel.add(new Option(s, s)); });
+    sel.value = cur;
+    render();
+  } catch (e) {
+    $("runs").innerHTML = `<div class="banner banner-err" style="margin:14px">${esc(e.message)}</div>`;
+  }
+}
+
+$("runs").addEventListener("click", ev => {
+  const tr = ev.target.closest("tr.run");
+  if (!tr || !DATA) return;
+  const r = (DATA.runs || [])[Number(tr.dataset.i)];
+  if (!r) return;
+  const k = String(r.id);
+  OPEN.has(k) ? OPEN.delete(k) : OPEN.add(k);
+  renderRuns(DATA);
+});
+function tab(name) {
+  TAB = name;
+  $("pane-runs").style.display = name === "runs" ? "" : "none";
+  $("pane-mails").style.display = name === "mails" ? "" : "none";
+  $("tab-runs").classList.toggle("on", name === "runs");
+  $("tab-mails").classList.toggle("on", name === "mails");
+}
+$("tab-runs").onclick = () => tab("runs");
+$("tab-mails").onclick = () => tab("mails");
+["system", "days", "result"].forEach(id => $(id).onchange = () => { OPEN.clear(); load(); });
+load();
+IB.poll(load, 60000);
+</script>
+</body>
+</html>

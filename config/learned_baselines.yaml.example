@@ -1,0 +1,27 @@
+# Learned normal values (core/learned_baseline.py). Optional: the defaults
+# below apply without this file. Copy to config/learned_baselines.yaml to change.
+
+# smart    -- a WARNING that is normal for this hour is graded NORMAL; an
+#             unusual high value becomes a WARNING; CRITICAL never changes
+# annotate -- only add "normal for Mon 09:00: 420-760" to the detail
+# off      -- nothing
+mode: smart
+
+# How wide "normal" is: middle value +/- k typical strays (k = 3 is about
+# "1 reading in 100 falls outside by chance").
+k: 3
+
+# Readings at the same weekday-hour from this many different weeks are
+# needed before that hour has its own band.
+min_weeks: 3
+
+# Metrics that get a learned band (default list shown):
+# include: [cpu, memory, load_1m, dialog_queue, update_queue, db_rtt_ms, sessions,
+#           sap.al08.user_logons, sap.sm12.lock_count, sap.sm50.wp_in_use,
+#           sap.sm66.wp_saturation_pct, sap.st03.dialog_resp_ms, sap.smlg.response_time,
+#           sap.st22.dumps, sap.sm37.cancelled_jobs, sap.sm58.stuck_entries,
+#           sap.smq1.entries, sap.smq2.entries, sap.su01.locked_users]
+# exclude: []
+
+# Never turned down from WARNING, even when "normal for this hour":
+never_downgrade: [sap.sm13.failed_updates, sap.we02.failed_idocs, sap.db12.last_backup, rfc.connection]

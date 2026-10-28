@@ -1,0 +1,70 @@
+# Credentials and login state -- never commit
+.env
+.env.*
+!.env.example
+config/systems.yaml
+config/systems.yaml.*
+config/systems-*.yaml
+config/systems_paused.yaml
+config/systems_paused.yaml.*
+!config/systems.yaml.example
+config/users.yaml
+config/backups/
+config/.secrets_changed
+config/vault.key
+dashboard/session_secret.key
+*.key
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Python / editors
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.vscode/
+.idea/
+
+# Logs, reports, client data
+logs/
+*.log
+reports/
+*.pdf
+*.xlsx
+*.xlsm
+!config/templates/*.xlsx
+~$*
+
+# Runtime state written by the dashboard, scheduler and collector
+dashboard/snapshots/
+dashboard/events/
+dashboard/incidents/
+dashboard/intelligence_state/
+dashboard/history/
+dashboard/changes/
+dashboard/run_history.json
+dashboard/run_history.sqlite*
+dashboard/outbox/
+dashboard/latest_status.json
+dashboard/parser_health.json
+dashboard/*.lock
+config/profile_state.json
+config/schedules.json
+
+# Scratch and backups
+*.bak*
+*.broken
+*.working
+*.good
+*.ORIGINAL-REPO
+probe_out.txt
+smlg_rfc*.txt
+alert_*.html
+Name
+CHANGES.diff
+
+config/remote_sources.yaml
+# Runtime state shared between processes (RFC logon guard)
+runtime/

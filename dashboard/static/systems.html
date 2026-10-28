@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Systems</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();
+// Projects already used by a system, offered in the Project box.
+function fillProjects() {
+  try {
+    const dl = document.getElementById("f-customer-list");
+    if (!dl) return;
+    const names = new Set();
+    ((typeof DATA !== "undefined" && Array.isArray(DATA)) ? DATA : []).forEach(x => { if (x && x.customer) names.add(String(x.customer)); });
+    dl.innerHTML = [...names].sort().map(n => `<option value="${IB.esc(n)}">`).join("");
+  } catch (e) { /* the box works without suggestions */ }
+}
+</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .paths span{margin-right:4px}
+  .cfg{font-family:var(--mono);font-size:11.5px;color:var(--muted-dim)}
+  .sec{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       color:var(--muted-dim);margin:18px 0 9px;padding-bottom:5px;
+       border-bottom:1px solid var(--border)}
+  .sec .hint{font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted-dim);
+       font-size:10.5px;margin-left:6px}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px 16px}
+  .fgrid label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700;
+       letter-spacing:.03em;text-transform:uppercase;color:var(--muted-dim)}
+  .fgrid .input{text-transform:none;letter-spacing:0;font-weight:400}
+  .req{color:var(--red)}
+  .mailgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+  .mbox{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+  .mb-int{border-left:4px solid var(--info)} .mb-rep{border-left:4px solid var(--red)}
+  .mhead{font-weight:800;font-size:13px;color:var(--text)} .mhead span{font-weight:500;font-size:11.5px;color:var(--muted);margin-left:6px}
+  .mfield{display:flex;flex-direction:column;gap:5px;text-transform:none;letter-spacing:0;font-weight:400}
+  .mfield .mgets,.mfield .mempty,.mfield .src{text-transform:none;letter-spacing:0}
+  .mlabel{font-size:12px}
+  .mgets{font-size:11.5px;color:var(--muted);line-height:1.45} .mgets b{color:var(--text)}
+  .mempty{font-size:11px;color:var(--muted-dim);line-height:1.4}
+  .mempty.eff{color:var(--text)} .mempty .src{color:var(--muted-dim)}
+  .rp{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:var(--radius-pill);
+      padding:2px 9px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}
+  .r-Manager{background:var(--amber-bg);border-color:var(--amber-br);color:var(--amber)}
+  .r-Basis{background:var(--info-bg);border-color:var(--info-br);color:var(--info)}
+  .r-Client{background:var(--red-bg);border-color:var(--red-br);color:var(--red)}
+  .r-Infrabeat,.r-Other{background:var(--gray-bg);border-color:var(--gray-br);color:var(--gray)}
+  .mprev{margin-top:14px;border:1px dashed var(--border);border-radius:var(--radius-sm);padding:12px 14px}
+  .mprev-h{font-weight:800;font-size:13px;margin-bottom:8px}
+  .mprev .hint{font-weight:500;font-size:11.5px;color:var(--muted-dim)}
+  .mprev table{width:100%;border-collapse:collapse} .mprev td,.mprev th{font-size:12px;padding:6px 8px;border-top:1px solid var(--border);vertical-align:top;text-align:left}
+  .mprev th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-dim);border-top:0}
+  .mprev .who{font-size:12px;line-height:1.5} .mprev .who i{color:var(--muted-dim);font-style:normal}
+  .mwarn{color:var(--amber);font-size:12px;margin-top:6px} .minfo{color:var(--muted);font-size:12px;margin-top:6px}
+
+  /* ======================================================================
+     Systems, glass: three still colour fields behind frosted panels. The
+     colour is there so the frost has something to blur; nothing drifts.
+     ====================================================================== */
+  body.pg-systems{--gl-bg:rgba(255,255,255,.40);--gl-bg-2:rgba(255,255,255,.28);--gl-edge:rgba(255,255,255,.78);
+    --gl-line:rgba(14,34,64,.10);--gl-shadow:0 10px 36px rgba(22,60,130,.14)}
+  html[data-theme="dark"] body.pg-systems{--gl-bg:rgba(18,32,56,.48);--gl-bg-2:rgba(18,32,56,.32);--gl-edge:rgba(255,255,255,.12);
+    --gl-line:rgba(255,255,255,.08);--gl-shadow:0 10px 36px rgba(0,0,0,.45)}
+  body.pg-systems::before{background:
+      radial-gradient(40% 46% at 12% 18%,rgba(47,140,243,.55),transparent 70%),
+      radial-gradient(36% 42% at 88% 12%,rgba(124,92,255,.42),transparent 70%),
+      radial-gradient(44% 50% at 70% 92%,rgba(32,196,181,.38),transparent 70%),
+      linear-gradient(160deg,#DCE8F7,#EEF1FA 50%,#E3F2F0)}
+  html[data-theme="dark"] body.pg-systems::before{background:
+      radial-gradient(40% 46% at 12% 18%,rgba(47,140,243,.38),transparent 70%),
+      radial-gradient(36% 42% at 88% 12%,rgba(124,92,255,.30),transparent 70%),
+      radial-gradient(44% 50% at 70% 92%,rgba(32,196,181,.24),transparent 70%),
+      linear-gradient(160deg,#07101F,#0A1426 50%,#06151A)}
+  .pg-systems .card,.pg-systems .topbar{background:var(--gl-bg);border:1px solid var(--gl-edge);
+    backdrop-filter:blur(22px) saturate(1.6);-webkit-backdrop-filter:blur(22px) saturate(1.6);
+    box-shadow:var(--gl-shadow),inset 0 1px 0 var(--gl-edge)}
+  .pg-systems .card{border-radius:18px}
+  .pg-systems .card-h{border-bottom:1px solid var(--gl-line)}
+  .pg-systems th{background:transparent;border-bottom:1px solid var(--gl-line)}
+  .pg-systems td{border-bottom:1px solid var(--gl-line)}
+  .pg-systems tr:hover td{background:var(--gl-bg-2)}
+  .pg-systems .input,.pg-systems select.input,.pg-systems textarea{background:var(--gl-bg-2);border:1px solid var(--gl-edge);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .pg-systems .input:focus{background:var(--gl-bg)}
+  .pg-systems .btn{background:var(--gl-bg-2);border:1px solid var(--gl-edge);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .pg-systems .btn:hover{background:var(--gl-bg)}
+  .pg-systems .btn-primary,.pg-systems .btn.primary,.pg-systems .btn-brand{backdrop-filter:none}
+  .pg-systems .mbox{background:var(--gl-bg-2);border:1px solid var(--gl-edge);border-left-width:4px;border-radius:14px}
+  .pg-systems .mb-int{border-left-color:var(--info)} .pg-systems .mb-rep{border-left-color:var(--red)}
+  .pg-systems .mprev{background:var(--gl-bg-2);border:1px solid var(--gl-edge);border-radius:14px}
+  .pg-systems .mprev th{background:transparent}
+  .pg-systems .sec{border-bottom-color:var(--gl-line)}
+</style>
+</head>
+<body class="pg-systems">
+<main>
+  <div class="topbar">
+    <div><h2>Systems</h2>
+      <div class="sub">Registry, collection paths and current state</div></div>
+    <div class="top-actions">
+      <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
+      <input class="input" id="q" placeholder="🔍 Filter systems by name / SID / host" title="Type to filter the list. Leave empty to show all systems." style="min-width:280px">
+      <span id="run-ctl"></span>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="banner banner-warn" style="display:none" id="warn"></div>
+
+    <div class="card">
+      <div class="card-h"><h3>Registered systems</h3>
+        <span class="src src-none" id="count">–</span></div>
+      <div style="overflow-x:auto">
+        <table id="tbl">
+          <tr>
+            <th>System</th><th>SID</th><th>Client</th><th>Host</th>
+            <th>Collection paths</th><th>State</th><th>Metrics</th>
+            <th>Last sweep</th><th></th>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+
+    <div class="card" style="margin-top:16px" id="add-card">
+      <div class="card-h">
+        <h3 id="form-title">Add a system</h3>
+        <button class="btn" id="toggle-add" style="margin-left:auto">Show form</button>
+      </div>
+      <div class="card-b" id="add-body" style="display:none">
+
+        <p style="font-size:12.5px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+          RFC is the important part. It works headless — no SAP GUI host, no OS
+          access — so it is the only path that reports on RISE and hosted
+          systems. A system added without RFC details produces no T-code
+          counters and stays blank on the live wall.
+          Passwords are written to <span class="mono">.env</span>; the registry
+          file itself only stores <span class="mono">${VAR}</span> references.
+        </p>
+
+        <div class="sec">Identity</div>
+        <div class="fgrid">
+          <label>System name <span class="req">*</span>
+            <input class="input" id="f-name" placeholder="BWQ"></label>
+          <label>SAP SID
+            <input class="input" id="f-sid" placeholder="BWQ"></label>
+          <label>Client <span class="req">*</span>
+            <input class="input" id="f-client" placeholder="100"></label>
+          <label>Language
+            <input class="input" id="f-lang" value="EN"></label>
+        </div>
+
+        <div class="sec">RFC — headless collection <span class="hint">strongly recommended</span></div>
+        <div class="fgrid">
+          <label>Application server
+            <input class="input" id="f-rfc-host" placeholder="10.1.0.178"></label>
+          <label>System number
+            <input class="input" id="f-rfc-sysnr" placeholder="00"></label>
+          <label>RFC client
+            <input class="input" id="f-rfc-client" placeholder="defaults to client above"></label>
+          <label>RFC user
+            <input class="input" id="f-rfc-user" placeholder="MONITORING"></label>
+          <label>RFC password
+            <input class="input" id="f-rfc-pass" type="password"></label>
+          <label>SAProuter route
+            <input class="input" id="f-rfc-router"
+                   placeholder="/H/router/H/ — keep the trailing /H/"></label>
+        </div>
+
+        <div class="sec">SAP GUI — screenshots and OCR evidence <span class="hint">optional</span></div>
+        <div class="fgrid">
+          <label style="grid-column:1/-1;flex-direction:row;align-items:center;gap:8px">
+            <input type="checkbox" id="f-gui"> Enable SAP GUI collection
+            <span class="hint">needs a Windows host with SAP GUI and an unlocked desktop</span>
+          </label>
+          <label>Logon Pad connection name
+            <input class="input" id="f-conn" placeholder="exact name, case-sensitive"></label>
+          <label>SAP user
+            <input class="input" id="f-user"></label>
+          <label>SAP password
+            <input class="input" id="f-pass" type="password"></label>
+        </div>
+
+        <div class="sec">OS access over SSH <span class="hint">optional</span></div>
+        <div class="fgrid">
+          <label style="grid-column:1/-1;flex-direction:row;align-items:center;gap:8px">
+            <input type="checkbox" id="f-ssh"> Enable SSH collection
+            <span class="hint">CPU, memory, swap, disk, sapcontrol</span>
+          </label>
+          <label>SSH host <input class="input" id="f-ssh-host"></label>
+          <label>SSH port <input class="input" id="f-ssh-port" value="22"></label>
+          <label>SSH user <input class="input" id="f-ssh-user" value="root"></label>
+          <label>SSH password <input class="input" id="f-ssh-pass" type="password"></label>
+          <label>Instance number <input class="input" id="f-inst" placeholder="00"></label>
+        </div>
+
+        <div class="sec">Who gets mails for this system
+          <span class="hint">four lists — each one gets different mails. Separate addresses with commas.</span></div>
+        <div class="mailgrid">
+          <div class="mbox mb-int">
+            <div class="mhead">Alerts <span>internal only — never the client</span></div>
+            <label class="mfield"><span class="mlabel"><b class="rp r-Basis">Basis team</b></span>
+              <input class="input" id="f-basis" placeholder="e.g. staff.c@infrabeat.com">
+              <span class="mgets"><b>Gets:</b> the first mail when a value crosses its limit · VPN, tunnel and
+                password problems · performance analyses (RCA) · a copy of every reminder and SYSTEM DOWN mail.</span>
+              <span class="mempty" id="e-basis">Empty = the on-call rotation, else IBO_BASIS_EMAILS in .env.</span></label>
+            <label class="mfield"><span class="mlabel"><b class="rp r-Manager">Basis manager</b></span>
+              <input class="input" id="f-manager" placeholder="e.g. staff.a@infrabeat.com">
+              <span class="mgets"><b>Gets:</b> reminders while a value stays bad · a value going bad again soon after
+                it recovered · SYSTEM DOWN / NOT REACHABLE.</span>
+              <span class="mempty" id="e-manager">Empty = ALERT_MANAGER_EMAILS in .env. No manager at all = these go to Basis only.</span></label>
+          </div>
+          <div class="mbox mb-rep">
+            <div class="mhead">Monitoring report <span>the PDF + Excel after each scheduled run</span></div>
+            <label class="mfield"><span class="mlabel"><b class="rp r-Client">Report To</b></span>
+              <input class="input" id="f-to" placeholder="e.g. sap.basis@client.com">
+              <span class="mgets"><b>Gets:</b> only the monitoring report — normally the client. Never alerts.</span>
+              <span class="mempty" id="e-to">Empty = ALERT_TO_EMAILS in .env. A profile can send its report to its own list instead.</span></label>
+            <label class="mfield"><span class="mlabel"><b class="rp r-Infrabeat">Report Cc</b></span>
+              <input class="input" id="f-cc" placeholder="e.g. staff.b@infrabeat.com">
+              <span class="mgets"><b>Gets:</b> a copy of the monitoring report only.</span>
+              <span class="mempty" id="e-cc">Empty = ALERT_CC_EMAILS in .env.</span></label>
+          </div>
+          <div class="mbox mb-int">
+            <div class="mhead">Own people for three mails <span>optional — empty = the normal rule above</span></div>
+            <label class="mfield"><span class="mlabel"><b class="rp r-Other">Back to normal</b></span>
+              <input class="input" id="f-recovery" placeholder="e.g. shift.lead@infrabeat.com">
+              <span class="mgets"><b>Gets:</b> "a value is back to normal" — instead of the people who got the alert.</span>
+              <span class="mempty" id="e-recovery">Empty = the same people as the alert (or IBO_RECOVERY_EMAILS in .env).</span></label>
+            <label class="mfield"><span class="mlabel"><b class="rp r-Other">System down</b></span>
+              <input class="input" id="f-down" placeholder="e.g. noc@infrabeat.com">
+              <span class="mgets"><b>Gets:</b> SYSTEM DOWN / NOT REACHABLE and "reachable again" — instead of manager + Basis.</span>
+              <span class="mempty" id="e-down">Empty = Basis manager + Basis team (or IBO_DOWN_EMAILS in .env).</span></label>
+            <label class="mfield"><span class="mlabel"><b class="rp r-Other">VPN / logon problems</b></span>
+              <input class="input" id="f-access" placeholder="e.g. network.team@infrabeat.com">
+              <span class="mgets"><b>Gets:</b> VPN or tunnel down, SAP refusing IBOPS's logon — instead of the Basis team.</span>
+              <span class="mempty" id="e-access">Empty = the Basis team (or IBO_ACCESS_EMAILS in .env).</span></label>
+          </div>
+        </div>
+        <div class="sec">How often, for this system
+          <span class="hint">optional — empty = the value shown in grey (from .env). A limit on the Thresholds page for one value still wins.</span></div>
+        <div class="fgrid" id="timing-grid">
+          <label>Readings over limit before 1st mail<input class="input t-in" type="number" min="0" id="t-raise_after" data-key="raise_after"></label>
+          <label>CRITICAL reminder (min)<input class="input t-in" type="number" min="0" id="t-repeat_critical_min" data-key="repeat_critical_min"></label>
+          <label>WARNING reminder (min)<input class="input t-in" type="number" min="0" id="t-repeat_warning_min" data-key="repeat_warning_min"></label>
+          <label>'Bad again soon' window (min)<input class="input t-in" type="number" min="0" id="t-escalate_window_min" data-key="escalate_window_min"></label>
+          <label>'Back to normal' only after (min)<input class="input t-in" type="number" min="0" id="t-recovery_min_minutes" data-key="recovery_min_minutes"></label>
+          <label>Failed checks before DOWN<input class="input t-in" type="number" min="0" id="t-down_after" data-key="down_after"></label>
+          <label>DOWN reminder (min)<input class="input t-in" type="number" min="0" id="t-down_repeat_min" data-key="down_repeat_min"></label>
+          <label>VPN / logon reminder (min)<input class="input t-in" type="number" min="0" id="t-access_repeat_min" data-key="access_repeat_min"></label>
+          <label>Automatic RCAs a day (0 = no cap)<input class="input t-in" type="number" min="0" id="t-rca_daily_cap" data-key="rca_daily_cap"></label>
+          <label>Everyday mails a day (CRITICAL not counted)<input class="input t-in" type="number" min="0" id="t-mail_cap_per_day" data-key="mail_cap_per_day"></label>
+        </div>
+        <div class="mprev" id="mail-preview">
+          <div class="mprev-h">With these settings <span class="hint" id="mail-preview-state">— updates as you type</span></div>
+          <div id="mail-preview-body"><span class="hint">Type or open a system to see who gets what.</span></div>
+        </div>
+
+        <div class="sec">Sending account <span class="hint">optional — which mailbox sends this system's mails; empty = the account in .env</span></div>
+        <div class="fgrid">
+          <label>SMTP server
+            <input class="input" id="f-smtp-host" placeholder="inherits .env"></label>
+          <label>SMTP port
+            <input class="input" id="f-smtp-port" placeholder="587"></label>
+          <label>SMTP username
+            <input class="input" id="f-smtp-user" placeholder="inherits .env"></label>
+          <label>SMTP password
+            <input class="input" id="f-smtp-pass" type="password"
+                   placeholder="inherits .env"></label>
+          <label>Sender address <span style="text-transform:none;font-weight:400">(the "From" people see)</span>
+            <input class="input" id="f-sender" placeholder="alerts@company.com"></label>
+        </div>
+
+        <div class="sec">Network, routing and actions <span class="hint">optional — kept on every edit</span></div>
+        <div class="fgrid">
+          <label>Project <span style="text-transform:none;font-weight:400">(CEAT, AG, CAR… — people get access per project on Team &amp; access; empty = Infrabeat)</span>
+            <input class="input" id="f-customer" placeholder="CEAT" list="f-customer-list"><datalist id="f-customer-list"></datalist></label>
+          <label>Network name <span style="text-transform:none;font-weight:400">(same name = one VPN alert)</span>
+            <input class="input" id="f-net-name" placeholder="Infrabeat VPN"></label>
+          <label>VPN check
+            <input class="input" id="f-net-check" placeholder="remote:ubuntu/pune_ttml · openfortivpn:name · forticlient"></label>
+          <label>Always-on probe <span style="text-transform:none;font-weight:400">(host:port)</span>
+            <input class="input" id="f-net-probe" placeholder="198.51.100.1:443"></label>
+          <label style="flex-direction:row;align-items:center;gap:8px">
+            <input type="checkbox" id="f-net-vpn"> behind a VPN (say "VPN not connected", not "down")</label>
+          <label>Live refresh every <span style="text-transform:none;font-weight:400">(seconds, empty = default)</span>
+            <input class="input" id="f-lrs" placeholder="300"></label>
+          <label style="grid-column:1/-1">One-click actions allowed on this system
+            <span style="display:flex;gap:16px;flex-wrap:wrap;text-transform:none;font-weight:400;margin-top:4px">
+              <span><input type="checkbox" class="f-act" value="restart_job"> restart cancelled job</span>
+              <span><input type="checkbox" class="f-act" value="release_lock"> release old lock</span>
+              <span><input type="checkbox" class="f-act" value="restart_queue"> restart inbound queue</span>
+              <span><input type="checkbox" class="f-act" value="unlock_user"> unlock user</span>
+              <span><input type="checkbox" class="f-act" value="cancel_job"> cancel running job</span>
+              <span style="color:var(--muted-dim)">also needs IBO_ACTIONS_ENABLED=1 in .env — try on QAS first</span>
+            </span></label>
+          <label style="grid-column:1/-1">Notes
+            <input class="input" id="f-notes" placeholder="anything the next person should know"></label>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;margin-top:18px">
+          <button class="btn" id="f-check" type="button">Check</button>
+          <button class="btn" id="f-test" type="button" style="display:none">Test connection</button>
+          <button class="btn btn-primary" id="f-save">Save and monitor now</button>
+          <button class="btn" id="f-clear" style="display:none">Cancel edit</button>
+          <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="f-run" checked> run monitoring immediately
+          </label>
+        </div>
+        <div id="f-msg" style="margin-top:12px;font-size:12.5px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-h"><h3>Configuration export / import</h3><span style="margin-left:auto;font-size:12px;color:var(--muted)">admin</span></div>
+      <div class="card-b">
+        <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Every configuration file in one zip (systems,
+          thresholds, profiles, runbooks, on-call, escalation, policies ...). Written-out passwords and tokens are removed;
+          the list of .env variables is included by name only. Importing checks every file first and backs up what it replaces.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="btn" id="exp-btn" type="button">Download export</button>
+          <input type="file" id="imp-file" accept=".zip">
+          <button class="btn" id="imp-check">Check import</button>
+          <button class="btn btn-primary" id="imp-apply" disabled>Apply import</button>
+        </div>
+        <div id="imp-msg" style="margin-top:10px;font-size:12.5px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-h"><h3>How collection works</h3></div>
+      <div class="card-b" style="font-size:12.5px;line-height:1.7;color:var(--muted)">
+        Systems are defined in <span class="mono">config/systems.yaml</span>. Each may use
+        any combination of three independent collection paths:
+        <ul style="margin:9px 0 9px 18px">
+          <li><span class="src src-rfc">RFC</span> headless; the only path that works on
+              RISE and hosted systems where there is no GUI host and no OS access</li>
+          <li><span class="src src-ssh">SSH</span> CPU, memory, swap, disk and sapcontrol
+              process state, read on the host itself</li>
+          <li><span class="src src-gui">SAP GUI</span> screenshots and OCR evidence; needs a
+              Windows machine with SAP GUI and a live desktop session</li>
+        </ul>
+        Passwords belong in <span class="mono">.env</span> and are referenced from the YAML
+        as <span class="mono">${VAR}</span>, so the registry itself holds no secrets.
+        See <span class="mono">config/systems.yaml.example</span>.
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=ds6"></script>
+<script>
+/* Every page here depends on shell.js for the sidebar, theme and helpers.
+   If it fails to load the page renders bare with only a console error, which
+   looks like the app is broken rather than one asset being missing. Say so
+   on screen instead. */
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
+    '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
+    '<p style="color:#666;line-height:1.6">This page needs ' +
+    '<code>/static/shell.js?v=ds6</code> and <code>/static/shell.css?v=ds6</code>. ' +
+    'They are missing or the static mount is not serving them.</p>' +
+    '<p style="color:#666;line-height:1.6">Check that ' +
+    '<code>dashboard/static/shell.js?v=ds6</code> exists, then restart the server. ' +
+    'If you are seeing this inside a preview pane rather than at ' +
+    '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
+    'behind a preview.</p></div>';
+}
+</script>
+<script>
+IB.mountShell("systems");
+IB.mountSchedulerControl("sched-ctl");
+IB.mountRunControl("run-ctl");
+IB.themeToggle(document.getElementById("theme"));
+let DATA = [];
+
+function row(s) {
+  const paths = (s.paths || []).map(p =>
+    `<span class="src src-${p.toLowerCase()}">${p}</span>`).join("") ||
+    '<span class="src src-none">none</span>';
+  return `<tr>
+    <td><b>${IB.esc(s.name)}</b></td>
+    <td class="mono">${IB.esc(s.sid || "—")}</td>
+    <td class="mono">${IB.esc(s.client || "—")}</td>
+    <td class="cfg">${IB.esc(s.host || "—")}</td>
+    <td class="paths">${paths}</td>
+    <td><span class="chip ${IB.statusClass(s.status)}">${IB.esc(s.status)}</span></td>
+    <td class="mono">${s.metric_count || 0}</td>
+    <td class="cfg">${IB.esc(s.last_scan || "never")}</td>
+    <td style="white-space:nowrap">
+      <a class="btn" href="/system?name=${encodeURIComponent(s.name)}">Open</a>
+      <button class="btn" onclick="editSystem('${IB.jsArg(s.name)}')">Edit</button>
+    </td>
+  </tr>`;
+}
+
+function render() {
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  const rows = DATA.filter(s => !q ||
+    [s.name, s.sid, s.host, s.client].join(" ").toLowerCase().includes(q));
+  const tbl = document.getElementById("tbl");
+  tbl.innerHTML = tbl.rows[0].outerHTML + rows.map(row).join("");
+  document.getElementById("count").textContent = `${rows.length} of ${DATA.length}`;
+
+  // Make a live filter impossible to mistake for missing systems.
+  let fnote = document.getElementById("filter-note");
+  if (!fnote) {
+    fnote = document.createElement("div");
+    fnote.id = "filter-note";
+    fnote.style.cssText = "margin:6px 0 10px;font-size:12.5px;color:var(--amber)";
+    tbl.parentNode.insertBefore(fnote, tbl);
+  }
+  fnote.innerHTML = (q && rows.length < DATA.length)
+    ? `Filter "<b>${IB.esc(q)}</b>" is hiding ${DATA.length - rows.length} system(s). `
+      + `<a href="#" id="clear-filter">Clear filter</a> to see all ${DATA.length}.`
+    : "";
+  const cf = document.getElementById("clear-filter");
+  if (cf) cf.onclick = (e) => { e.preventDefault(); document.getElementById("q").value = ""; render(); };
+
+  // A system configured for a path that produced nothing is worth naming:
+  // it means a collector failed, not that the system is quiet.
+  const blind = DATA.filter(s => s.metric_count === 0);
+  const w = document.getElementById("warn");
+  if (blind.length) {
+    w.style.display = "block";
+    w.innerHTML = `<strong>${blind.length} system(s) returned no metrics:</strong>
+      ${blind.map(s => IB.esc(s.name)).join(", ")} — their state is unknown, not healthy.`;
+  } else { w.style.display = "none"; }
+}
+
+document.getElementById("q").oninput = render;
+
+/* The Run/Stop button is provided by the shell (IB.mountRunControl), so the
+   page-local handler was removed -- it referenced an element that no longer
+   exists and threw on load. poll() is kept: the Add System form uses it. */
+async function poll() {
+  try {
+    const s = await IB.get("/api/run-status");
+    if (s.running) return setTimeout(poll, 2000);
+  } catch (e) {}
+  load();
+}
+
+async function load() {
+  const d = await IB.get("/api/overview");
+  DATA = d.systems;
+  IB.updatePathCounts(DATA);
+  render();
+}
+load();
+
+/* ---- Add system ------------------------------------------------------- */
+document.getElementById("toggle-add").onclick = () => {
+  const b = document.getElementById("add-body");
+  const open = b.style.display !== "none";
+  b.style.display = open ? "none" : "block";
+  document.getElementById("toggle-add").textContent = open ? "Show form" : "Hide form";
+};
+
+const v = id => document.getElementById(id).value.trim();
+const chk = id => document.getElementById(id).checked;
+
+/* Editing an existing system reuses the same form. Passwords are never sent
+   back to the browser, so their fields stay blank and blank means "keep the
+   stored one" -- otherwise changing a router string would require re-typing
+   every password. */
+let EDITING = null;
+
+function setForm(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value ?? "";
+}
+
+async function editSystem(name) {
+  try {
+    const c = await IB.get("/api/systems/" + encodeURIComponent(name) + "/config");
+    EDITING = name;
+
+    document.getElementById("add-body").style.display = "block";
+    document.getElementById("toggle-add").textContent = "Hide form";
+    document.getElementById("form-title").textContent = "Edit " + name;
+    document.getElementById("f-clear").style.display = "inline-block";
+
+    setForm("f-name", c.name);      setForm("f-sid", c.sap_system_id);
+    setForm("f-client", c.client);  setForm("f-lang", c.language);
+
+    setForm("f-rfc-host", c.rfc_ashost);   setForm("f-rfc-sysnr", c.rfc_sysnr);
+    setForm("f-rfc-client", c.rfc_client); setForm("f-rfc-user", c.rfc_username);
+    setForm("f-rfc-router", c.rfc_saprouter);
+    setForm("f-rfc-pass", "");
+
+    document.getElementById("f-gui").checked = c.has_gui_access;
+    setForm("f-conn", c.connection_name);  setForm("f-user", c.username);
+    setForm("f-pass", "");
+
+    document.getElementById("f-ssh").checked = c.has_os_access;
+    setForm("f-ssh-host", c.ssh_host);  setForm("f-ssh-port", c.ssh_port);
+    setForm("f-ssh-user", c.ssh_username); setForm("f-ssh-pass", "");
+    setForm("f-inst", c.sap_instance_nr);
+
+    setForm("f-smtp-host", c.smtp_host); setForm("f-smtp-port", c.smtp_port);
+    setForm("f-smtp-user", c.smtp_username); setForm("f-smtp-pass", "");
+    setForm("f-sender", c.sender_email);
+    setForm("f-to", c.alert_receivers); setForm("f-cc", c.alert_receivers_cc);
+
+    try {
+      const x = await IB.get("/api/ops/systems/" + encodeURIComponent(name) + "/extras");
+      setForm("f-customer", x.customer); fillProjects(); setForm("f-net-name", x.network_name);
+      setForm("f-net-check", x.network_check); setForm("f-net-probe", x.network_probe);
+      document.getElementById("f-net-vpn").checked = !!x.network_vpn;
+      setForm("f-lrs", x.live_refresh_seconds); setForm("f-basis", x.basis_emails);
+      setForm("f-manager", x.manager_receivers); setForm("f-notes", x.notes);
+      setForm("f-recovery", x.recovery_emails); setForm("f-down", x.down_emails); setForm("f-access", x.access_emails);
+      document.querySelectorAll(".t-in").forEach(el => { const t = x.alert_timing || {};
+        el.value = t[el.dataset.key] === undefined || t[el.dataset.key] === null ? "" : t[el.dataset.key]; });
+      document.querySelectorAll(".f-act").forEach(cb => { cb.checked = (x.actions || []).includes(cb.value); });
+      window._missingEnv = x.missing_env || [];
+    } catch (e) { window._missingEnv = []; }
+    document.getElementById("f-name").readOnly = true;
+    document.getElementById("f-test").style.display = "inline-block";
+
+    const kept = [
+      c.has_rfc_password && "RFC", c.has_password && "SAP GUI",
+      c.has_ssh_password && "SSH", c.has_smtp_password && "SMTP",
+    ].filter(Boolean);
+    document.getElementById("f-msg").innerHTML = (kept.length
+      ? `<span style="color:var(--muted)">Leave a password blank to keep the stored one
+         (${IB.esc(kept.join(", "))}).</span>` : "")
+      + ((window._missingEnv || []).length
+      ? `<div style="color:var(--amber);margin-top:6px">Not set in .env: ${IB.esc(window._missingEnv.join(", "))}
+         — fill the matching fields and save.</div>` : "");
+
+    mailPreview();
+    document.getElementById("add-card").scrollIntoView({ behavior: "smooth" });
+  } catch (e) {
+    alert("Could not load " + name + ": " + e.message);
+  }
+}
+
+document.getElementById("f-clear").onclick = () => {
+  EDITING = null;
+  document.getElementById("form-title").textContent = "Add a system";
+  document.getElementById("f-clear").style.display = "none";
+  document.getElementById("f-msg").innerHTML = "";
+  ["f-name","f-sid","f-client","f-rfc-host","f-rfc-sysnr","f-rfc-client","f-rfc-user",
+   "f-rfc-pass","f-rfc-router","f-conn","f-user","f-pass","f-ssh-host","f-ssh-user",
+   "f-ssh-pass","f-inst","f-smtp-host","f-smtp-port","f-smtp-user","f-smtp-pass",
+   "f-sender","f-to","f-cc"].forEach(id => setForm(id, ""));
+  setForm("f-lang", "EN"); setForm("f-ssh-port", "22");
+  ["f-customer","f-net-name","f-net-check","f-net-probe","f-lrs","f-basis","f-manager","f-notes",
+   "f-recovery","f-down","f-access"].forEach(id => setForm(id, ""));
+  document.querySelectorAll(".t-in").forEach(el => { el.value = ""; });
+  document.getElementById("f-net-vpn").checked = false;
+  document.querySelectorAll(".f-act").forEach(cb => { cb.checked = false; });
+  document.getElementById("f-name").readOnly = false;
+  document.getElementById("f-test").style.display = "none";
+  mailPreview();
+};
+
+/* ---- Who gets mails: live preview of the four lists (core/mail_explain.preview) ---- */
+let _mpTimer = null, _mpSeq = 0;
+const MP_FIELDS = {basis_emails: "f-basis", manager_receivers: "f-manager", alert_receivers: "f-to", alert_receivers_cc: "f-cc"};
+const MP_EMPTY = {basis_emails: "e-basis", manager_receivers: "e-manager", alert_receivers: "e-to", alert_receivers_cc: "e-cc"};
+const MP_KEY = {basis_emails: "basis", manager_receivers: "manager", alert_receivers: "report_to", alert_receivers_cc: "report_cc"};
+const MP_DEFAULT_EMPTY = {};
+Object.keys(MP_EMPTY).forEach(k => { const el = document.getElementById(MP_EMPTY[k]); if (el) MP_DEFAULT_EMPTY[k] = el.textContent; });
+
+function schedulePreview() {
+  clearTimeout(_mpTimer);
+  document.getElementById("mail-preview-state").textContent = "— updating…";
+  _mpTimer = setTimeout(mailPreview, 450);
+}
+
+function mpWho(entry, hidden) {
+  if (!entry) return "";
+  if (hidden) return entry.count ? `${entry.count} address${entry.count === 1 ? "" : "es"}` : `<b style="color:var(--red)">nobody</b>`;
+  return entry.addresses.length ? entry.addresses.map(IB.esc).join(", ") : `<b style="color:var(--red)">nobody</b>`;
+}
+
+async function mailPreview() {
+  const seq = ++_mpSeq;
+  const fields = {name: v("f-name")};
+  Object.keys(MP_FIELDS).forEach(k => fields[k] = v(MP_FIELDS[k]));
+  fields.recovery_emails = v("f-recovery"); fields.down_emails = v("f-down"); fields.access_emails = v("f-access");
+  let d;
+  try {
+    const r = await IB.post("/api/ops/mail-preview", {headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({system: EDITING || "", fields, alert_timing: timingBody()})});
+    d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "preview failed");
+  } catch (e) {
+    document.getElementById("mail-preview-state").textContent = "— could not update: " + e.message;
+    return;
+  }
+  if (seq !== _mpSeq) return;                        // a newer request is on its way
+  const hidden = !!d.recipients_hidden;
+  // Under each field: what an EMPTY field means right now, with the real addresses.
+  Object.keys(MP_EMPTY).forEach(k => {
+    const el = document.getElementById(MP_EMPTY[k]);
+    const e = d[MP_KEY[k]];
+    if (!el || !e) return;
+    if (v(MP_FIELDS[k]) && e.source.startsWith("this form") && !/not set/.test(e.source)) {
+      el.className = "mempty"; el.textContent = MP_DEFAULT_EMPTY[k]; return;
+    }
+    el.className = "mempty eff";
+    el.innerHTML = `<b>Will be used:</b> ${mpWho(e, hidden)} <span class="src">(${IB.esc(e.source)})</span>`;
+  });
+  const roleChip = x => {
+    const map = {"Basis": "Basis", "Manager": "Manager", "Report To list": "Client", "Report Cc list": "Infrabeat",
+                 "same people as the alert": "Other", "Back to normal list": "Other", "System down list": "Other",
+                 "Access problem list": "Other"};
+    return `<b class="rp r-${map[x] || "Other"}">${IB.esc(x === "Report To list" ? "Report To" : x === "Report Cc list" ? "Report Cc" : x)}</b>`;
+  };
+  const names = {Basis: mpWho(d.basis, hidden), Manager: mpWho(d.manager, hidden),
+                 "Report To list": mpWho(d.report_to, hidden), "Report Cc list": mpWho(d.report_cc, hidden),
+                 "Back to normal list": mpWho(d.recovery, hidden), "System down list": mpWho(d.down, hidden),
+                 "Access problem list": mpWho(d.access, hidden)};
+  (d.timing || []).forEach(t => { const el = document.getElementById("t-" + t.key); if (el) el.placeholder = String(t.default); });
+  const cell = arr => arr.length ? arr.map(x => `<div>${roleChip(x)} <span class="who">${names[x] || ""}</span></div>`).join("")
+                                 : `<i class="hint">—</i>`;
+  let html = `<table><tr><th style="width:34%">When this happens</th><th>Mail goes To</th><th>Copy (Cc)</th><th style="width:16%">How often</th></tr>` +
+    d.rules.map(r => {
+      // No manager: the senders fall back to Basis -- show what really happens.
+      let to = r.to.slice(), cc = r.cc.slice();
+      if (to.includes("Manager") && !(d.manager.addresses.length || d.manager.count)) {
+        to = to.filter(x => x !== "Manager"); if (!to.includes("Basis")) to.push("Basis");
+        cc = cc.filter(x => x !== "Basis");
+      }
+      return `<tr><td><b>${IB.esc(r.when)}</b><div class="hint">${IB.esc(r.detail)}</div></td>
+        <td>${cell(to)}</td><td>${cell(cc)}</td><td class="hint">${IB.esc(r.how_often)}</td></tr>`;
+    }).join("") + `</table>`;
+  if ((d.profiles || []).length) {
+    html += `<div class="mprev-h" style="margin-top:12px">Scheduled reports of this system's profiles</div><table>
+      <tr><th>Profile</th><th>Report To</th><th>Report Cc</th></tr>` +
+      d.profiles.map(p => `<tr><td><b>${IB.esc(p.label)}</b><div class="hint">${IB.esc(p.schedule || "")}${p.enabled ? "" : " · disabled"}${p.sends_email ? "" : " · sends no e-mail"}</div></td>
+        <td class="who">${hidden ? "(hidden)" : (p.to.map(IB.esc).join(", ") || "<b style='color:var(--red)'>nobody</b>")}<div class="hint">${IB.esc(p.to_source)}</div></td>
+        <td class="who">${hidden ? "(hidden)" : (p.cc.map(IB.esc).join(", ") || "—")}<div class="hint">${IB.esc(p.cc_source)}</div></td></tr>`).join("") + `</table>`;
+  }
+  html += `<div class="minfo"><b>${IB.esc(d.client_never)}</b></div>`;
+  html += (d.warnings || []).map(w => `<div class="mwarn">! ${IB.esc(w)}</div>`).join("");
+  html += (d.info || []).map(w => `<div class="minfo">i ${IB.esc(w)}</div>`).join("");
+  document.getElementById("mail-preview-body").innerHTML = html;
+  document.getElementById("mail-preview-state").textContent = EDITING ? `— ${EDITING}, including unsaved changes` : "— new system, unsaved";
+}
+["f-basis", "f-manager", "f-to", "f-cc", "f-name", "f-recovery", "f-down", "f-access"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("input", schedulePreview);
+});
+document.querySelectorAll(".t-in").forEach(el => el.addEventListener("input", schedulePreview));
+
+function timingBody() {
+  const t = {};
+  document.querySelectorAll(".t-in").forEach(el => { if (el.value.trim() !== "") t[el.dataset.key] = el.value.trim(); });
+  return t;
+}
+
+function formBody() {
+  return {
+    editing: !!EDITING,
+    name: v("f-name"), client: v("f-client"), language: v("f-lang") || "EN",
+    sap_system_id: v("f-sid"),
+    has_gui_access: chk("f-gui"),
+    connection_name: v("f-conn"), username: v("f-user"), password: v("f-pass"),
+    has_os_access: chk("f-ssh"),
+    ssh_host: v("f-ssh-host"), ssh_port: Number(v("f-ssh-port") || 22),
+    ssh_username: v("f-ssh-user"), ssh_password: v("f-ssh-pass"),
+    sap_instance_nr: v("f-inst"),
+    rfc_ashost: v("f-rfc-host"), rfc_sysnr: v("f-rfc-sysnr"),
+    rfc_client: v("f-rfc-client"), rfc_username: v("f-rfc-user"),
+    rfc_password: v("f-rfc-pass"), rfc_saprouter: v("f-rfc-router"),
+    smtp_host: v("f-smtp-host"), smtp_port: v("f-smtp-port"),
+    smtp_username: v("f-smtp-user"), smtp_password: v("f-smtp-pass"),
+    sender_email: v("f-sender"),
+    alert_receivers: v("f-to"), alert_receivers_cc: v("f-cc"),
+    customer: v("f-customer"), network_name: v("f-net-name"), network_vpn: chk("f-net-vpn"),
+    network_check: v("f-net-check"), network_probe: v("f-net-probe"),
+    live_refresh_seconds: v("f-lrs"), basis_emails: v("f-basis"), manager_receivers: v("f-manager"),
+    recovery_emails: v("f-recovery"), down_emails: v("f-down"), access_emails: v("f-access"),
+    alert_timing: timingBody(),
+    actions: Array.from(document.querySelectorAll(".f-act")).filter(cb => cb.checked).map(cb => cb.value),
+    notes: v("f-notes"),
+  };
+}
+
+function showCheck(d) {
+  const err = (d.errors || []).map(e => `<div style="color:var(--red);margin-top:4px">✕ ${IB.esc(e)}</div>`).join("");
+  const warn = (d.warnings || []).map(w => `<div style="color:var(--amber);margin-top:4px">! ${IB.esc(w)}</div>`).join("");
+  return err + warn;
+}
+
+document.getElementById("f-check").onclick = async () => {
+  const msg = document.getElementById("f-msg");
+  try {
+    const r = await IB.post("/api/ops/systems/validate", { headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(formBody()) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "check failed");
+    msg.innerHTML = (d.ok ? `<span style="color:var(--green);font-weight:700">No errors.</span>` : "") + showCheck(d);
+  } catch (e) { msg.innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`; }
+};
+
+document.getElementById("f-test").onclick = async () => {
+  const msg = document.getElementById("f-msg");
+  const btn = document.getElementById("f-test");
+  btn.disabled = true; btn.textContent = "Testing…";
+  try {
+    const r = await IB.post("/api/ops/systems/" + encodeURIComponent(v("f-name")) + "/test", { label: "Testing connection…" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "test failed");
+    msg.innerHTML = (d.steps || []).map(s => `<div style="color:${s.ok ? "var(--green)" : "var(--red)"};margin-top:4px">
+      ${s.ok ? "✓" : "✕"} <b>${IB.esc(s.step)}</b> — ${IB.esc(s.text)}</div>`).join("");
+  } catch (e) { msg.innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`; }
+  btn.disabled = false; btn.textContent = "Test connection";
+};
+
+async function sendImport(apply) {
+  const f = document.getElementById("imp-file").files[0];
+  const msg = document.getElementById("imp-msg");
+  if (!f) { msg.innerHTML = `<span style="color:var(--red)">Choose a zip first.</span>`; return; }
+  const fd = new FormData(); fd.append("file", f);
+  try {
+    const r = await IB.post("/api/ops/config/import?apply=" + (apply ? "1" : "0"), { body: fd, label: apply ? "Importing…" : "Checking…" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "import failed");
+    if (apply) {
+      msg.innerHTML = `<span style="color:var(--green);font-weight:700">Applied:</span> ${IB.esc((d.applied || []).join(", ") || "nothing")}`
+        + ((d.skipped || []).length ? `<div style="color:var(--amber)">Skipped: ${d.skipped.map(x => IB.esc(x.name + " (" + x.note + ")")).join("; ")}</div>` : "");
+      document.getElementById("imp-apply").disabled = true;
+      load();
+    } else {
+      msg.innerHTML = (d.files || []).map(x => `<div>${IB.esc(x.name)} — <b>${IB.esc(x.action)}</b> ${IB.esc(x.note)}</div>`).join("")
+        + (d.errors || []).map(e => `<div style="color:var(--red)">${IB.esc(e)}</div>`).join("");
+      document.getElementById("imp-apply").disabled = !d.ok || !(d.files || []).some(x => x.action === "replace" || x.action === "add");
+    }
+  } catch (e) { msg.innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`; }
+}
+document.getElementById("exp-btn").onclick = async () => {
+  const msg = document.getElementById("imp-msg");
+  try {
+    const r = await fetch("/api/ops/config/export", { cache: "no-store", credentials: "same-origin" });
+    if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || `HTTP ${r.status}`); }
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || "ibops-config.zip";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    msg.innerHTML = `Exported; ${IB.esc(r.headers.get("X-IBO-Secrets-Removed") || "0")} written-out secret(s) removed.`;
+  } catch (e) { msg.innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`; }
+};
+document.getElementById("imp-check").onclick = () => sendImport(false);
+document.getElementById("imp-apply").onclick = () => { if (confirm("Replace these configuration files? Backups go to config/backups.")) sendImport(true); };
+
+document.getElementById("f-save").onclick = async () => {
+  const msg = document.getElementById("f-msg");
+  if (!v("f-name") || !v("f-client")) {
+    msg.innerHTML = `<span style="color:var(--red)">System name and client are required.</span>`;
+    return;
+  }
+  const body = formBody();
+  const btn = document.getElementById("f-save");
+  btn.disabled = true; btn.textContent = "Saving…";
+  try {
+    // 1. validate (errors block the save)
+    let r = await IB.post("/api/ops/systems/validate", { headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body) });
+    let d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "check failed");
+    if (!d.ok) { msg.innerHTML = showCheck(d); btn.disabled = false; btn.textContent = "Save and monitor now"; return; }
+    // 2. save (backup, safe write, verify)
+    r = await IB.post("/api/ops/systems/save", { headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body), label: "Saving…" });
+    d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "save failed");
+    let started = false;
+    if (chk("f-run")) {
+      const rr = await IB.post("/api/run-now/" + encodeURIComponent(body.name));
+      started = rr.ok;
+    }
+    msg.innerHTML =
+      `<span style="color:var(--green);font-weight:700">${EDITING ? "Updated." : "Saved."}</span> ` +
+      `A backup of the previous file is in config/backups. ` +
+      (chk("f-run") ? (started ? "Monitoring started — the row below will fill when it finishes."
+                               : "Monitoring not started (a run is in progress, or this instance does not sweep).") : "")
+      + showCheck({ warnings: d.warnings });
+    EDITING = body.name;
+    document.getElementById("f-name").readOnly = true;
+    document.getElementById("f-test").style.display = "inline-block";
+    if (started) poll(); else load();
+  } catch (e) {
+    msg.innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`;
+  }
+  btn.disabled = false; btn.textContent = "Save and monitor now";
+};
+</script>
+</body>
+</html>

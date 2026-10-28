@@ -1,0 +1,133 @@
+# Per-system threshold overrides -- written by the Thresholds page (system selected).
+# Anything not listed here uses config/thresholds.yaml (the standard for all systems).
+systems:
+  CEAT S4P:
+    cpu:
+      alert: warning
+      channels:
+      - email
+    db_rtt_ms:
+      critical: 200
+      inclusive: false
+    sap.dispatcher.state:
+      channels:
+      - email
+    sap.gateway.state:
+      channels:
+      - email
+    sap.icm.state:
+      channels:
+      - email
+    sap.slicense.days_left:
+      alert: warning
+      channels:
+      - email
+      critical: 7
+      warning: 30
+    sap.sm12.lock_held_min:
+      alert: warning
+      channels:
+      - email
+    sap.sm12.user_old_locks:
+      alert: warning
+      channels:
+      - email
+    sap.sm12.users_same_table_15min:
+      alert: warning
+      channels:
+      - email
+    sap.sm37.cancelled_jobs:
+      alert: warning
+      channels:
+      - email
+      critical: 50
+      warning: 30
+    sap.sm37.longest_active_job_min:
+      alert: warning
+      channels:
+      - email
+    sap.sm37.user_cancelled_15min:
+      alert: warning
+      channels:
+      - email
+    sap.sm50.priv_mode_wp:
+      alert: warning
+      channels:
+      - email
+    sap.sm50.wp_utilization:
+      alert: warning
+      channels:
+      - email
+    sap.sm58.entries_today:
+      alert: warning
+      channels:
+      - email
+      critical: 250
+    sap.sm58.failed_today:
+      alert: warning
+      channels:
+      - email
+    sap.sm58.stuck_entries:
+      channels:
+      - email
+    sap.sm66.bgd_saturation_pct:
+      alert: warning
+      channels:
+      - email
+      critical: 70
+      warning: 60
+    sap.sm66.longest_wp_min:
+      alert: warning
+      channels:
+      - email
+    sap.smq1.entries:
+      alert: warning
+      channels:
+      - email
+      critical: 70000
+      warning: 60000
+    sap.smq2.entries:
+      alert: warning
+      channels:
+      - email
+      critical: 15
+    sap.smq2.error_10min:
+      alert: warning
+      channels:
+      - email
+    sap.smq2.waiting_10min:
+      alert: warning
+      channels:
+      - email
+    sap.sost.errors:
+      critical: 2000
+      warning: 1500
+    sap.sqlm.expensive_programs:
+      alert: warning
+      channels:
+      - email
+    sap.st03.top_user_memory_mb:
+      alert: warning
+      channels:
+      - email
+    sap.st22.dumps:
+      alert: warning
+      channels:
+      - email
+      critical: 150
+      warning: 120
+    sap.st22.user_dumps_10min:
+      alert: warning
+      channels:
+      - email
+      critical: 10
+      inclusive: false
+    sap.strust.cert_days_left:
+      alert: warning
+      channels:
+      - email
+      critical: 7
+      warning: 30
+    sap.su01.user_issues:
+      enabled: false
+      inclusive: false

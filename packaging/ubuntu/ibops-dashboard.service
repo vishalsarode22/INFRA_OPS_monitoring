@@ -1,0 +1,23 @@
+[Unit]
+Description=InfraBeatOps dashboard (Ubuntu collector)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__APP__
+Environment=PYTHONUNBUFFERED=1
+# A dashboard started by hand (nohup) or a leftover child process would hold
+# port 8000 and make this start fail -- the problem we hit twice. Free it.
+ExecStartPre=-/usr/bin/fuser -k -n tcp 8000
+ExecStart=__VENV__/bin/python -m uvicorn dashboard.app:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=10
+# Stop the whole process group, children included, so nothing is left
+# holding the port after a stop or restart.
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

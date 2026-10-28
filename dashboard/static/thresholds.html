@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Thresholds</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .tw{overflow-x:auto}
+  td{vertical-align:top}
+  td input.input{width:78px;padding:5px 8px}
+  td select.input{width:132px;padding:5px 8px}
+  .msg{font-size:11.5px}
+  .lbl{font-size:13px;font-weight:700;color:var(--text)}
+  .key{font-size:10.5px;color:var(--muted-dim);font-family:var(--mono)}
+  .note{font-size:10.5px;color:var(--muted);max-width:360px}
+  .std{font-size:11px;color:var(--muted-dim)}
+  .own{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:9px;
+       background:var(--info-bg);border:1px solid var(--info-br);color:var(--text)}
+  .code{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:9px;border:1px dashed var(--border);
+        color:var(--muted)}
+  .dir{display:inline-block;font-size:10px;padding:0 6px;border-radius:8px;border:1px solid var(--border);
+       color:var(--muted);margin-left:4px}
+  .dir.low{border-color:var(--amber);color:var(--amber)}
+  .where{font-size:10px;color:var(--muted-dim)}
+  .now{font-family:var(--mono);font-size:12px;font-weight:700;white-space:nowrap}
+  .now small{display:block;font-weight:400;font-size:10px;color:var(--muted-dim)}
+  .chans label{display:inline-flex;gap:3px;align-items:center;font-size:11px;margin-right:6px;white-space:nowrap}
+  .chans label.nr{opacity:.55}
+  .last{font-size:11px;max-width:300px}
+  .last .ok{color:var(--green)} .last .bad{color:var(--red)}
+  tr.ovr td{background:var(--info-bg)}
+  tr.off td{opacity:.6}
+  tr.dirty td{background:rgba(246,197,107,.18)}
+  tr.grp td{background:var(--bg);font-weight:800;font-size:12px;letter-spacing:.03em;text-transform:uppercase;
+            color:var(--muted);padding-top:14px}
+  /* not ".bar": shell.css uses that name for the 8 px progress bars */
+  .selbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .selbar select,.selbar input{min-width:240px}
+  .savebar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
+  .result{font-size:12px;margin:8px 0;max-height:260px;overflow:auto}
+  .rc{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .rc .k{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-dim)}
+  .rc input.input{width:100%}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Thresholds &amp; alerts</h2><div class="sub">Limits and alerts for every value — the standard for all systems, or one system's own</div></div>
+    <div class="top-actions"><a class="btn" href="/alerts-page" id="alink" style="text-decoration:none">Alert history</a>
+      <button class="btn" id="theme">◑ Light</button></div>
+  </div>
+  <div class="content">
+    <div class="banner" style="background:var(--info-bg);border:1px solid var(--info-br);color:var(--text)">
+      <b>Limits</b> colour the wall, the Detail page and the sweep reports. <b>Alert</b> chooses when someone is told —
+      <i>Off</i> (default), <i>Critical only</i>, or <i>Warning and critical</i> — and <b>Channels</b> how.
+      Critical alerts repeat every hour while the value stays critical (warnings every 8 hours); a ticked <b>Call</b>
+      rings after 15 minutes still critical; a recovery mail follows when it is back to normal.
+      <b>All systems</b> sets the standard; pick a <b>system</b> to give it its own limits and alerts.
+      Edit any rows, then <b>Save all changes</b> at the bottom. <b>Now</b> is the latest reading; <b>Last alert</b> what was sent, when, to whom.
+      Lower-is-worse values (<span class="dir low">lower is worse</span>) have warning above critical. Only admins can save.
+    </div>
+    <div class="selbar">
+      <label style="font-size:13px">Limits for
+        <select class="input" id="sys"><option value="">All systems (company standard)</option></select></label>
+      <input class="input" id="flt" placeholder="filter, e.g. smq, SM12, response">
+      <span class="msg" id="smsg"></span>
+    </div>
+    <div class="card" id="rcard" style="display:none;margin-bottom:14px"><div class="card-h"><h3 id="rtitle">Who gets the alerts</h3></div>
+      <div class="card-b" id="rbody"></div></div>
+    <div class="card" id="tcard" style="display:none;margin-bottom:14px"><div class="card-h"><h3 id="ttitle">Alert teams</h3></div>
+      <div class="card-b" id="tbody"></div></div>
+    <div class="savebar"><button class="btn btn-brand" onclick="saveAll()">Save all changes</button>
+      <span class="msg" id="dcount1"></span></div>
+    <div class="card"><div class="card-b tw" style="padding:0">
+      <table id="tbl"></table>
+    </div></div>
+    <div class="savebar"><button class="btn btn-brand" onclick="saveAll()">Save all changes</button>
+      <button class="btn" onclick="load()">Discard changes</button>
+      <span class="msg" id="dcount2"></span></div>
+    <div class="result" id="result"></div>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script src="/static/ops.js?v=ops1"></script>
+<script>
+IB.mountShell("thresholds");
+IB.themeToggle(document.getElementById("theme"));
+let D = { thresholds: {}, defaults: {}, overrides: {}, system: "" };
+let rows = [];
+const WHERE = { wall: "wall", detail: "detail page", sweep: "sweep report", checks: "daily checks" };
+const CH = [["email", "Mail"], ["whatsapp", "WhatsApp"], ["sms", "SMS"], ["call", "Call"]];
+const ALERTS = [["off", "Off"], ["critical", "Critical only"], ["warning", "Warning and critical"]];
+
+function val(v) { return v === null || v === undefined ? "" : v; }
+const has = (o, k) => o && Object.prototype.hasOwnProperty.call(o, k);
+const same = (a, b) => String(a ?? "") === String(b ?? "");
+const sameList = (a, b) => JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
+
+function buildRows() {
+  const std = D.thresholds || {}, def = D.defaults || {}, own = D.overrides || {};
+  const names = Object.keys(def).concat(Object.keys(std).filter(k => !def[k] && !k.endsWith(".dump_count")));
+  rows = Array.from(new Set(names)).map(k => {
+    const s = std[k], d = def[k] || {}, o = own[k];
+    const pick = (f, dflt) => (s && has(s, f)) ? s[f] : dflt;
+    const base = {
+      warning: pick("warning", d.warning), critical: pick("critical", d.critical),
+      inclusive: pick("inclusive", true) !== false,
+      enabled: pick("enabled", true) !== false,
+      severity: pick("severity", d.severity || "critical"), emergency: s ? s.emergency : undefined,
+      alert: pick("alert", "off"), channels: pick("channels", null) };
+    if (!Array.isArray(base.channels)) base.channels = base.alert !== "off" ? ["email"] : [];
+    const eff = Object.assign({}, base, { channels: [...base.channels] });
+    if (o) for (const f of ["warning", "critical", "inclusive", "enabled", "severity", "alert", "channels"])
+      if (has(o, f) && o[f] !== null && o[f] !== undefined) eff[f] = Array.isArray(o[f]) ? [...o[f]] : o[f];
+    const incSet = (s && has(s, "inclusive")) || (o && has(o, "inclusive"));
+    return { key: k, incSet, label: d.label || k, group: d.group || "Other", unit: d.unit || "",
+             direction: d.direction || "high", where: d.where || [], stored: d.stored || "",
+             tcode: d.tcode || "", note: d.note || "", base, eff, own: !!o, builtin: !s };
+  });
+  const order = ["Host (OS)", "Work processes (SM50 / SM66)", "Response time (SMLG / ST03)", "Availability",
+                 "Users", "Errors and jobs", "Locks and queues", "Expensive SQL (SQLM / ST03)",
+                 "Database (ASE)", "Daily checks", "HANA", "Other"];
+  rows.sort((a, b) => (order.indexOf(a.group) - order.indexOf(b.group)) || a.label.localeCompare(b.label));
+}
+
+function nowCell(r) {
+  const n = (D.now || {})[r.key] || ((r.key === "sap.st22.dumps") ? (D.now || {})["sap.st22.dump_count"] : null);
+  if (!n) return `<span class="std">—</span>`;
+  const col = { CRITICAL: "var(--red)", WARNING: "var(--amber)", NORMAL: "var(--green)" }[n.status] || "var(--muted)";
+  const who = D.system ? "" : `${n.system} · `;
+  const t = String(n.at || "").slice(11, 16) || String(n.at || "").slice(0, 16);
+  const why = n.value === "not checked" && n.detail
+    ? `<small style="color:var(--amber);white-space:normal;max-width:260px">${IB.esc(n.detail)}</small>` : "";
+  return `<span class="now" style="color:${col}" title="${IB.esc(n.status)} · ${IB.esc(n.source)} ${IB.esc(n.at || "")}${n.detail ? " · " + IB.esc(n.detail) : ""}">${IB.esc(String(n.value ?? "—"))}` +
+         `<small>${IB.esc(who)}${n.instance ? IB.esc(n.instance) + " · " : ""}${IB.esc(n.source)} ${IB.esc(t)}</small>${why}</span>`;
+}
+
+function lastCell(r) {
+  const a = (D.last_alerts || {})[r.key];
+  if (!a) return `<span class="std">none</span>`;
+  const today = new Date().toISOString().slice(0, 10);
+  const when = a.at.slice(0, 10) === today ? a.at.slice(11, 16) : a.at.slice(0, 16);
+  const ch = (a.channels || [a]).map(c =>
+    `<div><span class="${c.ok ? "ok" : "bad"}">${c.ok ? "✓" : "✗"} ${IB.esc(c.channel)}</span> → ${IB.esc(c.recipients || "nobody")}` +
+    `${!c.ok && c.note ? ` <span class="std">(${IB.esc(c.note)})</span>` : ""}</div>`).join("");
+  const sysTxt = D.system ? "" : `${IB.esc(a.system)} · `;
+  return `<div class="last"><b>${IB.esc(when)}</b> ${sysTxt}${IB.esc(a.level)} ${IB.esc(a.value)}` +
+         `${a.instance ? " (" + IB.esc(a.instance) + ")" : ""} · ${IB.esc(a.kind)}${ch}` +
+         `<a class="std" href="/alerts-page?system=${encodeURIComponent(a.system)}">all</a></div>`;
+}
+
+function rowHtml(r, i) {
+  const sysMode = !!D.system;
+  const dash = v => (v === null || v === undefined || v === "") ? "–" : v;
+  const isState = r.direction === "state";
+  const stdText = isState ? `standard: not running = ${r.base.enabled ? r.base.severity : "off"}`
+    : `standard ${dash(r.base.warning)} / ${dash(r.base.critical)}${r.base.enabled ? "" : " (off)"}`;
+  const stdAlert = `alert: ${(ALERTS.find(x => x[0] === r.base.alert) || ALERTS[0])[1].toLowerCase()}`;
+  const dirTag = isState ? `<span class="dir">service</span>`
+    : r.direction === "low" ? `<span class="dir low">lower is worse</span>` : "";
+  const unit = r.unit && !isState ? ` <span class="key">(${IB.esc(r.unit)})</span>` : "";
+  const where = r.where.map(w => WHERE[w] || w).join(" · ");
+  const limits = isState
+    ? `<td colspan="3"><label class="std">If not running:
+         <select class="input" id="sv${i}">${["critical", "warning", "off"].map(x =>
+           `<option value="${x}" ${(r.eff.enabled ? r.eff.severity : "off") === x ? "selected" : ""}>${x}</option>`).join("")}
+         </select></label></td>`
+    : `<td><input class="input" id="w${i}" value="${IB.esc(val(r.eff.warning))}"></td>
+       <td><input class="input" id="c${i}" value="${IB.esc(val(r.eff.critical))}"></td>
+       <td style="text-align:center"><input type="checkbox" id="i${i}" ${r.eff.inclusive ? "checked" : ""}
+           onchange="rows[${i}].incTouched = true"
+           title="${r.incSet ? "" : "Not set: the live wall counts the limit itself as critical; the SAP GUI sweep only above it. Click the box (even back to ticked) and Save to set it for both."}"></td>`;
+  const cs = D.channel_status || {};
+  const chans = CH.map(([c, label]) => {
+    const st = cs[c] || {};
+    return `<label class="${st.ready ? "" : "nr"}" title="${IB.esc(st.ready ? "" : (st.note || "not set up"))}">` +
+           `<input type="checkbox" id="ch${c}${i}" ${r.eff.channels.includes(c) ? "checked" : ""}> ${label}</label>`;
+  }).join("");
+  return `<tr class="${r.own ? "ovr" : ""} ${r.eff.enabled ? "" : "off"}" id="row${i}" data-k="${IB.esc(r.key)}">
+    <td><div class="lbl">${IB.esc(winLabel(r))}${unit}${dirTag}</div>
+        <div class="key">${IB.esc(r.key)}${r.tcode ? " · " + IB.esc(r.tcode) : ""}</div>
+        <div class="where">${IB.esc(where)}${where ? " · " : ""}${IB.esc(r.stored ? "stored as " + r.stored : "not stored")}</div>
+        ${r.note ? `<div class="note">${IB.esc(r.note)}</div>` : ""}${winCell(r)}</td>
+    <td>${nowCell(r)}</td>
+    <td>${r.own ? `<span class="own">${IB.esc(D.system)} only</span>` : (r.builtin ? `<span class="code">built-in</span>` : "")}
+        ${sysMode ? `<div class="std">${IB.esc(stdText)}<br>${IB.esc(stdAlert)}</div>` : ""}
+        ${sysMode && r.own ? `<a href="#" class="std" onclick="reset(${i});return false">↺ use standard</a>` : ""}</td>
+    ${limits}
+    <td style="text-align:center">${isState ? "" : `<input type="checkbox" id="e${i}" ${r.eff.enabled ? "checked" : ""}>`}</td>
+    <td><select class="input" id="al${i}">${ALERTS.map(([v, l]) =>
+          `<option value="${v}" ${r.eff.alert === v ? "selected" : ""}>${l}</option>`).join("")}</select></td>
+    <td class="chans">${chans}</td>
+    <td>${lastCell(r)}<div class="msg" id="m${i}"></div></td></tr>`;
+}
+
+function render() {
+  const head = `<tr><th>Value</th><th>Now</th><th>Source</th><th>Warning</th><th>Critical</th><th>Limit is critical</th>` +
+               `<th>On</th><th>Alert</th><th>Channels</th><th>Last alert</th></tr>`;
+  let html = head, group = null;
+  rows.forEach((r, i) => {
+    if (r.group !== group) { group = r.group; html += `<tr class="grp" data-g="${IB.esc(group)}"><td colspan="10">${IB.esc(group)}</td></tr>`; }
+    html += rowHtml(r, i);
+  });
+  document.getElementById("tbl").innerHTML = html;
+  document.querySelectorAll("#tbl input, #tbl select").forEach(el =>
+    el.addEventListener("change", () => { const tr = el.closest("tr"); if (tr) tr.classList.add("dirty"); counts(); }));
+  document.querySelectorAll("#tbl input[type=text], #tbl input:not([type])").forEach(el =>
+    el.addEventListener("input", () => { const tr = el.closest("tr"); if (tr) tr.classList.add("dirty"); counts(); }));
+  applyFilter();
+  const n = Object.keys(D.overrides || {}).length;
+  document.getElementById("smsg").textContent = D.system
+    ? `${D.system}: ${n} own setting(s); every other value uses the standard.` : `${rows.length} values · alerts set here apply to every system`;
+  counts();
+}
+
+/* The filter only hides rows: edits that are not saved yet stay as typed. */
+function applyFilter() {
+  const f = document.getElementById("flt").value.trim().toLowerCase();
+  const shown = {};
+  rows.forEach((r, i) => {
+    const tr = document.getElementById("row" + i);
+    if (!tr) return;
+    const hay = (r.key + " " + r.label + " " + r.tcode + " " + r.group).toLowerCase();
+    const ok = !f || hay.includes(f);
+    tr.style.display = ok ? "" : "none";
+    if (ok) shown[r.group] = true;
+  });
+  document.querySelectorAll("#tbl tr.grp").forEach(g => g.style.display = shown[g.dataset.g] ? "" : "none");
+}
+
+function counts() {
+  const n = document.querySelectorAll("#tbl tr.dirty").length;
+  const t = n ? `${n} row(s) changed — not saved yet` : "";
+  document.getElementById("dcount1").textContent = t; document.getElementById("dcount2").textContent = t;
+}
+
+function srcHelp(src) {
+  // Where the Basis people come from, and where to change them (core/alert_teams.basis_for).
+  if (src.startsWith("Alert teams page (this system"))
+    return "This system's own Basis team. Type the addresses above and press Save mail; 'Use Systems page' clears it so the Systems page Basis box is used.";
+  if (src.startsWith("Systems page"))
+    return "From the Basis team box of this system on the Systems page — change it there.";
+  if (src.startsWith("Alert teams page (standard"))
+    return "From the standard Basis team (all systems) on this page, because this system's Basis box on the Systems page is empty. Fill that box, or change the standard team.";
+  if (src) return "From the on-call rotation or .env (IBO_BASIS_EMAILS): this system has no Basis team anywhere.";
+  return "The system's alert receivers (set where the system is configured).";
+}
+
+function recipientsCard() {
+  const card = document.getElementById("rcard");
+  if (!D.system) { card.style.display = "none"; return; }
+  card.style.display = "";
+  const r = D.recipients || {}, e = r.email || {}, cs = D.channel_status || {};
+  document.getElementById("rtitle").textContent = `Who gets the alerts for ${D.system}`;
+  const status = c => { const s = cs[c] || {}; return s.ready ? `<span style="color:var(--green)">ready</span>`
+                                                          : `<span style="color:var(--amber)">${IB.esc(s.note || "not set up")}</span>`; };
+  document.getElementById("rbody").innerHTML = `<div class="rc">
+    <div><div class="k">Mail · ${status("email")}</div>
+      <input class="input" id="rnmail" value="${IB.esc((e.to || []).join(", "))}" placeholder="name@infrabeat.com, …"
+             title="Basis people for ${IB.esc(D.system)} (this system's own Basis team)">
+      <div style="font-size:12px;margin-top:2px">Cc: ${IB.esc((e.cc || []).join(", ") || "—")}</div>
+      <div class="std">${IB.esc(srcHelp(D.recipients_source || ""))}</div>
+      <button class="btn btn-brand ops-btn" onclick="saveMail()">Save mail</button>
+      <button class="btn ops-btn" onclick="saveMail(true)" title="Use the Basis box of this system on the Systems page">Use Systems page</button>
+      <button class="btn ops-btn" onclick="testSend('email')">Send test mail</button></div>
+    ${["whatsapp", "sms", "call"].map(c => `<div><div class="k">${c === "call" ? "Phone call" : c === "sms" ? "SMS" : "WhatsApp"} · ${status(c)}</div>
+      <input class="input" id="rn${c}" value="${IB.esc((r[c] || []).join(", "))}" placeholder="+91XXXXXXXXXX, +91…">
+      <button class="btn ops-btn" onclick="testSend('${c}')">Send test</button></div>`).join("")}
+  </div>
+  <div class="savebar"><button class="btn" onclick="saveNumbers()">Save numbers</button><span class="msg" id="rmsg"></span></div>`;
+}
+
+/* Alert teams: the standard (All systems) or one system's own. A team
+   without addresses sends to Basis. Admins only (the API says 403 otherwise). */
+let T = null;
+async function teamsCard() {
+  const card = document.getElementById("tcard");
+  try { T = await IB.get("/api/ops/alert-teams" + (D.system ? "?system=" + encodeURIComponent(D.system) : "")); }
+  catch (e) { card.style.display = "none"; return; }
+  card.style.display = "";
+  document.getElementById("ttitle").textContent = D.system ? `Alert teams for ${D.system}` : "Alert teams (standard for all systems)";
+  const rows = T.names.map(t => {
+    const std = (T.standard[t] || []).join(", ");
+    const own = D.system ? ((T.own || {})[t] || []).join(", ") : std;
+    const eff = D.system ? (T.effective || {})[t] || {} : {};
+    const hint = D.system
+      ? (own ? "" : std ? `standard: ${std}` : `no address: goes to Basis${eff.to && eff.to.length ? " (" + eff.to.join(", ") + ")" : ""}`)
+      : (std ? "" : (t === "Basis" ? "empty: each system's alert receivers" : "no address: goes to Basis"));
+    return `<div><div class="k">${IB.esc(t)}</div>
+      <input class="input" data-team="${IB.esc(t)}" value="${IB.esc(own)}" placeholder="${IB.esc(D.system ? (std || "use the standard") : "name@company.com, …")}">
+      <div class="std">${IB.esc(hint)}</div></div>`;
+  }).join("");
+  document.getElementById("tbody").innerHTML = `<div class="std" style="margin-bottom:8px">
+      ${D.system ? "Leave a team empty to use the standard addresses. " : ""}Dumps go to Basis (memory, database, RFC) or ABAP (program errors),
+      and also to FI / SD / MM or any team whose name starts the dump's component (FI-GL → FI). Other custom alerts go to Basis.</div>
+    <div class="rc" id="trows">${rows}</div>
+    <div class="savebar"><input class="input" id="tnew" placeholder="new team, e.g. PP" style="max-width:180px">
+      <button class="btn" onclick="addTeam()">Add team</button>
+      <button class="btn" onclick="saveTeams()">Save teams</button><span class="msg" id="tmsg"></span></div>`;
+}
+
+function addTeam() {
+  const v = document.getElementById("tnew").value.trim();
+  const m = document.getElementById("tmsg");
+  if (!/^[A-Za-z][A-Za-z0-9 _\/&.-]{0,29}$/.test(v)) { m.innerHTML = `<span style="color:var(--red)">Use letters and digits, up to 30 characters.</span>`; return; }
+  if (document.querySelector(`#trows input[data-team="${CSS.escape(v)}"]`)) { m.textContent = `${v} is already listed.`; return; }
+  const d = document.createElement("div");
+  d.innerHTML = `<div class="k">${IB.esc(v)}</div><input class="input" data-team="${IB.esc(v)}" data-new="1" placeholder="name@company.com, …">
+    <div class="std">new — save to keep it</div>`;
+  document.getElementById("trows").appendChild(d);
+  document.getElementById("tnew").value = "";
+}
+
+async function saveTeams() {
+  const m = document.getElementById("tmsg");
+  const teams = {};
+  document.querySelectorAll("#trows input[data-team]").forEach(el => {
+    const t = el.dataset.team, v = el.value.trim();
+    const inStd = Object.prototype.hasOwnProperty.call(T.standard || {}, t);
+    if (!D.system || v || !inStd) teams[t] = v;          // a system keeps only its own entries
+  });
+  try {
+    await OPS.post("/api/ops/alert-teams", { system: D.system || "", teams }, "Saving…");
+    m.innerHTML = `<span style="color:var(--green)">teams saved ${D.system ? "for " + IB.esc(D.system) : "as the standard"}</span>`;
+    const keep = m.innerHTML; await teamsCard(); document.getElementById("tmsg").innerHTML = keep;
+  } catch (e) { m.innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`; }
+}
+
+// The Mail box of "Who gets the alerts": this system's own Basis team
+// (same store as the Alert teams card). Empty / "Use Systems page" clears it,
+// so the system's Basis box on the Systems page is used.
+async function saveMail(clear) {
+  const m = document.getElementById("rmsg");
+  const box = document.querySelector('#trows input[data-team="Basis"]');
+  const v = clear ? "" : document.getElementById("rnmail").value.trim();
+  if (!box) { m.innerHTML = `<span style="color:var(--red)">Alert teams not loaded yet — try again</span>`; return; }
+  box.value = v;
+  await saveTeams();
+  const t = document.getElementById("tmsg").textContent || "";
+  if (/saved/.test(t)) {
+    await load();
+    document.getElementById("rmsg").innerHTML =
+      `<span style="color:var(--green)">${v ? "mail saved for " + IB.esc(D.system) : "now using the Systems page Basis box"}</span>`;
+  } else {
+    m.innerHTML = `<span style="color:var(--red)">${IB.esc(t || "not saved")}</span>`;
+  }
+}
+
+// Timed alerts ("... by one user (15 min)"): the window is set here, for
+// this system or for all systems (core/alert_windows.py).
+function winLabel(r) {
+  const w = (D.windows || {})[r.key];
+  return w ? w.label : r.label;
+}
+function winCell(r) {
+  const w = (D.windows || {})[r.key];
+  if (!w) return "";
+  const scope = D.system ? (w.own ? `${IB.esc(D.system)} only` : `standard ${w.standard} min`) : "all systems";
+  return `<div class="note" style="margin-top:5px">Time window:
+      <input class="input" type="number" min="1" max="1440" value="${w.minutes}" data-win="${IB.esc(r.key)}"
+             style="width:72px;padding:3px 6px;font-size:12px"> min
+      <button class="btn ops-btn" onclick="saveWin('${IB.jsArg(r.key)}')" style="padding:2px 8px">Save</button>
+      ${D.system && w.own ? `<button class="btn ops-btn" onclick="saveWin('${IB.jsArg(r.key)}', true)" style="padding:2px 8px">Use standard</button>` : ""}
+      <span class="std">(${scope}; ${IB.esc(w.meaning)})</span> <span class="std" id="winmsg-${IB.esc(r.key)}"></span></div>`;
+}
+async function saveWin(key, clear) {
+  const box = document.querySelector(`input[data-win="${CSS.escape(key)}"]`);
+  const msg = document.getElementById("winmsg-" + key);
+  try {
+    await OPS.post("/api/ops/alert-windows", { system: D.system || "", key, minutes: clear ? null : Number(box.value) }, "Saving…");
+    await load();
+  } catch (e) { if (msg) msg.innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`; }
+}
+
+async function saveNumbers() {
+  const m = document.getElementById("rmsg");
+  try {
+    const body = { system: D.system };
+    ["whatsapp", "sms", "call"].forEach(c => body[c] = document.getElementById("rn" + c).value);
+    await OPS.post("/api/ops/alert-recipients", body, "Saving…");
+    m.innerHTML = `<span style="color:var(--green)">numbers saved for ${IB.esc(D.system)}</span>`;
+  } catch (e) { m.innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`; }
+}
+
+async function testSend(channel) {
+  const m = document.getElementById("rmsg");
+  try {
+    const r = await OPS.post("/api/ops/alerts/test", { system: D.system, channel }, "Sending…");
+    const d = r && r.json ? await r.json() : r;
+    m.innerHTML = d && d.ok ? `<span style="color:var(--green)">test ${IB.esc(channel)} sent to ${IB.esc(d.recipients)}</span>`
+      : `<span style="color:var(--red)">test ${IB.esc(channel)} not sent: ${IB.esc((d && d.note) || "see Alert history")}</span>`;
+  } catch (e) { m.innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`; }
+}
+
+async function load() {
+  const sys = document.getElementById("sys").value;
+  D = await IB.get("/api/ops/thresholds" + (sys ? "?system=" + encodeURIComponent(sys) : ""));
+  const sel = document.getElementById("sys");
+  if (sel.options.length === 1) {
+    (D.systems || []).forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = s; sel.appendChild(o); });
+    try { const last = localStorage.getItem("ibo-thr-sys"); if (last && (D.systems || []).includes(last) && !sys) { sel.value = last; return load(); } } catch (e) {}
+  }
+  document.getElementById("alink").href = "/alerts-page" + (D.system ? "?system=" + encodeURIComponent(D.system) : "");
+  buildRows();
+  render();
+  recipientsCard();
+  teamsCard();
+}
+
+/* What to send for one changed row. With a system selected only what differs
+   from the standard is kept, so the rest keeps following the standard. */
+function bodyFor(r, i) {
+  const body = { key: r.key };
+  const al = document.getElementById("al" + i).value;
+  const ch = CH.map(c => c[0]).filter(c => document.getElementById("ch" + c + i).checked);
+  if (r.direction === "state") {
+    const sv = document.getElementById("sv" + i).value;
+    const baseSv = r.base.enabled ? r.base.severity : "off";
+    if (!D.system || sv !== baseSv) { body.severity = sv; if (sv !== "off" && !r.eff.enabled) body.enabled = true; }
+  } else {
+    const w = document.getElementById("w" + i).value.trim();
+    const c = document.getElementById("c" + i).value.trim();
+    const inc = document.getElementById("i" + i).checked;
+    const en = document.getElementById("e" + i).checked;
+    if (D.system) {
+      const wDiff = !same(w, r.base.warning), cDiff = !same(c, r.base.critical),
+            iDiff = inc !== r.base.inclusive || (!!r.incTouched && !r.incSet), eDiff = en !== r.base.enabled;
+      if (wDiff) body.warning = w;
+      if (cDiff || (iDiff && !wDiff)) body.critical = c;
+      if (iDiff) body.inclusive = inc;
+      if (eDiff) body.enabled = en;
+    } else {
+      if (!same(w, r.eff.warning)) body.warning = w;
+      if (!same(c, r.eff.critical)) body.critical = c;
+      if (inc !== r.eff.inclusive || r.incTouched) body.inclusive = inc;
+      if (en !== r.eff.enabled || !en) body.enabled = en;
+    }
+  }
+  if (D.system) {
+    if (al !== r.base.alert) body.alert = al;
+    if (!sameList(ch, r.base.channels)) body.channels = ch;
+  } else {
+    if (al !== r.eff.alert) body.alert = al;
+    if (!sameList(ch, r.eff.channels)) body.channels = ch;
+  }
+  if (al !== "off" && !ch.length) return { error: "alert is on but no channel is ticked" };
+  return body;
+}
+
+function describe(r, b) {
+  const parts = [];
+  const shown = (v, dflt) => (v === undefined) ? (dflt ?? "–") : (v === "" ? "standard/built-in" : v);
+  if (has(b, "warning") || has(b, "critical"))
+    parts.push(`warning ${shown(b.warning, r.eff.warning)}, critical ${shown(b.critical, r.eff.critical)}${r.unit ? " " + r.unit : ""}`);
+  if (has(b, "inclusive")) parts.push(`limit is critical: ${b.inclusive ? "yes" : "no"}`);
+  if (has(b, "enabled")) parts.push(b.enabled ? "switched on" : "switched OFF");
+  if (has(b, "severity")) parts.push(`not running = ${b.severity}`);
+  if (has(b, "alert")) parts.push(`alert: ${(ALERTS.find(x => x[0] === b.alert) || [0, b.alert])[1]}`);
+  if (has(b, "channels")) parts.push(`channels: ${b.channels.join(", ") || "none"}`);
+  return parts.join("; ");
+}
+
+async function saveAll() {
+  const out = document.getElementById("result");
+  const items = [], pending = [], errors = [];
+  document.querySelectorAll("#tbl tr.dirty").forEach(tr => {
+    const i = Number(tr.id.slice(3)), r = rows[i];
+    const b = bodyFor(r, i);
+    if (b.error) { errors.push(`<div style="color:var(--red)">${IB.esc(r.label)}: ${IB.esc(b.error)}</div>`); return; }
+    if (Object.keys(b).length === 1) {
+      if (D.system && r.own) pending.push({ reset: true, r, i }); return;      // back to the standard
+    }
+    items.push(b); pending.push({ r, i, b });
+  });
+  if (errors.length) { out.innerHTML = errors.join(""); return; }
+  if (!items.length && !pending.length) { out.innerHTML = `<span class="std">Nothing changed.</span>`; return; }
+  const lines = [], failed = [];
+  if (items.length) {
+    try {
+      const resp = await OPS.post("/api/ops/thresholds/batch", { system: D.system, items }, "Saving…");
+      const d = resp && resp.json ? await resp.json() : resp;
+      for (const res of (d.results || [])) {
+        const p = pending.find(x => x.b && x.b.key === res.key);
+        lines.push(res.ok
+          ? `<div><span style="color:var(--green)">✓ saved</span> <b>${IB.esc(p ? p.r.label : res.key)}</b> — ${IB.esc(p ? describe(p.r, p.b) : "")}</div>`
+          : `<div><span style="color:var(--red)">✗ not saved</span> <b>${IB.esc(p ? p.r.label : res.key)}</b> — ${IB.esc(res.error)}</div>`);
+        if (!res.ok) failed.push(res.key);
+      }
+    } catch (e) {
+      lines.push(`<div><span style="color:var(--red)">✗ not saved</span> — ${IB.esc(e.message)}</div>`);
+      items.forEach(b => failed.push(b.key));                      // the batch did not go through
+    }
+  }
+  for (const p of pending.filter(x => x.reset)) {
+    try {
+      await OPS.post("/api/ops/thresholds/reset", { system: D.system, key: p.r.key }, "Saving…");
+      lines.push(`<div><span style="color:var(--green)">✓</span> <b>${IB.esc(p.r.label)}</b> — back to the standard</div>`);
+    } catch (e) {
+      lines.push(`<div><span style="color:var(--red)">✗ not saved</span> <b>${IB.esc(p.r.label)}</b> — ${IB.esc(e.message)}</div>`);
+      failed.push(p.r.key);
+    }
+  }
+  out.innerHTML = `<div class="card"><div class="card-b"><b>Saved ${D.system ? "for " + IB.esc(D.system) : "for all systems"}:</b>${lines.join("")}</div></div>`;
+  // Rows that were not saved keep what the user typed, still marked as changed.
+  const keepRows = {};
+  for (const k of failed) {
+    const tr = document.querySelector(`#tbl tr[data-k="${CSS.escape(k)}"]`);
+    if (!tr) continue;
+    keepRows[k] = { vals: [...tr.querySelectorAll("input,select")].map(el => el.type === "checkbox" ? el.checked : el.value),
+                    incTouched: !!(rows[Number(tr.id.slice(3))] || {}).incTouched };
+  }
+  setTimeout(async () => {
+    const keep = out.innerHTML; await load(); out.innerHTML = keep;
+    for (const [k, saved] of Object.entries(keepRows)) {
+      const tr = document.querySelector(`#tbl tr[data-k="${CSS.escape(k)}"]`);
+      if (!tr) continue;
+      const els = [...tr.querySelectorAll("input,select")];
+      if (els.length !== saved.vals.length) continue;
+      // values only: firing change events would mark "Limit is critical" as touched
+      els.forEach((el, n) => { if (el.type === "checkbox") el.checked = saved.vals[n]; else el.value = saved.vals[n]; });
+      const r = rows[Number(tr.id.slice(3))];
+      if (r) r.incTouched = saved.incTouched;
+      tr.classList.add("dirty");
+    }
+    counts();
+  }, 500);
+}
+
+async function reset(i) {
+  const r = rows[i];
+  try {
+    await OPS.post("/api/ops/thresholds/reset", { system: D.system, key: r.key }, "Resetting…");
+    load();
+  } catch (e) { document.getElementById("m" + i).innerHTML = `<span style="color:var(--red)">${IB.esc(e.message)}</span>`; }
+}
+
+window.addEventListener("beforeunload", e => {
+  if (document.querySelectorAll("#tbl tr.dirty").length) { e.preventDefault(); e.returnValue = ""; }
+});
+document.getElementById("sys").onchange = () => {
+  if (document.querySelectorAll("#tbl tr.dirty").length &&
+      !confirm("You have changes that are not saved. Switch system and lose them?")) {
+    document.getElementById("sys").value = D.system || "";       // stay on the system shown
+    return;
+  }
+  try { localStorage.setItem("ibo-thr-sys", document.getElementById("sys").value); } catch (e) {}
+  document.getElementById("result").innerHTML = "";
+  load();
+};
+document.getElementById("flt").oninput = applyFilter;
+load();
+</script>
+</body>
+</html>

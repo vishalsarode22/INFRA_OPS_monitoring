@@ -1,0 +1,220 @@
+cpu:
+  warning: 80
+  critical: 90
+
+memory:
+  warning: 80
+  critical: 90
+
+swap:
+  warning: 20
+  critical: 40
+
+disk:
+  warning: 80
+  critical: 90
+
+load_1m:
+  warning: 4
+  critical: 8
+
+# ============================================================
+# SAP GUI / T-code monitoring thresholds
+# ============================================================
+
+# SMLG / SMON instance dialog response time (live, per instance)
+# Healthy   : <= 1500 ms  (an idle instance reads 0 ms and is healthy)
+# Warning   : > 1500 ms   yellow
+# Critical  : > 2000 ms   red
+# Emergency : > 2500 ms   red, flashing on the dashboard
+#
+# `emergency` is a third band the generic threshold engine does not read --
+# it grades on warning/critical only. SMLG is graded by
+# sap_gui/smlg_analyzer.py instead, which understands all three and also
+# emits the `alert_level` the dashboard uses to decide whether to flash.
+# The two numbers below are kept in step with that module so the limits
+# shown next to a value on screen match the ones that actually graded it.
+sap.smlg.response_time:
+  warning: 1500
+  critical: 2000
+  emergency: 2500
+
+# ST22 ABAP runtime errors / short dumps per day (company standard, 24.09.2026)
+# Healthy  : 0 - 4
+# Warning  : 5 - 9
+# Critical : 10 and more
+# `inclusive: true` makes the critical limit itself CRITICAL (10 -> CRITICAL);
+# without it the engine treats critical as "strictly above".
+sap.st22.dump_count:
+  warning: 5
+  critical: 10
+  inclusive: true
+
+sap.st22.dumps:
+  warning: 5
+  critical: 10
+  inclusive: true
+
+# SM12 active enqueue locks
+# Healthy  : < 50
+# Warning  : 50 - 150
+# Critical : > 150
+# 22.09.2026: raised from 50/150. PS4 (production) ranged 27-2,211 in one
+# afternoon; 150 made a normal snapshot CRITICAL on most runs.
+sap.sm12.lock_count:
+  warning: 500
+  critical: 2000
+
+# SM50 / SM51 active Dialog + Background work-process utilization
+# Healthy  : < 70%
+# Warning  : 70 - 90%
+# Critical : > 90%
+sap.sm50.wp_utilization:
+  warning: 70
+  critical: 90
+
+# Existing SAP GUI metrics
+sap.sm13.failed_updates:
+  warning: 1
+  critical: 10
+
+# SM37 cancelled jobs today (company standard, 24.09.2026)
+# Warning 5 - 9, Critical 10 and more
+sap.sm37.cancelled_jobs:
+  warning: 5
+  critical: 10
+  inclusive: true
+
+sap.smq1.entries:
+  warning: 10
+  critical: 50
+
+sap.smq2.entries:
+  warning: 10
+  critical: 50
+
+sap.sost.errors:
+  warning: 1
+  critical: 10
+
+# ============================================================
+# ASE / Sybase database (ST04 view via MDA tables)
+# ============================================================
+
+# Statements currently executing across all SAP work processes
+db.ase.active_statements:
+  warning: 40
+  critical: 80
+
+# Statements running longer than LONG_RUNNING_SECONDS (60s)
+db.ase.long_running_statements:
+  warning: 1
+  critical: 5
+
+# Sessions waiting on a lock held by another SPID
+db.ase.blocked_sessions:
+  warning: 1
+  critical: 5
+
+# Cached statements averaging more than EXPENSIVE_AVG_LIO (50k) logical reads
+db.ase.expensive_statement_count:
+  warning: 5
+  critical: 20
+
+# Highest average logical I/O of any cached statement, in pages
+db.ase.top_statement_avg_lio:
+  warning: 100000
+  critical: 1000000
+
+# Data cache hit ratio. LOW IS BAD: warning at or below 95, critical at or below 90.
+db.ase.data_cache_hit_pct:
+  warning: 95
+  critical: 90
+
+# ASE engine busy % (delta between polls; absent on the first poll)
+db.ase.engine_cpu_pct:
+  warning: 80
+  critical: 90
+
+# Hottest memory pool from sp_monitorconfig, Pct_act
+db.ase.memory_pool_max_used_pct:
+  warning: 85
+  critical: 95
+
+# ============================================================
+# RFC performance collector (all instances over RFC)
+# ============================================================
+
+# Dialog WPs in PRIV mode (user context spilled to heap; WP pinned to that user)
+sap.sm50.priv_mode_wp:
+  warning: 2
+  critical: 5
+
+# Busy dialog WPs running longer than 600s
+sap.sm50.long_running_wp:
+  warning: 2
+  critical: 5
+
+# Worst single instance's dialog WP saturation
+sap.sm66.max_instance_saturation_pct:
+  warning: 80
+  critical: 90
+
+# Average dialog response over the last 5 minutes, all instances (STAT records)
+# Aligned with sap.smlg.response_time so the same measurement grades the same
+# way whichever source it came from.
+sap.st03.dialog_resp_ms:
+  warning: 1500
+  critical: 3000
+
+# Worst single instance's average dialog response
+sap.st03.max_instance_resp_ms:
+  warning: 1500
+  critical: 3500
+
+# Share of dialog response spent in DB calls
+sap.st03.db_time_pct:
+  warning: 50
+  critical: 70
+
+# Most locks held by any one user
+# 22.09.2026: raised from 20/50 in line with the lock-count limits (500/2000).
+# One mass-processing job routinely holds 1,000+ locks on PS4.
+sap.sm12.locks_per_user_max:
+  warning: 200
+  critical: 1000
+
+# Users holding 10 or more locks
+sap.sm12.users_with_many_locks:
+  warning: 2
+  critical: 5
+
+# Age of the oldest lock entry
+# 22.09.2026, user decision: alert only on locks held 24 h or more.
+# Standing daemon locks are excluded in collectors/rfc_perf.py
+# (LOCK_AGE_IGNORE_PREFIXES).
+sap.sm12.oldest_lock_minutes:
+  warning: 1440
+  critical: 2880
+
+# ABAP programs with >= 60s total DB time in SQL Monitor
+sap.sqlm.expensive_programs:
+  warning: 3
+  critical: 10
+
+# Total DB time of the single most expensive program
+sap.sqlm.top_program_total_s:
+  warning: 300
+  critical: 1800
+
+# Largest per-step memory (MAXBYTES) of any user in the STAT window, MB
+# 22.09.2026: raised from 1024/2048. PS4 steps of 3.9-6.5 GB were CRITICAL on
+# every run; S/4 systems routinely allow multi-GB dialog steps.
+sap.st03.top_user_memory_mb:
+  warning: 4096
+  critical: 8192
+
+# Total DB request time of the single heaviest report in the STAT window, ms
+sap.st03.top_report_db_ms:
+  warning: 60000
+  critical: 300000

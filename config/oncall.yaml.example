@@ -1,0 +1,33 @@
+# On-call rotation for Basis alerts. Copy to config/oncall.yaml and edit.
+# Read on every alert (no restart needed). See core/oncall.py.
+#
+# Basis-level alerts (VPN, credentials, first-breach, T-code/parser problems)
+# go to whoever is on call, and the person on call is copied on every
+# critical alert. A system with its own basis_emails keeps that list.
+# Covers for leave or swaps are added on the Operations page -> On call.
+
+enabled: true
+
+rotation:
+  start: 2026-10-05          # first day of the first shift (a Monday works well)
+  handover: "09:00"          # the next person takes over at this time
+  length_days: 7             # weekly rotation; 1 = daily
+  per_shift: 1               # how many people are on call at the same time
+  members:                   # in rotation order
+    - name: First Consultant
+      email: first.consultant@example.com
+      phone: "+91 98xxxxxxxx"      # for SMS / call escalation (config/escalation.yaml)
+    - name: Second Consultant
+      email: second.consultant@example.com
+      phone: "+91 97xxxxxxxx"
+
+# Copied on every Basis alert, whoever is on call (e.g. the team mailbox).
+always_copy: []
+
+# Optional: ask your shift tool instead of the rotation. It must answer
+#   GET <url>   ->   {"emails": ["a@x.com"], "names": ["A"], "until": "2026-10-12 09:00"}
+# On any error the rotation above is used and the Health page says so.
+# shift_source:
+#   url: http://127.0.0.1:8100/api/oncall/current
+#   token: ${ONCALL_TOKEN}
+#   timeout_seconds: 5

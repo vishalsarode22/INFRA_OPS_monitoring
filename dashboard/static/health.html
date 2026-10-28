@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Health</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .hgrid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(460px,1fr))}
+  @media (max-width:560px){.hgrid{grid-template-columns:1fr}}
+  .hrow{display:flex;gap:10px;align-items:flex-start;padding:10px 18px;border-top:1px solid var(--border);font-size:12.5px}
+  .hrow:first-child{border-top:0}
+  .dot{width:10px;height:10px;border-radius:50%;flex:none;margin-top:4px}
+  .l-ok{background:var(--green)} .l-warn{background:var(--amber)} .l-bad{background:var(--red)} .l-off{background:var(--gray)}
+  .hrow .n{font-weight:700;min-width:170px;max-width:230px;overflow-wrap:anywhere}
+  .hrow .t{color:var(--muted);flex:1;overflow-wrap:anywhere}
+  .overall{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:14px;margin-bottom:16px;font-weight:700}
+  .o-ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-br)}
+  .o-warn{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-br)}
+  .o-bad{background:var(--red-bg);color:var(--red);border:1px solid var(--red-br)}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Monitoring chain health</h2>
+      <div class="sub">Tunnel, VPN, dashboards, services, last sweep per system and mail delivery — on one page</div></div>
+    <div class="top-actions">
+      <a class="btn" href="/settings" title="Switch features, mail lists, VPN">⚙ Settings</a>
+      <button class="btn" id="refresh">↻ Check now</button>
+      <button class="btn" id="testmail" title="Admin: sends a test mail to the Basis / on-call list">Send test mail</button>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div id="overall"></div>
+    <div class="hgrid" id="groups"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Checking the chain…</span></div></div>
+    <div style="margin-top:14px;font-size:11px;color:var(--muted-dim)">Checked <span id="gen" class="mono">–</span> on
+      <span id="host" class="mono">–</span>. Each dashboard shows the chain as seen from its own machine — open the
+      other dashboard's Health page for its side.</div>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script src="/static/ops.js?v=ops1"></script>
+<script>
+IB.mountShell("health");
+IB.themeToggle(document.getElementById("theme"));
+
+const LABEL = { ok: "All good", warn: "Needs attention", bad: "Something is broken" };
+
+function row(r) {
+  let extra = "";
+  if (r.peer) extra = ` <button class="btn ops-btn" onclick="forgetPeer('${IB.jsArg(r.peer)}')">Forget</button>`;
+  if (r.system) extra = ` <a class="btn ops-btn" href="/timeline?system=${encodeURIComponent(r.system)}">Timeline</a>`;
+  if (r.vpn_keeper) extra = ` <button class="btn ops-btn" onclick="resetVpn('${IB.jsArg(r.vpn_keeper)}')">Reset — reconnect now</button>`;
+  return `<div class="hrow"><span class="dot l-${r.level}" title="${r.level}"></span>
+    <span class="n">${IB.esc(r.name)}</span><span class="t">${IB.esc(r.text)}${extra}</span></div>`;
+}
+
+async function load() {
+  try {
+    const d = await IB.get("/api/ops/health");
+    document.getElementById("overall").innerHTML =
+      `<div class="overall o-${d.overall}"><span class="dot l-${d.overall}"></span>${LABEL[d.overall] || d.overall}</div>`;
+    document.getElementById("groups").innerHTML = d.groups.map(g => `<div class="card">
+      <div class="card-h"><h3>${IB.esc(g.title)}</h3></div><div>${g.rows.map(row).join("")}</div></div>`).join("");
+    document.getElementById("gen").textContent = d.generated_at;
+    document.getElementById("host").textContent = d.host;
+  } catch (e) {
+    document.getElementById("groups").innerHTML = `<div class="banner banner-err">${IB.esc(e.message)}</div>`;
+  }
+}
+
+async function resetVpn(name) {
+  try { await OPS.post(`/api/ops/vpn-keeper/${encodeURIComponent(name)}/reset`, {}); OPS.toast("Reconnecting on the next check (within a minute)"); load(); }
+  catch (e) { OPS.toast(e.message, "err"); }
+}
+
+async function forgetPeer(name) {
+  if (!confirm(`Stop watching ${name}? Do this only for a machine retired on purpose.`)) return;
+  try { await OPS.post(`/api/ops/peers/${encodeURIComponent(name)}/forget`, {}); OPS.toast("Forgotten"); load(); }
+  catch (e) { OPS.toast(e.message, "err"); }
+}
+
+document.getElementById("refresh").onclick = load;
+document.getElementById("testmail").onclick = async () => {
+  try { const d = await OPS.post("/api/ops/health/test-mail", {}, "Sending…"); OPS.toast("Test mail sent to " + d.to.join(", ")); }
+  catch (e) { OPS.toast(e.message, "err"); }
+};
+load();
+IB.poll(load, 60000);
+</script>
+</body>
+</html>

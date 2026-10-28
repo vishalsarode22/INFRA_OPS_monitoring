@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Alert history</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .tw{overflow-x:auto}
+  .selbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .selbar select{min-width:200px}
+  td{vertical-align:top;font-size:12px}
+  .ok{color:var(--green);font-weight:700} .bad{color:var(--red);font-weight:700} .held{color:var(--amber);font-weight:700}
+  .lv-CRITICAL{color:var(--red);font-weight:700} .lv-WARNING{color:var(--amber);font-weight:700} .lv-NORMAL{color:var(--green);font-weight:700}
+  .std{font-size:11px;color:var(--muted-dim)}
+  .head{font-weight:700;font-size:13px;color:var(--text)}
+  .why{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45;max-width:640px}
+  .cat{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;
+       color:var(--muted-dim);margin-bottom:3px}
+  .rp{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:var(--radius-pill);
+      padding:2px 8px;margin:0 4px 4px 0;font-size:11.5px;white-space:nowrap}
+  .rp b{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+  .r-Manager{background:var(--amber-bg);border-color:var(--amber-br)} .r-Manager b{color:var(--amber)}
+  .r-Basis{background:var(--info-bg);border-color:var(--info-br)} .r-Basis b{color:var(--info)}
+  .r-Client{background:var(--red-bg);border-color:var(--red-br)} .r-Client b{color:var(--red)}
+  .r-Infrabeat,.r-Other{background:var(--gray-bg);border-color:var(--gray-br)} .r-Infrabeat b,.r-Other b{color:var(--gray)}
+  .grp{display:inline-block;margin-top:4px;font-size:11px;font-weight:700;color:var(--amber);background:var(--amber-bg);
+       border:1px solid var(--amber-br);border-radius:var(--radius-pill);padding:1px 8px}
+  .rules td,.rules th{font-size:12.5px}
+  .lists{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:12px}
+  .list{border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}
+  .list .t{font-weight:700;font-size:12.5px} .list .m{font-size:11.5px;color:var(--muted);margin:2px 0 6px}
+  .list .a{font-size:12px;word-break:break-all}
+  .sumbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .sumbar .rp{font-size:12px;padding:4px 10px}
+  details.how summary{cursor:pointer;font-weight:700;font-size:14px;padding:12px 16px}
+  details.how .body{padding:0 16px 14px}
+  td.when{white-space:nowrap}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Alert history</h2><div class="sub">Every mail IBOPS sent or held: what happened, who got it and why, and whether it arrived</div></div>
+    <div class="top-actions"><a class="btn" href="/thresholds-page" style="text-decoration:none">Thresholds &amp; alerts</a>
+      <button class="btn" id="theme">◑ Light</button></div>
+  </div>
+  <div class="content">
+    <div class="selbar">
+      <label style="font-size:13px">System <select class="input" id="sys"><option value="">All systems</option></select></label>
+      <label style="font-size:13px">Period <select class="input" id="days">
+        <option value="1">today and yesterday</option><option value="7" selected>last 7 days</option>
+        <option value="30">last 30 days</option><option value="90">last 90 days</option></select></label>
+      <label style="font-size:13px">Show <select class="input" id="cat" style="min-width:170px">
+        <option value="">everything</option><option>Value alert</option><option>System reachability</option>
+        <option>Monitoring report</option><option>Performance analysis</option><option value="other">other mails</option></select></label>
+      <label style="font-size:13px">Result <select class="input" id="res" style="min-width:140px">
+        <option value="">all</option><option value="ok">delivered</option><option value="no">not sent / held</option></select></label>
+      <label style="font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="grp" checked> group reminders</label>
+      <span class="std" id="cnt"></span>
+    </div>
+    <div class="card" style="margin-bottom:14px"><details class="how" id="how">
+      <summary>Who gets which mail? <span class="std" id="howsys"></span></summary>
+      <div class="body" id="howbody"><span class="std">Loading…</span></div></details></div>
+    <div class="sumbar" id="sumbar"></div>
+    <div class="card" id="acard" style="display:none;margin-bottom:14px"><div class="card-h"><h3>Waiting for approval: mail the user about cancelled jobs</h3></div>
+      <div class="card-b tw" style="padding:0"><table id="atbl"></table></div></div>
+    <div class="card" id="ocard" style="display:none;margin-bottom:14px"><div class="card-h"><h3>Waiting for Basis approval: mail the job owner / dump-owning team</h3></div>
+      <div class="card-b tw" style="padding:0"><table id="otbl"></table></div></div>
+    <div class="card"><div class="card-b tw" style="padding:0"><table id="tbl"></table></div></div>
+    <p class="std">Coloured labels show each person's role: <b>Manager</b> = Basis manager, <b>Basis</b> = Basis
+      consultants, <b>Client</b> = the customer (they should only ever appear on the monitoring report).
+      Times are Indian Standard Time.</p>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script src="/static/ops.js?v=ops1"></script>
+<script>
+IB.mountShell("alerts");
+IB.themeToggle(document.getElementById("theme"));
+const KIND = { alert: "new", repeat: "still bad", call: "call after 15 min", recovery: "back to normal", test: "test",
+               user_mail: "user mailed (approved)" };
+
+/* "Approve: mail the user" requests (cancelled jobs). Shown to users who may act. */
+async function approvals() {
+  const card = document.getElementById("acard");
+  let d;
+  try { d = await IB.get("/api/ops/job-mail-requests"); } catch (e) { card.style.display = "none"; return; }
+  const sys = document.getElementById("sys").value;
+  const rows = (d.requests || []).filter(r => !sys || r.system === sys);
+  if (!rows.length) { card.style.display = "none"; return; }
+  card.style.display = "";
+  document.getElementById("atbl").innerHTML =
+    `<tr><th>Raised</th><th>System</th><th>User</th><th>Mail address (SU01)</th><th>Cancelled jobs</th><th></th></tr>` +
+    rows.map(r => `<tr><td class="mono">${IB.esc(r.created_at)}</td><td>${IB.esc(r.system)}</td><td><b>${IB.esc(r.user)}</b></td>
+      <td>${r.email ? IB.esc(r.email) : r.has_email ? `<span class="std">(shown to admins)</span>` : "no address in SAP"}</td>
+      <td class="std">${IB.esc((r.jobs || []).slice(0, 5).map(j => j.job).join(", "))}${(r.jobs || []).length > 5 ? ` … (${r.jobs.length})` : ` (${(r.jobs || []).length})`}
+        ${r.status === "failed" ? `<div class="bad">last try failed: ${IB.esc(r.note)}</div>` : ""}</td>
+      <td>${r.has_email ? `<button class="btn" onclick="approve(${Number(r.id)})">Approve: mail ${IB.esc(r.user)}</button>` : ""}
+        <span class="std" id="am${Number(r.id)}"></span></td></tr>`).join("");
+}
+
+/* Mails to job owners / dump-owning teams: nothing goes out until Basis approves. */
+const OWNER_KIND = {job_owner: "Job owner", dump_owner: "Dump-owning team"};
+async function ownerApprovals() {
+  const card = document.getElementById("ocard");
+  let d;
+  try { d = await IB.get("/api/ops/owner-mail-requests"); } catch (e) { card.style.display = "none"; return; }
+  const sys = document.getElementById("sys").value;
+  const rows = (d.requests || []).filter(r => !sys || r.system === sys);
+  if (!rows.length) { card.style.display = "none"; return; }
+  card.style.display = "";
+  document.getElementById("otbl").innerHTML =
+    `<tr><th>Raised</th><th>System</th><th>To</th><th>About</th><th></th></tr>` +
+    rows.map(r => `<tr><td class="mono">${IB.esc(r.created_at)}</td><td>${IB.esc(r.system)}</td>
+      <td><b>${IB.esc(OWNER_KIND[r.kind] || r.kind)}</b><div class="std">${IB.esc((r.to || []).join(", "))}</div></td>
+      <td class="std">${IB.esc(r.what || r.subject)}${r.status === "failed" ? `<div class="bad">last try failed</div>` : ""}</td>
+      <td><button class="btn" onclick="ownerDecide(${Number(r.id)}, 'approve')">Approve: send it</button>
+        <button class="btn" onclick="ownerDecide(${Number(r.id)}, 'reject')">Do not send</button>
+        <span class="std" id="om${Number(r.id)}"></span></td></tr>`).join("");
+}
+
+async function ownerDecide(id, what) {
+  const m = document.getElementById("om" + id);
+  try {
+    const d = await OPS.post(`/api/ops/owner-mail-requests/${id}/${what === "approve" ? "approve" : "reject"}`, {},
+                             what === "approve" ? "Sending…" : "Saving…");
+    m.innerHTML = `<span class="ok">${IB.esc(d.message || "done")}</span>`;
+    setTimeout(() => { ownerApprovals(); load(); }, 1500);
+  } catch (e) { m.innerHTML = `<span class="bad">${IB.esc(e.message)}</span>`; }
+}
+
+async function approve(id) {
+  const m = document.getElementById("am" + id);
+  try {
+    const d = await OPS.post(`/api/ops/job-mail-requests/${id}/approve`, {}, "Sending…");
+    m.innerHTML = `<span class="ok">${IB.esc(d.message || "sent")}</span>`;
+    setTimeout(() => { approvals(); load(); }, 1500);
+  } catch (e) { m.innerHTML = `<span class="bad">${IB.esc(e.message)}</span>`; }
+}
+let ROWS = [], HIDDEN = false;
+const ROLE_SHORT = {Manager: "Manager", Basis: "Basis", Client: "Client", Infrabeat: "Infrabeat", Other: "Other"};
+const MAIN_CATS = ["Value alert", "System reachability", "Monitoring report", "Performance analysis"];
+
+function chips(people) {
+  if (!people || !people.length) return `<span class="std">nobody</span>`;
+  if (HIDDEN) {
+    const n = {}; people.forEach(p => n[p.role] = (n[p.role] || 0) + 1);
+    return Object.keys(n).map(r => `<span class="rp r-${IB.esc(r)}"><b>${IB.esc(r)}</b> ${n[r]}</span>`).join("")
+      + `<div class="std">addresses shown to admins</div>`;
+  }
+  return people.map(p => `<span class="rp r-${IB.esc(p.role)}" title="${IB.esc(p.role)}"><b>${IB.esc(ROLE_SHORT[p.role] || p.role)}</b>${IB.esc(p.address.split("@")[0])}</span>`).join("");
+}
+
+function grouped(rows) {
+  // Repeats of the SAME mail (same system, value, level, result) with nothing
+  // different in between for that value become one row. A different event of
+  // the same family (e.g. RECOVERED between two NOT REACHABLE) ends the group.
+  if (!document.getElementById("grp").checked) return rows.map(r => ({r, n: 1, first: r}));
+  const out = [], open = {};               // family -> {key, g}
+  rows.forEach(r => {                       // newest first
+    const e = r.explain || {};
+    const fam = r.system + "|" + (e.category === "System reachability" ? "reach" : r.metric + "|" + (r.instance || ""));
+    const key = e.group_key + "|" + (r.ok ? 1 : 0);
+    const cur = open[fam];
+    if (cur && cur.key === key) { cur.g.n += 1; cur.g.first = r; return; }
+    const g = {r, n: 1, first: r};
+    out.push(g);
+    open[fam] = {key, g};
+  });
+  return out;
+}
+
+function summary(rows) {
+  const sent = rows.filter(r => r.ok), held = rows.length - sent.length;
+  const role = {Manager: 0, Basis: 0, Client: 0};
+  sent.forEach(r => { const seen = new Set(((r.explain || {}).people || []).map(p => p.role));
+    seen.forEach(x => { if (x in role) role[x] += 1; }); });
+  document.getElementById("sumbar").innerHTML =
+    `<span class="rp"><b>Mails</b> ${sent.length} delivered${held ? ` · ${held} not sent / held` : ""}</span>` +
+    `<span class="rp r-Manager"><b>Manager</b> told ${role.Manager}×</span>` +
+    `<span class="rp r-Basis"><b>Basis</b> told ${role.Basis}×</span>` +
+    `<span class="rp r-Client"><b>Client</b> got ${role.Client} mail${role.Client === 1 ? "" : "s"}</span>`;
+}
+
+function render() {
+  const cat = document.getElementById("cat").value, res = document.getElementById("res").value;
+  let rows = ROWS.filter(r => {
+    const c = (r.explain || {}).category || "Other";
+    if (cat === "other" ? MAIN_CATS.includes(c) : cat && c !== cat) return false;
+    if (res === "ok" && !r.ok) return false;
+    if (res === "no" && r.ok) return false;
+    return true;
+  });
+  summary(rows);
+  const groups = grouped(rows);
+  document.getElementById("cnt").textContent =
+    `${rows.length} mail${rows.length === 1 ? "" : "s"}` + (groups.length !== rows.length ? ` in ${groups.length} rows` : "");
+  document.getElementById("tbl").innerHTML =
+    `<tr><th>When (IST)</th><th>System</th><th>What happened — and why this mail</th><th>Who got it</th><th>Result</th></tr>` +
+    (groups.length ? groups.map(({r, n, first}) => {
+      const e = r.explain || {};
+      const lv = String(r.level || "").toUpperCase();
+      const res = r.ok ? `<span class="ok">${IB.esc(e.outcome || "delivered")}</span>`
+        : String(e.outcome || "").startsWith("Held") ? `<span class="held">${IB.esc(e.outcome)}</span>`
+        : String(e.outcome || "").startsWith("No mail") ? `<span class="std">${IB.esc(e.outcome)}</span>`
+        : `<span class="bad">${IB.esc(e.outcome || "not sent")}</span>`;
+      const grp = n > 1 ? `<div class="grp">${n} mails like this · since ${IB.esc(first.at_display || first.at)}</div>` : "";
+      return `<tr><td class="mono when" title="${IB.esc(r.at)} (VM clock)">${IB.esc(r.at_display || r.at)}</td>
+        <td><b>${IB.esc(r.system)}</b></td>
+        <td><div class="cat">${IB.esc(e.category || "")}${lv && lv !== "INFO" ? ` · <span class="lv-${IB.esc(lv)}">${IB.esc(lv)}</span>` : ""}</div>
+          <div class="head">${IB.esc(e.headline || r.label)}</div><div class="why">${IB.esc(e.why || "")}</div>${grp}</td>
+        <td>${chips(e.people)}</td><td>${res}</td></tr>`;
+    }).join("") : `<tr><td colspan="5" class="std">No mails in this period.</td></tr>`);
+}
+
+async function load() {
+  const sys = document.getElementById("sys").value, days = document.getElementById("days").value;
+  const d = await IB.get(`/api/ops/alerts?days=${days}` + (sys ? `&system=${encodeURIComponent(sys)}` : ""));
+  ROWS = d.rows || []; HIDDEN = !!d.recipients_hidden;
+  render();
+  routing();
+}
+
+async function routing() {
+  const sys = document.getElementById("sys").value;
+  const body = document.getElementById("howbody");
+  document.getElementById("howsys").textContent = sys ? `— ${sys}` : "— pick a system above for its exact addresses";
+  let d;
+  try { d = await IB.get("/api/ops/mail-routing" + (sys ? `?system=${encodeURIComponent(sys)}` : "")); }
+  catch (e) { body.innerHTML = `<span class="bad">${IB.esc(e.message)}</span>`; return; }
+  const list = d.systems || [];
+  if (!list.length) { body.innerHTML = `<span class="std">No systems.</span>`; return; }
+  const addr = l => HIDDEN || d.recipients_hidden
+    ? (l.count ? `${l.count} address${l.count === 1 ? "" : "es"} (shown to admins)` : `<span class="bad">not set</span>`)
+    : (l.addresses.length ? l.addresses.map(IB.esc).join(", ") : `<span class="bad">not set</span>`);
+  const one = list[0];
+  const ROLEMAP = {"Basis": "Basis", "Manager": "Manager", "Report To list": "Client", "Report Cc list": "Infrabeat"};
+  const who = arr => arr.map(x => `<span class="rp r-${IB.esc(ROLEMAP[x] || "Other")}"><b>${IB.esc(x)}</b></span>`).join("");
+  let html = "";
+  if (sys) {
+    html += `<div class="lists">` + one.lists.map(l => `<div class="list"><div class="t">${IB.esc(l.role)}</div>
+      <div class="m">${IB.esc(l.meaning)}</div><div class="a">${addr(l)}</div></div>`).join("") + `</div>`;
+  } else {
+    html += `<table class="rules" style="margin-bottom:12px"><tr><th>System</th>` +
+      one.lists.map(l => `<th>${IB.esc(l.role)}</th>`).join("") + `</tr>` +
+      list.map(s => `<tr><td><b>${IB.esc(s.system)}</b></td>` + s.lists.map(l => `<td class="std" style="font-size:11.5px">${addr(l)}</td>`).join("") + `</tr>`).join("") +
+      `</table>`;
+  }
+  html += `<table class="rules"><tr><th>When this happens</th><th>Mail goes To</th><th>Copy (Cc)</th><th>How often</th></tr>` +
+    one.rules.map(r => `<tr><td><b>${IB.esc(r.when)}</b><div class="std">${IB.esc(r.detail)}</div></td>
+      <td>${who(r.to)}</td><td>${r.cc.length ? who(r.cc) : `<span class="std">—</span>`}</td><td class="std">${IB.esc(r.how_often)}</td></tr>`).join("") +
+    `</table><p class="why" style="margin-top:10px"><b>${IB.esc(one.client_never)}</b> ${IB.esc(one.caps)}</p>
+    <p class="std" style="margin-top:6px"><b>To change who gets what:</b><br>${one.where_to_change.map(IB.esc).join("<br>")}</p>`;
+  body.innerHTML = html;
+}
+
+(async () => {
+  const sel = document.getElementById("sys");
+  try {
+    const t = await IB.get("/api/ops/alerts?days=1");          // light call: just the system list
+    (t.systems || []).forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = s; sel.appendChild(o); });
+  } catch (e) {}
+  const q = new URLSearchParams(location.search).get("system");
+  if (q) sel.value = q;
+  sel.onchange = () => { load(); approvals(); ownerApprovals(); }; document.getElementById("days").onchange = load;
+  ["cat", "res", "grp"].forEach(id => document.getElementById(id).onchange = render);
+  try { if (localStorage.getItem("ibo-alerts-how") === "open") document.getElementById("how").open = true; } catch (e) {}
+  document.getElementById("how").addEventListener("toggle", ev => {
+    try { localStorage.setItem("ibo-alerts-how", ev.target.open ? "open" : "closed"); } catch (e) {} });
+  load(); approvals(); ownerApprovals();
+})();
+</script>
+</body>
+</html>

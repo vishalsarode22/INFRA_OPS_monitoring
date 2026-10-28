@@ -1,0 +1,27 @@
+# Runtime dependencies, pinned to the versions installed and running on the
+# Windows VM (.venv\Lib\site-packages *.dist-info). Test tools live in
+# requirements-dev.txt.
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.53.0
+pydantic==2.13.5
+requests==2.34.2
+PyYAML==6.0.3
+python-dotenv==1.2.3
+pandas==3.0.5
+openpyxl==3.1.5
+reportlab==5.0.1
+Pillow==12.3.0
+paramiko==5.0.0
+# Form posts (login, one-click action links) need it.
+python-multipart==0.0.20
+# RFC collector. Requires the SAP NetWeaver RFC SDK on the host;
+# the collector degrades quietly if this is absent.
+pyrfc==3.3
+
+# ASE / Sybase collector. Needs an ODBC driver on the host: the SAP ASE
+# client's driver or FreeTDS (tds version 5.0). Degrades quietly if absent.
+pyodbc==5.3.0
+
+# Optional: OS credential store for ${VAR} secrets (scripts/set_secret.py)
+keyring==25.6.0

@@ -1,0 +1,17 @@
+[Unit]
+Description=InfraBeatOps jobs (mail, AI, maintenance, monitor-down watchdog)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ibops
+WorkingDirectory=/home/ibops/app
+Environment=IBO_ROLE=jobs
+ExecStart=/home/ibops/app/.venv/bin/python -m services.jobs
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

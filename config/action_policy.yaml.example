@@ -1,0 +1,18 @@
+# Approval policy for one-click actions (core/sap_actions.py). Copy to
+# config/action_policy.yaml. First matching rule wins; no match -> default.
+# IBO_ACTIONS_TWO_PERSON=1 in .env overrides this file: then EVERY action
+# needs a second person (standing approvals still work).
+#   confirm     the person who asks confirms in a dialog and it runs
+#   two_person  someone else must approve it on the Operations page
+# Every action is always a person's click, shows what it touches first,
+# and is logged -- nothing runs on its own.
+
+default: confirm
+
+rules:
+  - {systems: ["*QAS*", "*DEV*"], actions: ["*"], approval: confirm}
+  - {systems: ["PRD", "PS4", "SARLOHA PRD"], actions: [release_lock, cancel_job, unlock_user], approval: two_person}
+
+# During planned work an admin can add a time-boxed standing approval on the
+# Operations page (Actions -> Standing approval): two_person actions then run
+# on one click until it ends.

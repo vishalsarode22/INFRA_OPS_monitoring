@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Run history</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .mono{font-family:var(--mono);font-size:11.5px;white-space:nowrap}
+  .why{font-size:11.5px;color:var(--muted-dim);overflow-wrap:anywhere;max-width:420px}
+  .flag{color:var(--red);font-weight:800;font-size:11px}
+  .sec-h{font-size:13px;font-weight:700;margin:18px 0 8px}
+  td{vertical-align:top}
+  .c-info{background:var(--info-bg);color:var(--info);border:1px solid var(--info-br)}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Run history</h2><div class="sub">Every sweep and every scheduling decision — what ran, when, why, and what is next</div></div>
+    <div class="top-actions">
+      <span class="chip c-live"><span class="pulse"></span> live</span>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div id="banner"></div>
+    <div class="sec-h">Next scheduled runs</div>
+    <div class="card"><div id="next"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading…</span></div></div></div>
+
+    <div class="sec-h">History</div>
+    <div class="row">
+      <select class="input" id="system"><option value="">all systems</option></select>
+      <select class="input" id="result"><option value="">all results</option>
+        <option>success</option><option>failed</option><option>skipped</option><option>missed</option>
+        <option>parked</option><option>hung-killed</option><option>abandoned</option><option>stopped-by-user</option></select>
+      <select class="input" id="trigger"><option value="">all triggers</option>
+        <option>schedule</option><option>catch-up</option><option>manual-system</option><option>manual-profile</option>
+        <option>manual-all</option><option>new-system</option><option>retry</option><option>rca</option><option>cli</option></select>
+      <select class="input" id="since"><option value="1">last 24 h</option><option value="7" selected>7 days</option>
+        <option value="30">30 days</option><option value="">everything</option></select>
+      <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="unexp"> only unexpected</label>
+      <a class="btn" id="csv" href="/api/run-history.csv" style="text-decoration:none">Download CSV</a>
+      <span class="sub" id="sum"></span>
+    </div>
+    <div class="card"><div id="list"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading…</span></div></div></div>
+    <p style="margin-top:12px;font-size:11.5px;color:var(--muted-dim)">
+      <b>Unexpected</b> marks a run that started outside its plan: not a manual, retry or RCA run, and not on
+      (or within the grace window after) a planned slot. Missed and skipped slots are never run late; the schedule
+      keeps its next slot. A parked system stays parked until someone clears the flag on the Live wall.</p>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script>
+IB.mountShell("runhistory");
+IB.themeToggle(document.getElementById("theme"));
+const $ = id => document.getElementById(id);
+const esc = s => IB.esc(s == null ? "" : String(s));
+const CHIP = {"success": "c-normal", "failed": "c-critical", "hung-killed": "c-critical", "abandoned": "c-critical",
+              "parked": "c-warning", "missed": "c-warning", "skipped": "c-unknown", "stopped-by-user": "c-info"};
+const short = t => t ? String(t).replace("T", " ").slice(0, 16) : "";
+let SYSTEMS = new Set();
+
+function query() {
+  const p = new URLSearchParams();
+  ["system", "result", "trigger"].forEach(k => { if ($(k).value) p.set(k, $(k).value); });
+  if ($("since").value) {
+    const d = new Date(Date.now() - Number($("since").value) * 86400000);
+    p.set("since", d.toISOString().slice(0, 19));
+  }
+  p.set("limit", "500");
+  return p.toString();
+}
+
+async function loadNext() {
+  try {
+    const d = await IB.get("/api/run-history/next");
+    const notes = [];
+    if (d.config_error) notes.push(`systems.yaml cannot be read (${esc(d.config_error.error)}) — the last good copy is in use.`);
+    if (d.paused) notes.push("Automatic monitoring is paused.");
+    if (d.snoozed) notes.push("Automatic monitoring is snoozed.");
+    if (d.manual_hold) notes.push("A manual run is in progress; automatic runs wait until it ends.");
+    $("banner").innerHTML = notes.map(n => `<div class="banner banner-err" style="margin-bottom:10px">${n}</div>`).join("");
+    const rows = (d.items || []).map(r => `<tr>
+        <td>${esc(r.system)}</td>
+        <td>${r.kind === "profile" ? "profile <b>" + esc(r.id) + "</b>" : "Scheduler page"}</td>
+        <td>${esc(r.schedule)}</td>
+        <td class="mono">${r.next_run_at ? esc(r.next_run_at) : "—"}</td>
+        <td class="why">${r.held ? esc(r.held) : "on schedule"}</td>
+        <td class="mono">${esc(short(r.last_run))}</td></tr>`).join("");
+    $("next").innerHTML = rows ? `<table><thead><tr><th>System</th><th>Source</th><th>Schedule</th><th>Next run</th>
+        <th>Status</th><th>Last planned run</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="empty">No profile or saved schedule — nothing runs automatically.</div>`;
+  } catch (e) {
+    $("next").innerHTML = `<div class="banner banner-err" style="margin:14px">${esc(e.message)}</div>`;
+  }
+}
+
+async function loadHistory() {
+  const q = query();
+  $("csv").href = "/api/run-history.csv?" + q;
+  try {
+    let rows = await IB.get("/api/run-history?" + q);
+    rows.forEach(r => r.system && SYSTEMS.add(r.system));
+    const sel = $("system"), cur = sel.value;
+    const have = new Set([...sel.options].map(o => o.value));
+    [...SYSTEMS].sort().forEach(s => { if (!have.has(s)) sel.add(new Option(s, s)); });
+    sel.value = cur;
+    if ($("unexp").checked) rows = rows.filter(r => r.unexpected);
+    $("sum").textContent = `${rows.length} row(s)`;
+    $("list").innerHTML = rows.length ? `<table><thead><tr><th>When</th><th>System</th><th>Trigger</th><th>Planned</th>
+        <th>Result</th><th>Duration</th><th>Attempt</th><th>Screens</th><th>Why / stage</th><th>Next</th></tr></thead><tbody>
+      ${rows.map(r => `<tr>
+        <td class="mono">${esc(short(r.started_at || r.recorded_at))}</td>
+        <td>${esc(r.system)}${r.run_name ? `<div><b>${esc(r.run_name)}</b></div>` : r.profile_id ? `<div class="why">${esc(r.profile_id)}</div>` : ""}</td>
+        <td>${esc(r.trigger)}${r.unexpected ? ` <span class="flag" title="Started outside its schedule">UNEXPECTED</span>` : ""}</td>
+        <td class="mono">${esc(short(r.planned_at))}</td>
+        <td><span class="chip ${CHIP[r.result] || "c-unknown"}">${esc(r.result)}</span></td>
+        <td class="mono">${r.duration_s != null ? Math.round(r.duration_s) + " s" : ""}</td>
+        <td class="mono">${r.attempt ? esc(r.attempt) + "/" + esc(r.attempts_max || "?") : ""}</td>
+        <td class="mono">${r.screenshots_captured != null ? esc(r.screenshots_captured) : ""}</td>
+        <td class="why">${r.failed_stage ? "<b>" + esc(r.failed_stage) + "</b> " : ""}${esc(r.failure_reason || r.note || "")}</td>
+        <td class="why">${r.next_run_at ? esc(short(r.next_run_at)) + " " : ""}${esc(r.next_run_reason || "")}</td>
+      </tr>`).join("")}</tbody></table>`
+      : `<div class="empty">Nothing recorded for this filter.</div>`;
+  } catch (e) {
+    $("list").innerHTML = `<div class="banner banner-err" style="margin:14px">${esc(e.message)}</div>`;
+  }
+}
+
+["system", "result", "trigger", "since", "unexp"].forEach(id => $(id).onchange = loadHistory);
+loadNext(); loadHistory();
+IB.poll(loadNext, 30000);
+IB.poll(loadHistory, 30000);
+</script>
+</body>
+</html>

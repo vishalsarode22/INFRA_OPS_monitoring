@@ -1,0 +1,19 @@
+# Escalation by time (core/escalation_time.py). Copy to config/escalation.yaml.
+# An alert nobody acknowledges climbs these steps. Acknowledge / Ignore /
+# Snooze, a maintenance window or recovery stops it.
+
+enabled: true
+states: [SYSTEM DOWN]        # also possible: VPN NOT CONNECTED, CREDENTIALS, NOT REACHABLE
+peers: true                  # escalate "[WINDOWS VM SILENT]" too
+
+steps:
+  - {after_minutes: 15, action: manager_mail}
+  - {after_minutes: 30, action: sms,   to: [oncall, manager]}
+  - {after_minutes: 45, action: voice, to: [oncall]}
+
+# Numbers for "manager" (on-call phones come from config/oncall.yaml).
+manager_phones: []
+
+# SMS / voice settings are in .env -- see notifications/sms.py:
+#   IBO_MSG91_AUTHKEY, IBO_MSG91_FLOW_ID, IBO_MSG91_SENDER,
+#   IBO_MSG91_VOICE_URL, IBO_MSG91_VOICE_BODY

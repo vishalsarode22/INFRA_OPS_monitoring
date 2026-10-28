@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IBOPS · Sky view</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  /* Sky view, future vision (v6): one luminous sentence, four HUD readouts,
+     then every system as a row on a frosted console. Night only; the floor
+     grid and horizon come from body.pg-future in shell.css. */
+  .pg-sky .content{max-width:1320px;padding-top:40px}
+  .say{font-family:var(--display);font-weight:200;font-size:clamp(28px,3.4vw,46px);line-height:1.12;letter-spacing:-.01em;
+    max-width:30ch;color:var(--fv-title);text-shadow:0 0 24px var(--fv-title-glow)}
+  .say-sub{margin-top:12px;font-size:14px;color:var(--muted);max-width:70ch}
+  .counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:34px 0 8px}
+  .counts div{padding:20px 20px 16px}
+  .counts b{display:inline-block;font-family:var(--display);font-weight:300;font-size:62px;padding-right:.1em;line-height:1;letter-spacing:-.04em;
+    font-variant-numeric:tabular-nums;background:var(--val-neutral);-webkit-background-clip:text;background-clip:text;
+    color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 12px var(--fv-title-glow))}
+  .counts span{display:block;margin-top:10px;font-size:12.5px;color:var(--muted)}
+  .counts .warn b{background-image:var(--val-warn)}
+  .counts .crit b{background-image:var(--val-crit)}
+  .split{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;margin-top:22px;align-items:start}
+  .split > section,.split > aside{padding:16px 20px 8px}
+  .split h3{font-size:12.5px;font-weight:500;color:var(--muted);margin-bottom:6px;letter-spacing:.02em}
+  .sys{display:grid;grid-template-columns:12px 170px 165px minmax(0,1fr) 170px;
+    align-items:center;gap:16px;padding:14px 6px;border-bottom:1px solid var(--gl-line);color:var(--text);
+    transition:background .15s}
+  .sys:last-child{border-bottom:0}
+  .sys:hover{background:var(--fv-tint)}
+  .sys .dot{width:9px;height:9px;border-radius:50%;background:var(--gray)}
+  .sys.NORMAL .dot{background:var(--green);box-shadow:0 0 10px var(--green)}
+  .sys.WARNING .dot{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+  .sys.CRITICAL .dot{background:var(--red);box-shadow:0 0 0 4px var(--red-bg),0 0 14px var(--red)}
+  .sys .nm b{display:block;font-weight:600;font-size:14px}
+  .sys .nm small{font-family:var(--mono);font-size:11px;color:var(--muted-dim)}
+  .sys .meter{height:3px;background:var(--fv-tint);border-radius:2px;overflow:hidden}
+  .sys .meter i{display:block;height:100%;background:var(--green);box-shadow:0 0 8px var(--green)}
+  .sys.WARNING .meter i{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .sys.CRITICAL .meter i{background:var(--red);box-shadow:0 0 8px var(--red)}
+  .sys .pct{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:7px}
+  .sys .worst{font-size:12.5px;color:var(--muted)} .sys .worst b{color:var(--text);font-weight:600}
+  .sys .nums{font-family:var(--mono);font-size:11.5px;color:var(--muted-dim);white-space:nowrap;text-align:right}
+  .sys.UNKNOWN .nm b{color:var(--muted)}
+  .changes{list-style:none}
+  .changes li{padding:11px 0;border-bottom:1px solid var(--gl-line);font-size:12.5px;display:grid;grid-template-columns:1fr auto;gap:2px 10px}
+  .changes li:last-child{border-bottom:0}
+  .changes li .what{color:var(--text)} .changes li .val{font-family:var(--mono);font-weight:600}
+  .changes li .who{grid-column:1/-1;font-size:11.5px;color:var(--muted-dim)}
+  .changes li.CRITICAL .val{color:var(--red)} .changes li.WARNING .val{color:var(--amber)} .changes li.NORMAL .val{color:var(--green)}
+  .quiet{color:var(--muted-dim);font-size:12.5px;padding:12px 0}
+  @media (max-width:1000px){.split{grid-template-columns:1fr}.sys{grid-template-columns:14px 1fr auto}.sys .meterbox,.sys .worst{display:none}
+    .counts{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body class="pg-sky pg-future">
+<main>
+  <div class="topbar">
+    <div><h2>Sky view</h2></div>
+    <div class="top-actions">
+      <select class="input" id="every" title="Refresh interval">
+        <option value="10000">every 10 s</option><option value="30000">every 30 s</option><option value="60000">every 60 s</option>
+      </select>
+      <a class="btn" href="/wall">Live wall</a>
+      <button class="btn" id="theme">◐ Dark</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <h1 class="say" id="greet">Reading every system…</h1>
+    <p class="say-sub" id="lede">The first live read is on its way.</p>
+
+    <div class="counts">
+      <div class="hud"><b id="s-live">0</b><span>systems answering</span></div>
+      <div class="hud"><b id="s-checks">0</b><span>checks read</span></div>
+      <div class="hud warn"><b id="s-warn">0</b><span>need a look</span></div>
+      <div class="hud crit"><b id="s-crit">0</b><span>critical</span></div>
+    </div>
+
+    <div class="split">
+      <section class="hud">
+        <h3>Systems, worst first</h3>
+        <div id="orbits"></div>
+      </section>
+      <aside class="hud">
+        <h3>What just changed</h3>
+        <ul class="changes" id="ticker"><li class="quiet" data-empty>Nothing yet. Changes appear here as they happen.</li></ul>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=ds6"></script>
+<script>
+IB.mountShell("sky");
+IB.themeToggle(document.getElementById("theme"));
+
+const seen = {};        // metric -> last status, to build the change list from real changes
+const SEEN_MAX = 800;   // hard cap so a long-open tab doesn't grow this map forever
+function rememberSeen(key, status) {
+  if (!(key in seen) && Object.keys(seen).length >= SEEN_MAX) {
+    const keys = Object.keys(seen);
+    for (let i = 0; i < keys.length - SEEN_MAX + 1; i++) delete seen[keys[i]];
+  }
+  seen[key] = status;
+}
+const RANK = {CRITICAL: 0, WARNING: 1, UNKNOWN: 2, NORMAL: 3};
+
+function summary(s) {
+  const checks = s.checks || [];
+  const graded = checks.filter(c => c.status !== "UNKNOWN");
+  const ok = graded.filter(c => c.status === "NORMAL").length;
+  const crit = checks.filter(c => c.status === "CRITICAL").length;
+  const warn = checks.filter(c => c.status === "WARNING").length;
+  const status = !s.connected ? "UNKNOWN" : crit ? "CRITICAL" : warn ? "WARNING" : "NORMAL";
+  return {checks, pct: graded.length ? Math.round(100 * ok / graded.length) : 0, crit, warn, status,
+          worst: checks.find(c => c.status === "CRITICAL") || checks.find(c => c.status === "WARNING")};
+}
+
+function rowHtml(s) {
+  const m = summary(s);
+  const wp = s.work_processes || {};
+  const resp = (s.instances || []).map(i => i.response_ms).filter(v => typeof v === "number");
+  const nums = [wp.available ? `WP ${wp.in_use}/${wp.total}` : "", resp.length ? `${Math.max(...resp)} ms` : "",
+                s.users == null ? "" : `${s.users} users`].filter(Boolean).join("  ");
+  const worst = !s.connected
+    ? `Not answering: ${IB.esc((s.error || "no connection").split("(")[0].slice(0, 60))}`
+    : m.worst ? `<b>${IB.esc(m.worst.label || m.worst.tcode)}</b> ${IB.esc(m.worst.value)}` : "All checks within threshold";
+  return `<a class="sys ${m.status}" href="/system?name=${encodeURIComponent(s.system)}" title="${IB.esc(m.status)}">
+    <span class="dot" aria-hidden="true"></span>
+    <span class="nm"><b>${IB.esc(s.system)}</b><small>${IB.esc(s.sid || "")}${s.client ? " · client " + IB.esc(s.client) : ""}</small></span>
+    <span class="meterbox">${s.connected ? `<div class="meter"><i style="width:${m.pct}%"></i></div><div class="pct">${m.pct}% within threshold</div>` : `<div class="pct">no reading</div>`}</span>
+    <span class="worst">${worst}</span>
+    <span class="nums">${IB.esc(nums)}</span>
+  </a>`;
+}
+
+function tick(sys, c, prev) {
+  const ul = document.getElementById("ticker");
+  if (ul.firstElementChild && ul.firstElementChild.dataset.empty !== undefined) ul.innerHTML = "";
+  const li = document.createElement("li");
+  li.className = c.status;
+  li.innerHTML = `<span class="what">${IB.esc(c.label)}</span><span class="val">${IB.esc(c.value)}</span>
+    <span class="who">${IB.esc(sys)} · ${prev ? `${IB.esc(prev.toLowerCase())} to ${IB.esc(c.status.toLowerCase())}` : IB.esc(c.status.toLowerCase())}</span>`;
+  ul.prepend(li);
+  while (ul.children.length > 10) ul.removeChild(ul.lastElementChild);
+}
+
+function sentence(d, warn, crit) {
+  const down = (d.total || 0) - (d.live_count || 0);
+  if (!d.total) return ["No systems configured yet.", "Add one on the Systems page."];
+  const head = crit ? `${crit} critical finding${crit > 1 ? "s" : ""} need someone now.`
+    : warn ? `${warn} thing${warn > 1 ? "s" : ""} to look at, nothing critical.`
+    : down ? `${d.live_count} of ${d.total} systems answering, all within threshold.`
+    : `All ${d.total} systems answering. Nothing outside threshold.`;
+  const sub = `${d.live_count} of ${d.total} systems answering over RFC` + (down ? `, ${down} not reachable` : "") +
+              `. Read at ${d.generated_at || "—"}.`;
+  return [head, sub];
+}
+
+async function load() {
+  try {
+    const d = await IB.get("/api/live");
+    const systems = d.systems || [];
+    let checks = 0, warn = 0, crit = 0;
+    systems.forEach(s => (s.checks || []).forEach(c => {
+      checks++; if (c.status === "WARNING") warn++; if (c.status === "CRITICAL") crit++;
+      const key = s.system + "|" + c.metric;
+      const prev = seen[key];
+      if (prev === undefined) { if (c.status === "CRITICAL" || c.status === "WARNING") tick(s.system, c); }
+      else if (prev !== c.status) tick(s.system, c, prev);
+      rememberSeen(key, c.status);
+    }));
+    const set = (id, v) => { document.getElementById(id).textContent = v; };
+    set("s-live", d.live_count || 0); set("s-checks", checks); set("s-warn", warn); set("s-crit", crit);
+    const [head, sub] = sentence(d, warn, crit);
+    set("greet", head); set("lede", sub);
+    IB.heartbeat.beat({ live: d.live_count, total: d.total, critical: crit > 0 });
+    const ordered = systems.slice().sort((a, b) => RANK[summary(a).status] - RANK[summary(b).status]
+      || String(a.system).localeCompare(String(b.system)));
+    document.getElementById("orbits").innerHTML = ordered.length ? ordered.map(rowHtml).join("")
+      : `<div class="quiet">No systems yet.</div>`;
+    const el = document.getElementById("sf-rfc");
+    if (el) el.textContent = `${systems.filter(s => s.connected).length}/${systems.length}`;
+  } catch (e) {
+    document.getElementById("lede").textContent = "The live read failed: " + e.message + ". It is tried again automatically.";
+  }
+}
+const poller = IB.poll(load, 10000);   // pauses when the tab is hidden
+document.getElementById("every").onchange = e => poller.setInterval(+e.target.value);
+</script>
+</body>
+</html>

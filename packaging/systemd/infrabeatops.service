@@ -1,0 +1,21 @@
+[Unit]
+Description=InfraBeatOps SAP Basis Monitoring
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/infrabeatops
+EnvironmentFile=-/opt/infrabeatops/.env
+# Binds 127.0.0.1 unless IBO_BIND_HOST is set in .env; put an HTTPS reverse
+# proxy (packaging/proxy/) in front rather than binding to the network.
+ExecStart=/opt/infrabeatops/venv/bin/python -m dashboard.serve --port 8000
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+KillSignal=SIGINT
+User=infrabeatops
+Group=infrabeatops
+
+[Install]
+WantedBy=multi-user.target

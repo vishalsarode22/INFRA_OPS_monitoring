@@ -1,0 +1,26 @@
+# HTTPS in front of the web service. Caddy fetches and renews certificates
+# itself for a public name; for an internal name use the `tls internal`
+# line (self-signed by Caddy's local CA -- install its root on the clients)
+# or point `tls` at your own cert and key.
+#
+#   Windows: download caddy.exe, run  caddy run --config packaging\proxy\Caddyfile
+#            (or install it as a service with NSSM like the others).
+#   Linux:   apt install caddy; copy this to /etc/caddy/Caddyfile.
+#
+# The web service keeps listening on 127.0.0.1:8000 only; the proxy is the
+# one thing bound to the network. Set in .env: IBO_TRUST_PROXY=1 and
+# IBO_ALLOWED_HOSTS=<the name below>; cookies are then marked Secure because
+# the proxy sends X-Forwarded-Proto=https (see packaging/OPERATIONS.md).
+
+ibops.infrabeat.local {
+    tls internal
+    encode gzip
+    reverse_proxy 127.0.0.1:8000 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Real-IP {remote_host}
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        -Server
+    }
+}

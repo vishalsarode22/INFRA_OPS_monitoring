@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Errors</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .er{border-top:1px solid var(--border);padding:12px 18px;cursor:pointer}
+  .er:first-child{border-top:0}
+  .er:hover{background:var(--card-hover)}
+  .er .t{font-weight:700;font-size:13px;overflow-wrap:anywhere}
+  .er .m{font-size:11.5px;color:var(--muted-dim);margin-top:3px;font-family:var(--mono)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:700;border:1px solid var(--border);margin-right:6px}
+  .p-web{color:var(--red);border-color:var(--red-br);background:var(--red-bg)}
+  .p-browser{color:var(--info);border-color:var(--info-br);background:var(--info-bg)}
+  .p-loop,.p-sweep,.p-thread,.p-process,.p-job{color:var(--amber);border-color:var(--amber-br);background:var(--amber-bg)}
+  .cnt{font-family:var(--mono);font-weight:800;font-size:15px;min-width:52px;text-align:right}
+  pre.tb{white-space:pre-wrap;font-size:11px;background:var(--mist);padding:12px;border-radius:10px;max-height:420px;overflow:auto}
+  .new{animation:flash 1.6s ease-out}
+  @keyframes flash{from{background:var(--red-bg)}to{background:transparent}}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Errors</h2><div class="sub">Every unhandled error from the dashboard, sweeps, background loops and these pages — live</div></div>
+    <div class="top-actions">
+      <span class="chip c-live"><span class="pulse"></span> live</span>
+      <button class="btn" id="theme">◑ Light</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="row">
+      <select class="input" id="hours"><option value="24">last 24 h</option><option value="168" selected>7 days</option><option value="720">30 days</option></select>
+      <select class="input" id="src"><option value="">all sources</option>
+        <option>web</option><option>sweep</option><option>loop</option><option>thread</option><option>job</option><option>log</option><option>browser</option><option>process</option></select>
+      <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="res"> show resolved</label>
+      <span class="sub" id="sum"></span>
+    </div>
+    <div class="card"><div id="list"><div class="ibo-loading-inline"><img src="/static/brand/ibops-mark-64.png" alt=""><span>Loading…</span></div></div></div>
+    <p style="margin-top:12px;font-size:11.5px;color:var(--muted-dim)">A new kind of error is mailed to Basis once (then counted here).
+      "Resolved" hides it; if it happens again it comes back and is mailed again.</p>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script src="/static/ops.js?v=ops1"></script>
+<script>
+IB.mountShell("errors");
+IB.themeToggle(document.getElementById("theme"));
+let SEEN = new Set(), FIRST = true, ROWS = [];
+
+function render() {
+  const src = document.getElementById("src").value;
+  const rows = ROWS.filter(e => !src || e.source === src);
+  document.getElementById("list").innerHTML = rows.map(e => `<div class="er ${!FIRST && !SEEN.has(e.signature + e.count) ? "new" : ""}"
+      onclick="openErr('${IB.jsArg(e.signature)}')">
+    <div style="display:flex;gap:12px;align-items:flex-start"><div style="flex:1">
+      <div class="t"><span class="pill p-${OPS.esc(e.source)}">${OPS.esc(e.source)}</span>${OPS.esc(e.etype)}: ${OPS.esc(e.message.slice(0, 220))}</div>
+      <div class="m">${OPS.esc(e.location)} · ${OPS.esc(e.host)} · first ${OPS.esc(e.first_seen.slice(5, 16))} · last ${OPS.esc(e.last_seen.slice(5, 19))}
+        ${e.resolved_at ? ` · resolved by ${OPS.esc(e.resolved_by)}` : ""}</div></div>
+      <div class="cnt">${e.count}×</div></div></div>`).join("")
+    || `<div class="empty">No errors${src ? " from " + OPS.esc(src) : ""} in this period.</div>`;
+  rows.forEach(e => SEEN.add(e.signature + e.count));
+  FIRST = false;
+}
+
+async function load() {
+  try {
+    const d = await IB.get(`/api/errors?hours=${document.getElementById("hours").value}&resolved=${document.getElementById("res").checked}`);
+    ROWS = d.errors || [];
+    document.getElementById("sum").textContent = `${d.summary.open_groups} open kind(s), ${d.summary.occurrences} occurrence(s) in 24 h`;
+    render();
+  } catch (e) {
+    document.getElementById("list").innerHTML = `<div class="banner banner-err" style="margin:14px">${OPS.esc(e.message)}</div>`;
+  }
+}
+
+async function openErr(sig) {
+  let e;
+  try { e = await IB.get("/api/errors/" + encodeURIComponent(sig)); } catch (x) { OPS.toast(x.message, "err"); return; }
+  const ok = await OPS.dialog(`${e.etype}`, `<p style="overflow-wrap:anywhere"><b>${OPS.esc(e.message)}</b></p>
+    <p class="sub">${OPS.esc(e.source)} · ${OPS.esc(e.location)} · ${OPS.esc(e.host)} · ${e.count} time(s), first ${OPS.esc(e.first_seen)},
+      last ${OPS.esc(e.last_seen)}</p>${e.context ? `<p class="sub">Context: ${OPS.esc(e.context)}</p>` : ""}
+    <p class="sub">Last error id: <span class="mono">${OPS.esc(e.last_error_id)}</span></p>
+    ${e.traceback ? `<pre class="tb">${OPS.esc(e.traceback)}</pre>` : ""}`, e.resolved_at ? null : "Mark resolved",
+    async () => { await OPS.post(`/api/errors/${encodeURIComponent(sig)}/resolve`, {}); return true; });
+  if (ok) { OPS.toast("Marked resolved"); load(); IB.refreshErrorBadge(); }
+}
+
+["hours", "res"].forEach(id => document.getElementById(id).onchange = load);
+document.getElementById("src").onchange = render;
+load();
+IB.poll(load, 10000);
+const sig = new URLSearchParams(location.search).get("sig");
+if (sig) openErr(sig);
+</script>
+</body>
+</html>

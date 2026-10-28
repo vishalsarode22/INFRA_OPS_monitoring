@@ -1,0 +1,19 @@
+# Business calendar for the learned normal values (core/business_calendar.py).
+# Copy to config/business_calendar.yaml. Without it every working day is
+# treated the same.
+
+weekend: [sat, sun]
+
+# Treated like a weekend day (and compared with other holidays once there are 3).
+holidays: ["2026-10-20", "2026-11-08", "2026-12-25"]
+
+# Month-end / month-start are compared with other month-ends, not with an
+# ordinary Tuesday: billing and closing runs make them busy by design.
+month_end_working_days: 2
+month_start_working_days: 1
+
+# Year-end close: the last 5 working days up to this date are special.
+fiscal_year_end: "03-31"
+
+# Anything else that is busy on purpose: campaigns, migrations, go-lives.
+special_days: []

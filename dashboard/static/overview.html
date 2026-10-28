@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · System Overview</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  /* ======================================================================
+     Overview, future vision (v6): a night-time flight deck. Each system is
+     a frosted HUD pane with corner brackets; status is a glowing lamp; the
+     numbers are thin luminous figures. The --lamp-* and --phos* names are
+     kept because the card markup below colours its counts with them.
+     ====================================================================== */
+  body.pg-overview{
+    --lamp-ok:#3BE58A; --lamp-warn:#FFC23D; --lamp-crit:#FF5A4E; --lamp-off:#4A5F7C;
+    --phos:#9CCBFB; --phos-dim:#4F6E94;
+  }
+  html:not([data-theme="dark"]) body.pg-overview{
+    --lamp-ok:#1FA374; --lamp-warn:#DE8E1A; --lamp-crit:#DD4A40; --lamp-off:#B5C8DC;
+    --phos:#1E7FD6; --phos-dim:#9FB6CE;
+  }
+  .pg-overview .content{padding:24px 22px 40px}
+  .pg-overview .search{flex:1;max-width:380px;margin-left:18px}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:28px}
+  .pg-overview .kpi{padding:16px 18px 14px}
+  .pg-overview .kpi .lbl{font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500}
+  .pg-overview .kpi .num{display:inline-block;font-family:var(--display);font-weight:300;font-size:46px;padding-right:.1em;line-height:1;letter-spacing:-.04em;
+    background:var(--val-neutral);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 0 10px var(--fv-title-glow))}
+  .pg-overview .kpi.ok .num{background-image:var(--val-ok)}
+  .pg-overview .kpi.warn .num{background-image:var(--val-warn)}
+  .pg-overview .kpi.crit .num{background-image:var(--val-crit)}
+  .pg-overview .kpi.unk .num{background-image:var(--val-unk);filter:none}
+  .pg-overview .kpi .sub{font-size:11px;color:var(--muted-dim);margin-top:8px}
+
+  .section-head{display:flex;align-items:baseline;gap:12px;margin:4px 2px 14px}
+  .section-head h3{font-family:var(--display);font-weight:300;font-size:15px;letter-spacing:.28em;text-transform:uppercase;color:var(--fv-title)}
+  .section-head .hint{font-family:var(--mono);font-size:11px;color:var(--muted-dim)}
+
+  .pg-overview .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px}
+  .pg-overview .sys{overflow:hidden;display:flex;flex-direction:column}
+  .pg-overview .sys.s-critical{border-color:var(--red-br);box-shadow:var(--gl-shadow),0 0 30px var(--red-br),inset 0 0 40px var(--red-bg)}
+  .pg-overview .sys.s-warning{border-color:var(--amber-br)}
+  .sys-head{padding:14px 16px 10px}
+  .sys-title{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .sys-title h4{font-size:15.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+  .sys-title::before{content:"";width:9px;height:9px;border-radius:50%;flex:0 0 9px;background:var(--lamp-off)}
+  .sys.s-normal .sys-title::before{background:var(--lamp-ok);box-shadow:0 0 10px var(--lamp-ok)}
+  .sys.s-warning .sys-title::before{background:var(--lamp-warn);box-shadow:0 0 10px var(--lamp-warn)}
+  .sys.s-critical .sys-title::before{background:var(--lamp-crit);box-shadow:0 0 0 4px rgba(255,90,78,.15),0 0 14px var(--lamp-crit);
+    animation:lamp 1.8s ease-in-out infinite}
+  @keyframes lamp{50%{box-shadow:0 0 0 7px rgba(255,90,78,0),0 0 6px var(--lamp-crit)}}
+  .sys.s-unknown{background-image:repeating-linear-gradient(135deg,transparent 0 8px,rgba(127,155,191,.04) 8px 16px)}
+  .sys-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--muted-dim)}
+  .tag{border:1px solid var(--fv-line);border-radius:3px;padding:0 5px;color:var(--muted)}
+  .path{font-family:var(--mono);font-size:10px;font-weight:700;border-radius:3px;padding:0 5px;color:var(--phos);
+    background:var(--fv-tint);border:1px solid var(--fv-line)}
+  .p-SSH{color:var(--lamp-ok)} .p-GUI{color:#2A9FD8}
+
+  .pg-overview .counts{display:grid;grid-template-columns:repeat(3,1fr);margin:2px 16px 10px;
+    border-top:1px solid var(--gl-line);border-bottom:1px solid var(--gl-line)}
+  .pg-overview .counts div{padding:10px 4px 9px;text-align:center;border-right:1px solid var(--gl-line)}
+  .pg-overview .counts div:last-child{border-right:0}
+  .pg-overview .counts .n{font-family:var(--display);font-weight:300;font-size:32px;line-height:1}
+  .pg-overview .counts .t{font-size:11px;margin-top:5px;color:var(--muted-dim)}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;padding:6px 16px 10px;flex:1}
+  .tile{min-height:0}
+  .tile .k{font-size:11px;color:var(--muted-dim);margin-bottom:2px}
+  .tile .v{font-family:var(--mono);font-size:13px;font-weight:600;line-height:1.3;color:var(--phos);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .v-normal{color:var(--lamp-ok)!important} .v-warning{color:var(--lamp-warn)!important}
+  .v-critical{color:var(--lamp-crit)!important;text-shadow:0 0 8px rgba(255,90,78,.5)} .v-unknown{color:var(--phos-dim)!important}
+  .scan{font-family:var(--mono);font-size:11px;color:var(--muted-dim);padding:0 16px 10px}
+  .sys-foot{display:flex;gap:9px;padding:12px 16px 14px;border-top:1px solid var(--gl-line)}
+  .sys-foot .btn{flex:1;text-align:center}
+  .add-card{border:1px dashed var(--fv-line-hi);border-radius:6px;display:grid;place-items:center;min-height:230px;
+    color:var(--muted);cursor:pointer;text-align:center;background:var(--gl-bg-2);transition:box-shadow .2s,color .2s}
+  .add-card:hover{color:var(--fv-nav-hi);box-shadow:0 0 24px var(--fv-title-glow)}
+  .add-card .plus{font-family:var(--display);font-weight:100;font-size:44px;line-height:1;margin-bottom:8px;color:var(--phos)}
+  .pg-overview .empty{padding:44px;text-align:center;color:var(--muted)}
+  @media (max-width:900px){.pg-overview .content{padding:14px}}
+  @media (prefers-reduced-motion:reduce){.sys.s-critical .sys-title::before{animation:none}}
+</style>
+</head>
+<body class="pg-overview pg-future">
+
+
+
+<main>
+  <div class="topbar">
+    <div>
+      <h2>System Overview</h2>
+      <div class="sub">Real-time status of all monitored systems</div>
+    </div>
+    <input class="input search" id="search" placeholder="Filter systems, SIDs, hosts...">
+    <div class="top-actions">
+      <span id="sched-ctl" style="display:flex;gap:8px;align-items:center"></span>
+      <button class="btn" id="theme">◐ Dark</button>
+      <span id="run-ctl"></span>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="banner"></div>
+
+    <div class="kpi-row" id="kpis"></div>
+
+    <div class="section-head">
+      <h3>Systems</h3>
+      <span class="hint" id="gen">loading…</span>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+</main>
+
+<script src="/static/shell.js?v=ds6"></script>
+<script>
+/* Every page here depends on shell.js for the sidebar, theme and helpers.
+   If it fails to load the page renders bare with only a console error, which
+   looks like the app is broken rather than one asset being missing. Say so
+   on screen instead. */
+if (typeof IB === "undefined") {
+  document.body.innerHTML =
+    '<div style="font-family:system-ui;padding:40px;max-width:640px;margin:0 auto">' +
+    '<h2 style="margin-bottom:10px">Shared assets did not load</h2>' +
+    '<p style="color:#666;line-height:1.6">This page needs ' +
+    '<code>/static/shell.js?v=ds6</code> and <code>/static/shell.css?v=ds6</code>. ' +
+    'They are missing or the static mount is not serving them.</p>' +
+    '<p style="color:#666;line-height:1.6">Check that ' +
+    '<code>dashboard/static/shell.js?v=ds6</code> exists, then restart the server. ' +
+    'If you are seeing this inside a preview pane rather than at ' +
+    '<code>127.0.0.1:8000</code>, that is expected — there is no server ' +
+    'behind a preview.</p></div>';
+}
+</script>
+<script>
+IB.mountShell("overview");
+IB.mountSchedulerControl("sched-ctl");
+IB.mountRunControl("run-ctl");
+const $ = id => document.getElementById(id);
+const esc = IB.esc;   // the shared escape helper (escapes quotes too)
+
+let DATA = null;
+
+/* Theme ------------------------------------------------------------------ */
+const savedTheme = document.documentElement.getAttribute("data-theme");
+$("theme").onclick = () => {
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+  $("theme").textContent = dark ? "◐ Dark" : "◑ Light";
+};
+
+/* Render ----------------------------------------------------------------- */
+function kpis(c, incidents) {
+  const cell = (lbl, num, cls, sub) =>
+    `<div class="kpi ${cls}"><div class="lbl">${lbl}</div>
+     <div class="num">${num}</div><div class="sub">${sub}</div></div>`;
+  const pct = n => c.total ? Math.round(n / c.total * 100) + "% of fleet" : "—";
+
+  $("kpis").innerHTML =
+    cell("Total systems", c.total, "", "monitored") +
+    cell("Healthy", c.healthy, "ok", pct(c.healthy)) +
+    cell("Warning", c.warning, "warn", pct(c.warning)) +
+    cell("Critical", c.critical, "crit", pct(c.critical)) +
+    // Unknown is shown as its own KPI, never folded into healthy. A system
+    // we could not reach is not a system in good health.
+    cell("Unknown", c.unknown, "unk", "not reachable") +
+    cell("Open incidents", incidents, "", "correlated");
+}
+
+function tile(label, t) {
+  const st = (t.status || "UNKNOWN").toLowerCase();
+  return `<div class="tile"><div class="k">${label}</div>
+          <div class="v v-${st}">${esc(t.value)}</div></div>`;
+}
+
+function card(s) {
+  const st = (s.status || "UNKNOWN").toLowerCase();
+  const paths = (s.paths || []).map(p => `<span class="path p-${p}">${p}</span>`).join("");
+  const meta = [
+    s.sid ? `<span class="tag">${esc(s.sid)}</span>` : "",
+    s.client ? `<span class="tag">CLIENT ${esc(s.client)}</span>` : "",
+    s.host ? `<span>${esc(s.host)}</span>` : "",
+  ].join("");
+
+  const noData = s.metric_count === 0
+    ? `<div class="scan" style="color:var(--amber)">No metrics collected —
+       ${paths ? "configured for " + (s.paths || []).join(" + ") : "no collector configured"}</div>`
+    : `<div class="scan">Last scan: ${esc(s.last_scan) || "never"} ·
+       ${s.metric_count} metrics</div>`;
+
+  return `<div class="sys hud s-${st}">
+    <div class="sys-head">
+      <div class="sys-title">
+        <h4>${esc(s.name)}</h4>
+        <span class="chip c-${st}">${esc(s.status)}</span>
+      </div>
+      <div class="sys-meta">${meta} ${paths}</div>
+    </div>
+    <div class="counts">
+      <div><div class="n" style="color:${s.critical ? "var(--lamp-crit)" : "var(--phos-dim)"}">${s.critical}</div><div class="t">Critical</div></div>
+      <div><div class="n" style="color:${s.warning ? "var(--lamp-warn)" : "var(--phos-dim)"}">${s.warning}</div><div class="t">Warning</div></div>
+      <div><div class="n" style="color:${s.unknown ? "var(--phos)" : "var(--phos-dim)"}">${s.unknown}</div><div class="t">Unknown</div></div>
+    </div>
+    <div class="tiles">
+      ${tile("CPU", s.tiles.cpu)}
+      ${tile("Memory", s.tiles.memory)}
+      ${tile("Dispatcher", s.tiles.dispatcher)}
+      ${tile("ICM", s.tiles.icm)}
+      ${tile("Gateway", s.tiles.gateway)}
+      ${tile("Work processes", s.tiles.workprocess)}
+      ${tile("SMLG response", s.tiles.smlg)}
+      ${tile("Open incidents", {value: String(s.incidents), status: s.incidents ? "warning" : "normal"})}
+    </div>
+    ${noData}
+    <div class="sys-foot">
+      <a class="btn btn-primary" href="/system?name=${encodeURIComponent(s.name)}">Open dashboard</a>
+    </div>
+  </div>`;
+}
+
+function render() {
+  if (!DATA) return;
+  kpis(DATA.counts, DATA.incidents_open);
+  $("gen").textContent = "as of " + (DATA.generated_at || "—");
+
+  const q = $("search").value.trim().toLowerCase();
+  const shown = DATA.systems.filter(s => !q ||
+    [s.name, s.sid, s.host, s.client].join(" ").toLowerCase().includes(q));
+
+  $("grid").innerHTML = shown.length
+    ? shown.map(card).join("") +
+      `<div class="add-card" onclick="location.href='/'">
+         <div><div class="plus">+</div>Add a system<br>
+         <small>configure in config/systems.yaml</small></div></div>`
+    : q ? `<div class="empty">No systems match “${esc(q)}”.</div>`
+        : `<div class="empty">No systems in your projects yet. <a href="/team" style="text-decoration:underline">Ask for access</a>.</div>`;
+
+  // Collector path coverage, from configuration rather than guesswork.
+  const count = p => DATA.systems.filter(s => (s.paths || []).includes(p)).length;
+  const n = DATA.systems.length;
+  IB.updatePathCounts(DATA.systems);
+  // The collector-health panel this filled is gone from the page; writing to
+  // a missing element threw here and the catch in load() replaced every
+  // system card with "Could not reach /api/overview".
+  const pts = $("ch-points");
+  if (pts) pts.textContent = DATA.systems.reduce((a, s) => a + (s.metric_count || 0), 0);
+
+  const stale = DATA.systems.filter(s => s.metric_count === 0);
+  $("banner").innerHTML = stale.length
+    ? `<div class="banner"><strong>${stale.length} system(s) reported no metrics:</strong>
+       ${stale.map(s => esc(s.name)).join(", ")}. They are shown as UNKNOWN rather than
+       healthy — check the sweep log for the collector error.</div>`
+    : "";
+}
+
+/* Data ------------------------------------------------------------------- */
+async function load() {
+  try {
+    // /api/overview is a GET. This was IB.post(), which the server answers
+    // with 405; IB.post does not treat that as an error, so r.json() failed
+    // on the error body and the page fell into the catch every time.
+    DATA = await IB.get("/api/overview");
+    render();
+  } catch (e) {
+    // Say what actually failed: a fetch error and a drawing error are different problems.
+    $("grid").innerHTML = e && e.name === "TypeError" && DATA
+      ? `<div class="empty">The overview loaded but could not be drawn (${esc(e.message)}). See the Errors page.</div>`
+      : `<div class="empty">Could not load the overview (${esc((e && e.message) || "no answer")}). It is tried again automatically.</div>`;
+    if (IB.reportError) IB.reportError("OverviewError", (e && e.message) || String(e), "overview render", e && e.stack);
+  }
+}
+
+$("search").oninput = render;
+
+// The sweep button (#run) is not in this page's markup, only its handler
+// was. Assigning .onclick on null threw at script top level, which aborted
+// everything after it -- including poll() -- so the page never loaded any
+// data at all. Guard it: the button is optional here; sweeps belong on the
+// Systems page, where launching SAP GUI is the operator's deliberate choice.
+const runBtn = $("run");
+if (runBtn) runBtn.onclick = async () => {
+  const b = runBtn;
+  b.disabled = true; b.textContent = "Sweeping…";
+  try { await IB.post("/api/run-now"); } catch (e) {}
+  poll();
+};
+
+async function poll() {
+  const b = $("run");   // optional on this page
+  try {
+    const r = await fetch("/api/run-status");
+    const s = await r.json();
+    if (s.running) {
+      if (b) b.textContent = "Sweeping" + (s.current_system ? ` ${s.current_system}…` : "…");
+      setTimeout(poll, 2000);
+      return;
+    }
+  } catch (e) {}
+  if (b) { b.disabled = false; b.textContent = "Run sweep"; }
+  load();
+}
+
+load();
+IB.poll(load, 60000);   // paused while tab hidden
+</script>
+</body>
+</html>

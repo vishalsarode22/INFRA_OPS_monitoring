@@ -1,0 +1,22 @@
+[Unit]
+Description=InfraBeatOps client VPN %i (openfortivpn or strongSwan IPsec; retry rules in ibops_vpn_watchdog.py)
+After=network-online.target strongswan-starter.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/ibops-vpn/ibops_vpn_watchdog.py run %i
+# The watchdog decides when to retry; systemd only restarts the watchdog
+# itself if it crashes. It never re-dials faster than the retry rules.
+Restart=on-failure
+RestartSec=30
+RuntimeDirectory=ibops-vpn
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+StateDirectory=ibops-vpn
+StateDirectoryMode=0700
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

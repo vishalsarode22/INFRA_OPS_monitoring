@@ -1,0 +1,3 @@
+# Monitoring profiles -- edited from the Profiles page in the UI.
+# Public copy: the real profiles and their recipients live only on the monitoring VM.
+profiles: []

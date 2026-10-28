@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfraBeatOps · Projects &amp; passwords</title>
+<link rel="icon" href="/static/brand/favicon.png">
+<script>(function(){var t=null;try{t=localStorage.getItem("ibo-theme");}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");})();</script>
+<link rel="stylesheet" href="/static/shell.css?v=ds6">
+<style>
+  .stack{display:flex;flex-direction:column;gap:18px}
+  .muted{color:var(--muted);font-size:12.5px}
+  .dim{color:var(--muted-dim);font-size:11.5px}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;
+    background:var(--info-bg);border:1px solid var(--info-br);color:var(--info)}
+  .tag.cust{background:var(--gray-bg);border-color:var(--gray-br);color:var(--gray)}
+  .checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:5px 12px;margin:8px 0 10px}
+  .checks label{display:flex;gap:7px;align-items:center;font-size:12.5px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .msg{margin-top:10px;font-size:12.5px;padding:9px 12px;border-radius:10px;display:none}
+  .msg.ok{display:block;background:var(--green-bg);border:1px solid var(--green-br);color:var(--green)}
+  .msg.err{display:block;background:var(--red-bg);border:1px solid var(--red-br);color:var(--red)}
+  td .input{padding:6px 9px;font-size:12px}
+  .secret{font-family:var(--mono);font-size:12px;background:var(--amber-bg);border:1px solid var(--amber-br);
+    padding:2px 8px;border-radius:6px;user-select:all}
+  .edit-box{border:1px dashed var(--border);border-radius:10px;padding:10px 12px;margin-top:8px}
+  .perm{display:flex;gap:16px;flex-wrap:wrap;margin:6px 0}
+  .perm label{display:flex;gap:6px;align-items:center;font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div><h2>Projects &amp; passwords</h2><div class="sub">Which systems are in which project, what each person may do, and the saved SAP passwords</div></div>
+    <div class="top-actions"><button class="btn" id="theme">◑ Light</button></div>
+  </div>
+  <div class="content stack">
+    <div id="banner"></div>
+
+    <div class="card">
+      <div class="card-h"><h3>Projects</h3><span class="dim" id="proj-count"></span></div>
+      <div class="card-b">
+        <div class="muted" style="margin-bottom:10px">A project is a group of systems — e.g. <b>CEAT</b> with 4 CEAT systems, or <b>CEAT + AG</b> with a mix. A system can be in several projects. People get access per project on <a href="/team">Team &amp; access</a>.</div>
+        <div id="projects"></div>
+        <div id="create" style="display:none" class="edit-box">
+          <b>New project</b>
+          <div class="row" style="margin-top:8px"><input class="input" id="new-name" placeholder="Project name, e.g. CEAT core" style="max-width:280px"></div>
+          <div class="checks" id="new-systems"></div>
+          <button class="btn btn-primary" id="new-go">Create project</button>
+        </div>
+        <div class="msg" id="proj-msg"></div>
+      </div>
+    </div>
+
+    <div class="card" id="perm-card" style="display:none">
+      <a id="perm"></a>
+      <div class="card-h"><h3>What a consultant may do</h3></div>
+      <div class="card-b">
+        <div class="muted">For senior consultants and consultants, per project you lead. Nothing ticked = they can only look.</div>
+        <div class="row" style="margin:10px 0"><select class="input" id="perm-user" style="max-width:320px"></select></div>
+        <div id="perm-body"></div>
+        <div class="msg" id="perm-msg"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>SAP monitoring logins</h3><span class="dim">the passwords IBOPS logs on with</span></div>
+      <div class="card-b" style="padding:0"><div id="mon"></div></div>
+      <div class="card-b"><div class="msg" id="mon-msg"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Team password vault</h3><span class="dim">SAP logins your team keeps here, per project</span></div>
+      <div class="card-b" style="padding:0"><div id="vault"></div></div>
+      <div class="card-b">
+        <div class="edit-box" id="vadd">
+          <b>Save a login</b>
+          <div class="row" style="margin-top:8px">
+            <select class="input" id="v-project" style="width:auto"></select>
+            <select class="input" id="v-system" style="width:auto"></select>
+            <input class="input" id="v-user" placeholder="SAP user" style="max-width:150px">
+            <input class="input" id="v-client" placeholder="Client" style="max-width:80px">
+            <input class="input" id="v-pass" type="password" placeholder="Password" autocomplete="new-password" style="max-width:180px">
+            <input class="input" id="v-note" placeholder="Note (optional)" style="max-width:220px">
+            <button class="btn btn-primary" id="v-go">Save</button>
+          </div>
+          <div class="dim" style="margin-top:6px">Only you, a manager of the project and an admin can see the password later. Others on the project see the system and SAP user.</div>
+        </div>
+        <div class="msg" id="v-msg"></div>
+      </div>
+    </div>
+
+    <div class="card" id="audit-card" style="display:none">
+      <div class="card-h"><h3>Access audit</h3><span class="dim">admins only · newest first</span></div>
+      <div class="card-b" style="padding:0"><div id="audit"></div></div>
+    </div>
+  </div>
+</main>
+<script src="/static/shell.js?v=ds6"></script>
+<script>
+IB.mountShell("access");
+IB.themeToggle(document.getElementById("theme"));
+const $ = id => document.getElementById(id);
+const esc = s => IB.esc(s == null ? "" : String(s));
+let P = null, W = null, TEAM = null;
+
+function say(id, ok, html) { const m = $(id); m.className = "msg " + (ok ? "ok" : "err"); m.innerHTML = html; }
+async function send(url, body) {
+  const r = await IB.post(url, { body: JSON.stringify(body || {}), headers: { "Content-Type": "application/json" } });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || ("HTTP " + r.status));
+  return data;
+}
+const sysChecks = (all, ticked, name) => all.map(s =>
+  `<label><input type="checkbox" name="${esc(name)}" value="${esc(s)}" ${ticked.includes(s) ? "checked" : ""}> ${esc(s)}</label>`).join("");
+
+/* ---------------- projects */
+function renderProjects() {
+  const can = P.can_manage_projects;
+  $("proj-count").textContent = `${P.projects.length} project(s)`;
+  $("create").style.display = can ? "" : "none";
+  $("new-systems").innerHTML = sysChecks(P.systems, [], "new");
+  $("projects").innerHTML = P.projects.length ? `<table><thead><tr><th>Project</th><th>Systems</th><th></th></tr></thead><tbody>
+    ${P.projects.map(p => `<tr data-p="${esc(p.name)}">
+      <td><b>${esc(p.name)}</b>${p.default ? `<div class="dim">systems in no project</div>` : ""}
+        ${p.created_by ? `<div class="dim">by ${esc(p.created_by)}</div>` : ""}</td>
+      <td><div class="tags">${p.systems.map(s => `<span class="tag ${p.from_systems_page.includes(s) && !p.editable_systems.includes(s) ? "cust" : ""}"
+          title="${p.from_systems_page.includes(s) ? "from the Systems page Project box" : ""}">${esc(s)}</span>`).join("") || `<span class="dim">no systems</span>`}</div>
+        <div class="edit" style="display:none"></div></td>
+      <td style="white-space:nowrap">
+        ${can && p.explicit ? `<button class="btn" data-act="edit">Edit systems</button> <button class="btn" data-act="del">Delete</button>` : ""}
+        ${P.role === "manager" && !p.member ? `<button class="btn btn-primary" data-act="join">Join</button>` : ""}
+        ${P.role === "manager" && p.member ? `<span class="dim">you are on it</span>` : ""}</td></tr>`).join("")}</tbody></table>`
+    : `<div class="empty">No projects yet.</div>`;
+}
+$("projects").onclick = async ev => {
+  const b = ev.target.closest("button[data-act]");
+  if (!b) return;
+  const tr = b.closest("tr"), name = tr.dataset.p, p = P.projects.find(x => x.name === name);
+  try {
+    if (b.dataset.act === "join") {
+      await send(`/api/projects/${encodeURIComponent(name)}/join`);
+      say("proj-msg", true, `You are on ${esc(name)} now. Sign out and in again to see its systems everywhere.`);
+    } else if (b.dataset.act === "del") {
+      if (!confirm(`Delete the project ${name}? People lose access through it; systems stay.`)) return;
+      await send(`/api/projects/${encodeURIComponent(name)}/delete`);
+      say("proj-msg", true, `${esc(name)} deleted.`);
+    } else if (b.dataset.act === "edit") {
+      const box = tr.querySelector(".edit");
+      box.style.display = "";
+      box.innerHTML = `<div class="checks">${sysChecks(P.systems, p.editable_systems, "edit-" + name)}</div>
+        <button class="btn btn-primary" data-act="save">Save systems</button>`;
+      return;
+    } else if (b.dataset.act === "save") {
+      const systems = [...tr.querySelectorAll(".edit input:checked")].map(i => i.value);
+      await send(`/api/projects/${encodeURIComponent(name)}/systems`, { systems });
+      say("proj-msg", true, `${esc(name)} saved.`);
+    }
+    load();
+  } catch (e) { say("proj-msg", false, esc(e.message)); }
+};
+$("new-go").onclick = async () => {
+  const systems = [...document.querySelectorAll('input[name="new"]:checked')].map(i => i.value);
+  try {
+    await send("/api/projects", { name: $("new-name").value.trim(), systems });
+    say("proj-msg", true, `Project ${esc($("new-name").value.trim())} created.`);
+    $("new-name").value = "";
+    load();
+  } catch (e) { say("proj-msg", false, esc(e.message)); }
+};
+
+/* ---------------- permissions */
+async function renderPerm() {
+  const people = (TEAM && TEAM.users || []).filter(u => ["senior_consultant", "consultant"].includes(u.role) && u.editable);
+  const lead = ["admin", "manager", "team_lead", "operator"].includes(P.role);
+  $("perm-card").style.display = lead && people.length ? "" : "none";
+  if (!lead || !people.length) return;
+  const want = new URLSearchParams(location.search).get("person");
+  const sel = $("perm-user");
+  if (!sel.options.length) {
+    sel.innerHTML = people.map(u => `<option value="${esc(u.username)}">${esc(u.full_name || u.username)} — ${esc(u.role_label)}</option>`).join("");
+    if (want && people.some(u => u.username === want)) sel.value = want;
+  }
+  const g = await IB.get("/api/projects/grants?username=" + encodeURIComponent(sel.value));
+  $("perm-body").innerHTML = g.grants.length ? g.grants.map(x => `<div class="edit-box" data-project="${esc(x.project)}">
+      <b>${esc(x.project)}</b>
+      <div class="perm"><label><input type="radio" name="all-${esc(x.project)}" value="all" ${x.systems === "*" ? "checked" : ""}> All systems of the project</label>
+        <label><input type="radio" name="all-${esc(x.project)}" value="some" ${x.systems !== "*" ? "checked" : ""}> Only these:</label></div>
+      <div class="checks">${sysChecks(x.project_systems, x.systems === "*" ? [] : x.systems, "s-" + x.project)}</div>
+      <div class="perm">
+        <label><input type="checkbox" data-k="run" ${x.run ? "checked" : ""}> Start monitoring (Monitor now, Performance monitoring)</label>
+        <label><input type="checkbox" data-k="alerts" ${x.alerts ? "checked" : ""}> Handle alerts (acknowledge, snooze)</label>
+        <label><input type="checkbox" data-k="settings" ${x.settings ? "checked" : ""}> Change settings (limits, mail lists, schedules)</label></div>
+      <button class="btn btn-primary" data-save>Save</button>
+      ${x.set_by ? `<span class="dim">last set by ${esc(x.set_by)}, ${esc(x.set_at)}</span>` : `<span class="dim">not set yet: can only look</span>`}
+    </div>`).join("") : `<div class="empty">This person is on none of the projects you lead.</div>`;
+}
+$("perm-user").onchange = renderPerm;
+$("perm-body").onclick = async ev => {
+  const b = ev.target.closest("button[data-save]");
+  if (!b) return;
+  const box = b.closest("[data-project]"), project = box.dataset.project;
+  const all = box.querySelector(`input[value="all"]`).checked;
+  const body = { username: $("perm-user").value, project,
+    systems: all ? "*" : [...box.querySelectorAll(".checks input:checked")].map(i => i.value) };
+  box.querySelectorAll("input[data-k]").forEach(i => body[i.dataset.k] = i.checked);
+  try { await send("/api/projects/grants", body); say("perm-msg", true, `Saved for ${esc(project)}. It applies at once (they are signed out).`); renderPerm(); }
+  catch (e) { say("perm-msg", false, esc(e.message)); }
+};
+
+/* ---------------- passwords */
+function renderPasswords() {
+  // One row per system; its passwords (SAP GUI, RFC, ...) side by side.
+  const bySys = {};
+  W.monitoring.forEach(m => { const k = m.systems.join(", "); (bySys[k] = bySys[k] || []).push(m); });
+  const kind = m => (m.label.split(" -- ")[1] || m.key).replace(/^password$/, "SAP GUI password");
+  $("mon").innerHTML = W.monitoring.length ? `<table><thead><tr><th>System</th><th>Passwords</th></tr></thead><tbody>
+    ${Object.entries(bySys).map(([sys, list]) => `<tr><td><b>${esc(sys)}</b>
+        ${list.some(m => m.shared_with_other_systems) ? `<div class="dim">also used by systems outside your projects</div>` : ""}</td>
+      <td>${list.map(m => `<div data-k="${esc(m.key)}" style="padding:4px 0">
+        <span style="display:inline-block;min-width:170px">${esc(kind(m))}</span>
+        ${m.set ? `<span class="dim">set</span>` : `<span style="color:var(--red)">not set</span>`}
+        ${m.can_change ? `<button class="btn" data-act="mchange">Change</button>` : ""}
+        ${m.can_reveal ? `<button class="btn" data-act="mreveal">Show</button>` : ""}<span class="out"></span>
+        <div class="edit" style="display:none"></div></div>`).join("")}</td></tr>`).join("")}</tbody></table>`
+    : `<div class="empty">No monitoring passwords for your systems.</div>`;
+  $("vault").innerHTML = W.vault.length ? `<table><thead><tr><th>Project</th><th>System</th><th>SAP user</th><th>Client</th><th>Password</th><th>Saved by</th><th></th></tr></thead><tbody>
+    ${W.vault.map(v => `<tr data-id="${v.id}">
+      <td>${esc(v.project)}</td><td>${esc(v.system)}</td><td><b>${esc(v.sap_user)}</b>${v.note ? `<div class="dim">${esc(v.note)}</div>` : ""}</td>
+      <td>${esc(v.client)}</td><td class="pw">••••••••</td>
+      <td class="dim">${esc(v.owner)}<div>${esc(v.updated_at)}</div></td>
+      <td style="white-space:nowrap">${v.can_reveal ? `<button class="btn" data-act="vreveal">Show</button>` : ""}
+        ${v.can_change ? `<button class="btn" data-act="vchange">New password</button> <button class="btn" data-act="vdel">Delete</button>` : ""}</td></tr>`).join("")}</tbody></table>`
+    : `<div class="empty">Nothing saved yet.</div>`;
+  const mine = P.projects.filter(p => p.member || P.role === "admin");
+  $("vadd").style.display = ["viewer", "client"].includes(P.role) || !mine.length ? "none" : "";
+  const projSel = $("v-project");
+  const cur = projSel.value;
+  projSel.innerHTML = mine.map(p => `<option>${esc(p.name)}</option>`).join("");
+  if (cur) projSel.value = cur;
+  fillVSystems();
+}
+function fillVSystems() {
+  const p = P.projects.find(x => x.name === $("v-project").value);
+  $("v-system").innerHTML = (p ? p.systems : []).map(s => `<option>${esc(s)}</option>`).join("");
+}
+$("v-project").onchange = fillVSystems;
+$("v-go").onclick = async () => {
+  try {
+    await send("/api/access/vault", { project: $("v-project").value, system: $("v-system").value,
+      sap_user: $("v-user").value, client: $("v-client").value, password: $("v-pass").value, note: $("v-note").value });
+    ["v-user", "v-client", "v-pass", "v-note"].forEach(i => $(i).value = "");
+    say("v-msg", true, "Saved.");
+    load();
+  } catch (e) { say("v-msg", false, esc(e.message)); }
+};
+function showSecret(cell, value) {
+  cell.innerHTML = `<span class="secret">${esc(value)}</span>`;
+  setTimeout(() => { cell.textContent = "••••••••"; }, 30000);       // hidden again after 30 s
+}
+$("mon").onclick = async ev => {
+  const b = ev.target.closest("button[data-act]");
+  if (!b) return;
+  const tr = b.closest("[data-k]"), key = tr.dataset.k;
+  try {
+    if (b.dataset.act === "mreveal") {
+      const r = await send("/api/access/passwords/monitoring/reveal", { key });
+      const out = tr.querySelector(".out"); out.innerHTML = ` <span class="secret">${esc(r.value)}</span>`;
+      setTimeout(() => { out.innerHTML = ""; }, 30000);
+    } else if (b.dataset.act === "mchange") {
+      const box = tr.querySelector(".edit"); box.style.display = "";
+      box.innerHTML = `<div class="row" style="margin-top:6px"><input class="input" type="password" autocomplete="new-password" placeholder="New password" data-v1 style="max-width:170px">
+        <input class="input" type="password" autocomplete="new-password" placeholder="Again" data-v2 style="max-width:170px">
+        <button class="btn btn-primary" data-act="msave">Save</button></div>`;
+    } else if (b.dataset.act === "msave") {
+      await send("/api/access/passwords/monitoring", { key, value: tr.querySelector("[data-v1]").value, again: tr.querySelector("[data-v2]").value });
+      say("mon-msg", true, `${esc(key)} changed. IBOPS uses it from the next logon; Basis got a notice.`);
+      load();
+    }
+  } catch (e) { say("mon-msg", false, esc(e.message)); }
+};
+$("vault").onclick = async ev => {
+  const b = ev.target.closest("button[data-act]");
+  if (!b) return;
+  const tr = b.closest("tr"), id = tr.dataset.id;
+  try {
+    if (b.dataset.act === "vreveal") {
+      const r = await send(`/api/access/vault/${id}/reveal`);
+      showSecret(tr.querySelector(".pw"), r.value);
+    } else if (b.dataset.act === "vchange") {
+      const v = prompt("New password for this login:");
+      if (!v) return;
+      await send(`/api/access/vault/${id}`, { password: v });
+      say("v-msg", true, "Password changed.");
+    } else if (b.dataset.act === "vdel") {
+      if (!confirm("Delete this saved login?")) return;
+      await send(`/api/access/vault/${id}/delete`);
+      load();
+    }
+  } catch (e) { say("v-msg", false, esc(e.message)); }
+};
+
+/* ---------------- audit */
+async function renderAudit() {
+  $("audit-card").style.display = P.can_see_audit ? "" : "none";
+  if (!P.can_see_audit) return;
+  const a = await IB.get("/api/access/audit?limit=300");
+  $("audit").innerHTML = a.rows.length ? `<table><thead><tr><th>When</th><th>Who</th><th>What</th><th>On</th><th>Detail</th></tr></thead><tbody>
+    ${a.rows.map(r => `<tr><td class="mono">${esc(r.at)}</td><td>${esc(r.actor)}</td><td><b>${esc(r.action)}</b></td>
+      <td>${esc(r.target)}</td><td class="dim">${esc(r.detail)}</td></tr>`).join("")}</tbody></table>`
+    : `<div class="empty">Nothing yet.</div>`;
+}
+
+async function load() {
+  try {
+    [P, W, TEAM] = await Promise.all([IB.get("/api/projects"), IB.get("/api/access/passwords"),
+                                      IB.get("/api/team").catch(() => null)]);
+    renderProjects(); renderPasswords(); await renderPerm(); await renderAudit();
+    if (location.hash === "#perm") $("perm-card").scrollIntoView();
+  } catch (e) {
+    $("banner").innerHTML = `<div class="banner banner-err">Could not load: ${esc(e.message)}</div>`;
+  }
+}
+load();
+</script>
+</body>
+</html>
